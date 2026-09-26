@@ -22,6 +22,7 @@ import soundfile as sf
 import torch
 
 from sglang_omni.client.client import build_params
+from sglang_omni.config import FactoryArgs
 from sglang_omni.models.minicpm_o import stages
 from sglang_omni.models.minicpm_o.components.code2wav import (
     SAMPLES_PER_CODEC_TOKEN,
@@ -56,9 +57,9 @@ class Code2WavBuilder(Protocol):
     def __call__(
         self,
         *,
-        reference_workers: int = 8,
-        prompt_cache_capacity: int = 32,
-        enable_flow_variable_length: bool = False,
+        reference_workers: int = ...,
+        prompt_cache_capacity: int = ...,
+        enable_flow_variable_length: bool = ...,
     ) -> MiniCPMOCode2Wav: ...
 
 
@@ -143,7 +144,7 @@ def fake_token2wav(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> MagicMock
 
 @pytest.fixture
 def build_code2wav_model(
-    tmp_path: Path, fake_token2wav: MagicMock, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, fake_token2wav: MagicMock
 ) -> Iterator[Code2WavBuilder]:
     default_reference_path = tmp_path / "default.wav"
     default_reference_path.write_bytes(DEFAULT_REFERENCE_AUDIO)
@@ -155,12 +156,12 @@ def build_code2wav_model(
         prompt_cache_capacity: int = 32,
         enable_flow_variable_length: bool = False,
     ) -> MiniCPMOCode2Wav:
-        monkeypatch.setenv("MINICPMO_REF_WORKERS", str(reference_workers))
-        monkeypatch.setenv("MINICPMO_PROMPT_CACHE_CAPACITY", str(prompt_cache_capacity))
         model = MiniCPMOCode2Wav(
             str(tmp_path),
             prompt_wav=str(default_reference_path),
             enable_flow_variable_length=enable_flow_variable_length,
+            reference_workers=reference_workers,
+            prompt_cache_capacity=prompt_cache_capacity,
         )
         built_models.append(model)
         return model
@@ -227,13 +228,21 @@ def require_checkpoint_dir() -> Path:
     return checkpoint
 
 
+def code2wav_stage_factory() -> FactoryArgs:
+    config = MiniCPMOSpeechPipelineConfig(model_path="unused")
+    return next(stage for stage in config.stages if stage.name == "code2wav").factory
+
+
 def load_checkpoint_model(
     checkpoint: Path, *, enable_flow_variable_length: bool = False
 ) -> MiniCPMOCode2Wav:
+    factory = code2wav_stage_factory()
     return MiniCPMOCode2Wav(
         str(checkpoint),
         device="cuda:0",
         enable_flow_variable_length=enable_flow_variable_length,
+        reference_workers=factory.reference_workers,
+        prompt_cache_capacity=factory.prompt_cache_capacity,
     )
 
 
@@ -375,13 +384,14 @@ def test_variable_length_option_reaches_dit(
 
 
 def test_speech_pipeline_enables_code2wav_batching_by_default() -> None:
-    config = MiniCPMOSpeechPipelineConfig(model_path="unused")
-    code2wav = next(stage for stage in config.stages if stage.name == "code2wav")
-    assert code2wav.factory.max_batch_size == 8
-    assert code2wav.factory.max_batch_wait_ms == 0.0
-    assert code2wav.factory.batch_wait_when_idle is False
-    assert code2wav.factory.dtype is None
-    assert code2wav.factory.enable_flow_variable_length is True
+    factory = code2wav_stage_factory()
+    assert factory.max_batch_size == 8
+    assert factory.max_batch_wait_ms == 0.0
+    assert factory.batch_wait_when_idle is False
+    assert factory.dtype is None
+    assert factory.enable_flow_variable_length is True
+    assert factory.reference_workers == 8
+    assert factory.prompt_cache_capacity == 32
 
 
 @pytest.mark.parametrize(
@@ -552,7 +562,15 @@ def test_stage_stop_rejects_new_reference_preparation(
 ) -> None:
     model = build_code2wav_model()
     monkeypatch.setattr(stages, "MiniCPMOCode2Wav", MagicMock(return_value=model))
-    scheduler = stages.create_code2wav_executor("unused", device="cuda", gpu_id=0)
+    factory = code2wav_stage_factory()
+    scheduler = stages.create_code2wav_executor(
+        "unused",
+        device="cuda",
+        gpu_id=0,
+        enable_flow_variable_length=factory.enable_flow_variable_length,
+        reference_workers=factory.reference_workers,
+        prompt_cache_capacity=factory.prompt_cache_capacity,
+    )
     scheduler.stop()
     with pytest.raises(RuntimeError):
         model.prepare_references([b"a", b"b"])
@@ -560,19 +578,18 @@ def test_stage_stop_rejects_new_reference_preparation(
 
 
 @pytest.mark.parametrize(
-    "name", ["MINICPMO_REF_WORKERS", "MINICPMO_PROMPT_CACHE_CAPACITY"]
+    ("reference_workers", "prompt_cache_capacity"), [(0, 32), (8, 0)]
 )
-@pytest.mark.parametrize("value", ["0", "abc"])
-def test_reference_configuration_rejects_invalid_values(
-    tmp_path: Path,
-    fake_token2wav: MagicMock,
-    monkeypatch: pytest.MonkeyPatch,
-    name: str,
-    value: str,
+def test_reference_configuration_rejects_non_positive_values(
+    build_code2wav_model: Code2WavBuilder,
+    reference_workers: int,
+    prompt_cache_capacity: int,
 ) -> None:
-    monkeypatch.setenv(name, value)
-    with pytest.raises(ValueError, match=name):
-        MiniCPMOCode2Wav(str(tmp_path))
+    with pytest.raises(ValueError, match="must be positive"):
+        build_code2wav_model(
+            reference_workers=reference_workers,
+            prompt_cache_capacity=prompt_cache_capacity,
+        )
 
 
 def test_vocode_payloads_returns_each_row_with_its_reference(
