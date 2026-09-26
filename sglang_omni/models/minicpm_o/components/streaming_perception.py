@@ -5,10 +5,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from io import BytesIO
 from typing import Literal, Protocol, TypedDict
 
 import numpy as np
 import torch
+from PIL import Image
 from transformers import PreTrainedTokenizerBase
 
 from sglang_omni.models.minicpm_o.components.audio_encoder import MiniCPMOAudioEncoder
@@ -21,6 +23,20 @@ SAMPLE_RATE = 16000
 UNIT_MS = 1000
 FIRST_CHUNK_MS = 1035
 UNIT_DECODE_BUDGET = 20
+IMAGE_TOKENS = 64
+MAX_FRAME_PIXELS = 4096 * 4096
+
+
+class ImageEncoder(Protocol):
+    def __call__(
+        self, *, pixel_values: list[torch.Tensor], tgt_sizes: torch.Tensor
+    ) -> dict[str, torch.Tensor]:
+        pass
+
+
+class ImageFeatureBatch(TypedDict):
+    pixel_values: list[list[torch.Tensor]]
+    tgt_sizes: list[torch.Tensor]
 
 
 class StreamingMelProcessor(Protocol):
@@ -46,6 +62,11 @@ class StreamingAudioProcessor(Protocol):
     ) -> None:
         pass
 
+    def process_image(
+        self, images: list[Image.Image], *, max_slice_nums: int
+    ) -> ImageFeatureBatch:
+        pass
+
     def get_streaming_chunk_size(self) -> int:
 
         pass
@@ -67,7 +88,7 @@ class ProcessorFactory(Protocol):
 
 
 class EmbeddingSpanPlan(TypedDict):
-    modality: Literal["audio"]
+    modality: Literal["audio", "image"]
     token_start: int
     token_end: int
     embed_start: int
@@ -78,7 +99,7 @@ class PerceptionStepPlan(TypedDict):
     token_ids: list[int]
     input_embeds: torch.Tensor
     embedding_spans: list[EmbeddingSpanPlan]
-    prefill_schema: list[tuple[Literal["tok", "audio"], int]]
+    prefill_schema: list[tuple[Literal["tok", "audio", "image"], int]]
     decode_budget: int
 
 
@@ -113,6 +134,7 @@ class MiniCPMOPerceptionState:
     tokenizer: PreTrainedTokenizerBase
     processor: StreamingAudioProcessor
     audio_encoder: MiniCPMOAudioEncoder
+    image_encoder: ImageEncoder | None = None
     audio_buffer: np.ndarray = field(
         default_factory=lambda: np.zeros(0, dtype=np.float32)
     )
@@ -134,6 +156,7 @@ class MiniCPMOPerceptionState:
         audio_encoder: MiniCPMOAudioEncoder,
         prompt: str,
         reference_audio: str | None,
+        image_encoder: ImageEncoder | None = None,
     ) -> MiniCPMOPerceptionState:
         processor.set_streaming_mode(
             mode="exact",
@@ -145,7 +168,10 @@ class MiniCPMOPerceptionState:
             slide_stride_seconds=10.0,
         )
         state = cls(
-            tokenizer=tokenizer, processor=processor, audio_encoder=audio_encoder
+            tokenizer=tokenizer,
+            processor=processor,
+            audio_encoder=audio_encoder,
+            image_encoder=image_encoder,
         )
         prompt_ids = list(
             tokenizer.encode(
@@ -249,12 +275,33 @@ class MiniCPMOPerceptionState:
         self.audio_chunk_idx += 1
         return audio_embeds
 
-    def build_step_plan(self, audio_embeds: torch.Tensor) -> PerceptionStepPlan:
+    def encode_image(self, encoded_image: bytes) -> torch.Tensor:
+        with Image.open(BytesIO(encoded_image)) as image:
+            if image.format not in ("JPEG", "PNG"):
+                raise ValueError("unit image must be JPEG or PNG")
+            elif image.width * image.height > MAX_FRAME_PIXELS:
+                raise ValueError("unit image exceeds pixel limit")
+            else:
+                frame = image.convert("RGB")
+        processed = self.processor.process_image([frame], max_slice_nums=1)
+        assert self.image_encoder is not None
+        image_embeds = self.image_encoder(
+            pixel_values=processed["pixel_values"][0],
+            tgt_sizes=processed["tgt_sizes"][0],
+        )["image_embeds"]
+        assert image_embeds.ndim == 2 and image_embeds.shape[0] == IMAGE_TOKENS
+        return image_embeds
+
+    def build_step_plan(
+        self, audio_embeds: torch.Tensor, image_embeds: torch.Tensor | None = None
+    ) -> PerceptionStepPlan:
         token_ids: list[int] = []
         embed_blocks: list[torch.Tensor] = []
         spans: list[EmbeddingSpanPlan] = []
 
-        def add_embeds(values: torch.Tensor) -> None:
+        def add_embeds(
+            values: torch.Tensor, modality: Literal["audio", "image"] = "audio"
+        ) -> None:
             start = len(token_ids)
             count = int(values.shape[0])
             embed_start = sum(int(block.shape[0]) for block in embed_blocks)
@@ -262,7 +309,7 @@ class MiniCPMOPerceptionState:
             embed_blocks.append(values)
             spans.append(
                 EmbeddingSpanPlan(
-                    modality="audio",
+                    modality=modality,
                     token_start=start,
                     token_end=start + count,
                     embed_start=embed_start,
@@ -286,11 +333,25 @@ class MiniCPMOPerceptionState:
             pass
 
         token_ids.append(self.tokenizer.convert_tokens_to_ids("<unit>"))
+        schema: list[tuple[Literal["tok", "audio", "image"], int]]
+        if image_embeds is None:
+            schema = [("tok", 1), ("audio", int(audio_embeds.shape[0]))]
+        else:
+            assert image_embeds.shape == (IMAGE_TOKENS, audio_embeds.shape[1])
+            token_ids.append(self.tokenizer.convert_tokens_to_ids("<image>"))
+            add_embeds(image_embeds, "image")
+            token_ids.append(self.tokenizer.convert_tokens_to_ids("</image>"))
+            schema = [
+                ("tok", 2),
+                ("image", IMAGE_TOKENS),
+                ("tok", 1),
+                ("audio", int(audio_embeds.shape[0])),
+            ]
         add_embeds(audio_embeds)
         return PerceptionStepPlan(
             token_ids=token_ids,
             input_embeds=torch.cat(embed_blocks, dim=0),
             embedding_spans=spans,
-            prefill_schema=[("tok", 1), ("audio", int(audio_embeds.shape[0]))],
+            prefill_schema=schema,
             decode_budget=UNIT_DECODE_BUDGET,
         )

@@ -1,15 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
 """Model computations executed by the shared session stage scheduler."""
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+from PIL import Image
 from pydantic import JsonValue
 from transformers import AutoProcessor, AutoTokenizer, PreTrainedTokenizerBase
 
 from sglang_omni.models.minicpm_o.components.audio_encoder import MiniCPMOAudioEncoder
 from sglang_omni.models.minicpm_o.components.code2wav import MiniCPMOCode2Wav
+from sglang_omni.models.minicpm_o.components.image_encoder import MiniCPMOImageEncoder
 from sglang_omni.models.minicpm_o.components.streaming_perception import (
     MiniCPMOPerceptionState,
     ProcessorFactory,
@@ -30,6 +33,8 @@ from sglang_omni.scheduling.session import (
 )
 from sglang_omni.utils.device import resolve_concrete_device
 
+logger = logging.getLogger(__name__)
+
 
 class PerceptionHooks(SessionHooks):
     def __init__(
@@ -38,11 +43,13 @@ class PerceptionHooks(SessionHooks):
         processor_factory: ProcessorFactory,
         audio_encoder: MiniCPMOAudioEncoder,
         reference_audio: str | None = None,
+        image_encoder: MiniCPMOImageEncoder | None = None,
     ) -> None:
         self.tokenizer = tokenizer
         self.processor_factory = processor_factory
         self.audio_encoder = audio_encoder
         self.reference_audio = reference_audio
+        self.image_encoder = image_encoder
         self.states: dict[SessionIdentity, MiniCPMOPerceptionState] = {}
 
     def open(self, session_identity: SessionIdentity, request: OmniRequest) -> None:
@@ -52,6 +59,7 @@ class PerceptionHooks(SessionHooks):
             audio_encoder=self.audio_encoder,
             prompt=request.params.get("instructions", ""),
             reference_audio=self.reference_audio,
+            image_encoder=self.image_encoder,
         )
 
     def append(
@@ -61,8 +69,29 @@ class PerceptionHooks(SessionHooks):
             payload.data = None
         else:
             state = self.states[context.session_identity]
-            pcm = np.frombuffer(chunk.payload, dtype="<i2").astype(np.float32) / 32768.0
-            payload.data = state.build_step_plan(state.encode_audio(pcm))
+            if isinstance(chunk.payload, dict):
+                # Note (Junnan Li): The frame is client data acknowledged before decoding;
+                # an undecodable frame is dropped so the unit still runs on its audio.
+                try:
+                    image_embeds = state.encode_image(chunk.payload["image"])
+                except (OSError, ValueError, Image.DecompressionBombError) as exc:
+                    logger.warning(
+                        f"Dropping undecodable frame of unit {chunk.seq}: {exc}"
+                    )
+                    image_embeds = None
+                pcm = (
+                    np.frombuffer(chunk.payload["pcm"], dtype="<i2").astype(np.float32)
+                    / 32768.0
+                )
+                payload.data = state.build_step_plan(
+                    state.encode_audio(pcm), image_embeds
+                )
+            else:
+                pcm = (
+                    np.frombuffer(chunk.payload, dtype="<i2").astype(np.float32)
+                    / 32768.0
+                )
+                payload.data = state.build_step_plan(state.encode_audio(pcm))
         return payload
 
     def close(self, session_identity: SessionIdentity) -> None:
@@ -156,13 +185,14 @@ def create_perception_scheduler(
 ) -> SessionScheduler:
     """Build perception; extra factory options follow the stage loader contract."""
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-    encoder = MiniCPMOAudioEncoder(
-        model_path, device=str(resolve_concrete_device(device, gpu_id)), dtype=dtype
-    )
+    device = str(resolve_concrete_device(device, gpu_id))
+    encoder = MiniCPMOAudioEncoder(model_path, device=device, dtype=dtype)
+    image_encoder = MiniCPMOImageEncoder(model_path, device=device, dtype=dtype)
     hooks = PerceptionHooks(
         tokenizer,
         lambda: AutoProcessor.from_pretrained(model_path, trust_remote_code=True),
         encoder,
+        image_encoder=image_encoder,
         reference_audio=reference_audio
         or str(Path(resolve_model_path(model_path)) / "assets" / "HT_ref_audio.wav"),
     )

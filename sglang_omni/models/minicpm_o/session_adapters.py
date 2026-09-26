@@ -227,6 +227,7 @@ def build_realtime_deployment(
             native_unit_ms=1000,
             output_sample_rate_hz=24000,
             output_modalities=("audio", "text"),
+            input_modalities=("audio", "image"),
             tail_policy="pad",
         ),
         factory,

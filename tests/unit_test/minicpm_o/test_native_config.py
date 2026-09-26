@@ -161,6 +161,7 @@ def test_duplex_yaml_session_limits(
     hooks = SessionHooks()
     monkeypatch.setattr(native_stages.AutoTokenizer, "from_pretrained", Mock())
     monkeypatch.setattr(native_stages, "MiniCPMOAudioEncoder", Mock())
+    monkeypatch.setattr(native_stages, "MiniCPMOImageEncoder", Mock())
     monkeypatch.setattr(native_stages, "PerceptionHooks", Mock(return_value=hooks))
     monkeypatch.setattr(native_stages, "MiniCPMOCode2Wav", Mock())
     monkeypatch.setattr(native_stages, "MiniCPMOVocoderRuntime", Mock())

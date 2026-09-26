@@ -35,7 +35,7 @@ class DuplexUnitRequestData(SGLangARRequestData):
     """One bounded generated unit appended to an SGLang streaming session."""
 
     thinker_state: MiniCPMOThinkerSessionState | None = None
-    prefill_schema: list[tuple[Literal["tok", "audio"], int]] = field(
+    prefill_schema: list[tuple[Literal["tok", "audio", "image"], int]] = field(
         default_factory=list
     )
     unit_pairs: list[tuple[int, torch.Tensor, bool]] = field(default_factory=list)
