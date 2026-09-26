@@ -6,6 +6,8 @@ from __future__ import annotations
 import hashlib
 import inspect
 import json
+import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -13,10 +15,17 @@ import pytest
 from transformers import AutoConfig
 from transformers.models.auto.configuration_auto import CONFIG_MAPPING
 
+from sglang_omni.config.manager import ConfigManager
+from sglang_omni.config.runtime import (
+    apply_typed_stage_kwargs,
+    resolve_stage_typed_kwargs,
+)
 from sglang_omni.models.minicpm_o import engine_builder, native_stages, stages
 from sglang_omni.models.minicpm_o.components import audio_encoder, image_encoder
 from sglang_omni.models.minicpm_o.hf_config import MiniCPMOConfig
+from sglang_omni.models.minicpm_o.session_adapters import build_realtime_deployment
 from sglang_omni.scheduling import sglang_backend
+from sglang_omni.scheduling.session import SessionHooks
 
 
 class ConfigLoaded(Exception):
@@ -120,6 +129,80 @@ def test_engine_factory_resolves_native_config_before_server_args(
         factory(str(snapshot), server_args_overrides=overrides)
 
 
+@pytest.mark.parametrize(
+    ("settings", "sessions", "state_bytes", "thinker", "talker"),
+    [
+        ("", 2, 4 << 30, 4, 32),
+        ("max_sessions: 8\n", 8, 16 << 30, 9, 32),
+        (
+            "max_sessions: 64\nspeech_state_bytes_per_session: 1024\n",
+            64,
+            65536,
+            65,
+            65,
+        ),
+    ],
+)
+def test_duplex_yaml_session_limits(
+    settings: str,
+    sessions: int,
+    state_bytes: int,
+    thinker: int,
+    talker: int,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = tmp_path / "duplex.yaml"
+    config_path.write_text(
+        "config_cls: MiniCPMODuplexPipelineConfig\n"
+        "model_path: unused\nreference_audio: reference.wav\n" + settings
+    )
+    config = ConfigManager.from_file(str(config_path)).config
+    hooks = SessionHooks()
+    monkeypatch.setattr(native_stages.AutoTokenizer, "from_pretrained", Mock())
+    monkeypatch.setattr(native_stages, "MiniCPMOAudioEncoder", Mock())
+    monkeypatch.setattr(native_stages, "PerceptionHooks", Mock(return_value=hooks))
+    monkeypatch.setattr(native_stages, "MiniCPMOCode2Wav", Mock())
+    monkeypatch.setattr(native_stages, "MiniCPMOVocoderRuntime", Mock())
+    monkeypatch.setattr(native_stages, "SpeechHooks", Mock(return_value=hooks))
+    perception = native_stages.create_perception_scheduler(
+        config.model_path, device="cpu", **config.stage_factory_kwargs("perception")
+    )
+    speech = native_stages.create_speech_scheduler(
+        config.model_path, device="cpu", **config.stage_factory_kwargs("speech")
+    )
+    for scheduler in (perception, speech):
+        assert scheduler.max_open_sessions == sessions
+        assert scheduler.max_concurrency == 1
+    assert speech.max_state_bytes == state_bytes
+    assert build_realtime_deployment(Mock(), config).max_connections == sessions
+    assert config.stage_factory_kwargs("thinker")["server_args_overrides"] == {
+        "max_running_requests": thinker
+    }
+    assert config.stage_factory_kwargs("talker")["server_args_overrides"] == {
+        "max_running_requests": talker
+    }
+
+
+@pytest.mark.parametrize("stage_name", ["thinker", "talker"])
+def test_duplex_engine_override_wins(stage_name: str, tmp_path: Path) -> None:
+    config_path = tmp_path / "duplex.yaml"
+    config_path.write_text(
+        "config_cls: MiniCPMODuplexPipelineConfig\nmodel_path: unused\n"
+        "max_sessions: 8\nstages:\n"
+        f"  {stage_name}:\n    engine:\n      max_running_requests: 3\n"
+    )
+    config = ConfigManager.from_file(str(config_path)).config
+    stage = config.stage_named(stage_name)
+    kwargs = apply_typed_stage_kwargs(
+        native_stages.create_thinker_scheduler,
+        config.stage_factory_kwargs(stage_name),
+        resolve_stage_typed_kwargs(stage),
+        stage_name=stage_name,
+    )
+    assert kwargs["server_args_overrides"]["max_running_requests"] == 3
+
+
 @pytest.mark.parametrize("context_length", [None, 32768])
 def test_native_thinker_context_length(
     context_length: int | None, snapshot: Path, monkeypatch: pytest.MonkeyPatch
@@ -140,3 +223,24 @@ def test_native_engine_factories_declare_the_placement_fraction() -> None:
         native_stages.create_talker_scheduler,
     ):
         assert "total_gpu_memory_fraction" in inspect.signature(factory).parameters
+
+
+def test_minicpmo_configs_load_without_sglang(tmp_path: Path) -> None:
+    config_path = tmp_path / "duplex.yaml"
+    script = """
+import sys
+from pathlib import Path
+sys.modules["sglang"] = None
+from sglang_omni.config.manager import ConfigManager
+for name in ("MiniCPMODuplexPipelineConfig", "MiniCPMOPipelineConfig", "MiniCPMOSpeechPipelineConfig"):
+    Path(sys.argv[1]).write_text(f"config_cls: {name}\\nmodel_path: unused\\n")
+    config = ConfigManager.from_file(sys.argv[1]).config
+    assert type(config).__name__ == name
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script, str(config_path)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr

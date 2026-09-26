@@ -12,6 +12,7 @@ from sglang_omni.client.client import Client
 from sglang_omni.models.minicpm_o.components.streaming_perception import (
     PerceptionStepPlan,
 )
+from sglang_omni.models.minicpm_o.native_config import MiniCPMODuplexPipelineConfig
 from sglang_omni.models.minicpm_o.special_tokens import (
     MiniCPMOSpecialTokenIds,
     resolve_special_token_ids,
@@ -198,7 +199,9 @@ class OutputConverter:
         return events
 
 
-def build_realtime_deployment(client: Client) -> RealtimeDeployment:
+def build_realtime_deployment(
+    client: Client, config: MiniCPMODuplexPipelineConfig
+) -> RealtimeDeployment:
 
     def factory() -> CoordinatorAdapter:
         return CoordinatorAdapter(
@@ -227,5 +230,5 @@ def build_realtime_deployment(client: Client) -> RealtimeDeployment:
             tail_policy="pad",
         ),
         factory,
-        max_connections=2,
+        max_connections=config.max_sessions,
     )

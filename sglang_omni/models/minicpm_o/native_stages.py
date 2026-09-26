@@ -151,6 +151,7 @@ def create_perception_scheduler(
     gpu_id: int | None = None,
     dtype: str = "bfloat16",
     reference_audio: str | None = None,
+    max_open_sessions: int,
     **kwargs: JsonValue,
 ) -> SessionScheduler:
     """Build perception; extra factory options follow the stage loader contract."""
@@ -165,7 +166,9 @@ def create_perception_scheduler(
         reference_audio=reference_audio
         or str(Path(resolve_model_path(model_path)) / "assets" / "HT_ref_audio.wav"),
     )
-    return SessionScheduler(hooks, max_open_sessions=2, max_concurrency=1)
+    return SessionScheduler(
+        hooks, max_open_sessions=max_open_sessions, max_concurrency=1
+    )
 
 
 def create_thinker_scheduler(
@@ -194,6 +197,8 @@ def create_speech_scheduler(
     gpu_id: int | None = None,
     dtype: str = "bfloat16",
     reference_audio: str | None = None,
+    max_open_sessions: int,
+    max_state_bytes: int,
     **kwargs: JsonValue,
 ) -> SessionScheduler:
     """Build speech; dtype and extra options follow the stage loader contract."""
@@ -202,10 +207,9 @@ def create_speech_scheduler(
     runtime = MiniCPMOVocoderRuntime(codec.token2wav)
     return SessionScheduler(
         SpeechHooks(runtime, codec.default_prompt_wav),
-        max_open_sessions=2,
+        max_open_sessions=max_open_sessions,
         max_concurrency=1,
-        # note (Junnan Li): Each speaker retains both reference and working flow caches.
-        max_state_bytes=4 << 30,
+        max_state_bytes=max_state_bytes,
     )
 
 

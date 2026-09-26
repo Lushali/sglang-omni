@@ -17,7 +17,10 @@ from sglang.srt.managers.io_struct import (
 from sglang.srt.managers.schedule_batch import FINISH_ABORT, Req
 from sglang.srt.session.session_controller import SessionController
 
-from sglang_omni.admission import QueueFullError
+from sglang_omni.admission import (
+    REQUEST_TO_TOKEN_SLOTS_RESERVED_FOR_RETAINED_KV,
+    QueueFullError,
+)
 from sglang_omni.profiler.event_recorder import get_active_stage
 from sglang_omni.proto.request import OmniRequest, StagePayload
 from sglang_omni.proto.session import (
@@ -34,7 +37,6 @@ from sglang_omni.scheduling.sglang_backend.request_data import (
 from sglang_omni.scheduling.types import RequestOutput
 
 SESSION_STRING_LENGTH_LIMIT_CHARACTERS = 0
-REQUEST_TO_TOKEN_SLOTS_RESERVED_FOR_RETAINED_KV = 1
 
 
 class SessionKV(Protocol):

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+REQUEST_TO_TOKEN_SLOTS_RESERVED_FOR_RETAINED_KV = 1
+
 
 class QueueFullError(RuntimeError):
     """A serving queue is at capacity (HTTP 503)."""

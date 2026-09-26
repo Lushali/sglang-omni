@@ -16,6 +16,12 @@ The `MiniCPMODuplexPipelineConfig` is also available as the `session` model vari
 The existing `text` and `speech` variants keep their ordinary request pipelines.
 An optional top-level `reference_audio` path supplies the reference for both
 perception and speech; the default is the checkpoint's `assets/HT_ref_audio.wav`.
+Set `max_sessions` and `speech_state_bytes_per_session` in `minicpmo.yaml` to
+adjust session capacity and the speech memory budget per session (defaults: 2
+and 2 GiB). Perception and speech each process one unit at a time. Engine request
+limits are `max(engine default, max_sessions + 1)`, reserving one slot for retained
+KV; engine defaults are 4 for thinker and 32 for talker. Explicit `engine` overrides
+take precedence.
 
 The native path accepts mono PCM16 at 16 kHz and emits 24 kHz audio and text over
 `/v1/realtime`. It processes one-second units with session-resident encoder,
