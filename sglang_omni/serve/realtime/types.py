@@ -63,6 +63,8 @@ class Capabilities:
     native_unit_ms: int = 20
     tail_policy: TailPolicy = "flush"
     partial_style: PartialStyle = "append_only"
+    input_modalities: tuple[str, ...] = ("audio",)
+    max_image_bytes: int = 512 * 1024
 
     def __post_init__(self) -> None:
         if self.interaction != "native":
@@ -75,6 +77,8 @@ class Capabilities:
             raise ValueError("positive rates and cadence required")
         elif self.input_sample_rate_hz * self.native_unit_ms % MS_PER_SECOND:
             raise ValueError("native cadence must contain whole samples")
+        elif self.max_image_bytes <= 0:
+            raise ValueError("positive image byte limit required")
         elif self.tail_policy not in get_args(TailPolicy):
             raise ValueError("unsupported tail policy")
         elif (
@@ -96,13 +100,13 @@ class Capabilities:
         return samples_to_ms(sample_count, self.input_sample_rate_hz)
 
     def to_granted_capabilities(self) -> GrantedCapabilities:
-        return dict(
+        granted: GrantedCapabilities = dict(
             interaction=self.interaction,
             native_full_duplex=self.interaction == "native",
             proactive_output=False,
             turn_control=[None],
             client_commit=False,
-            input_modalities=["audio"],
+            input_modalities=list(self.input_modalities),
             output_modalities=list(self.output_modalities),
             input_audio_format=dict(type="audio/pcm", rate=self.input_sample_rate_hz),
             output_audio_format=dict(type="audio/pcm", rate=self.output_sample_rate_hz),
@@ -118,6 +122,16 @@ class Capabilities:
             strict_order=True,
         )
 
+        if "image" in self.input_modalities:
+            granted["input_image_format"] = dict(
+                types=["image/jpeg", "image/png"],
+                max_bytes=self.max_image_bytes,
+                max_per_unit=1,
+            )
+        else:
+            pass
+        return granted
+
 
 @dataclass(frozen=True)
 class Unit:
@@ -127,6 +141,7 @@ class Unit:
     real_samples: int
     eos: bool = False
     output_modalities: tuple[str, ...] | None = None
+    image: bytes | None = None
 
     @property
     def unit_id(self) -> str:

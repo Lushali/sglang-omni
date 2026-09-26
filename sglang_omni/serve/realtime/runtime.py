@@ -20,6 +20,7 @@ from sglang_omni.serve.realtime.control import (
     Drained,
     Ended,
     Failure,
+    ImageAccepted,
     UnitCompleted,
     Updated,
 )
@@ -45,6 +46,7 @@ from sglang_omni.serve.realtime.types import (
 
 logger = logging.getLogger(__name__)
 
+MAX_FRAME_LOOKAHEAD_UNITS = 2
 MAX_FAILURE_MESSAGE_CHARS = 512
 MEDIA_TIME_TOLERANCE_MS = 1e-7
 
@@ -75,6 +77,7 @@ class SessionRuntime:
         self.discarded_samples = 0
         self.padding_samples = 0
         self.pending_pcm = bytearray()
+        self.pending_frames: dict[int, bytes] = {}
         self.next_unit_index = 0
         self.is_input_ended = False
         self.end_event_id: str | None = None
@@ -226,12 +229,43 @@ class SessionRuntime:
             )
             self.input_ready.set()
 
+    async def append_image(self, image: bytes, t_ms: float, event_id: str) -> None:
+        async with self.command_lock:
+            self.require_open()
+            unit_index = math.floor(t_ms / self.capabilities.native_unit_ms)
+            accepted_units = math.ceil(
+                self.capabilities.input_duration_ms(self.accepted_samples)
+                / self.capabilities.native_unit_ms
+            )
+            if "image" not in self.capabilities.input_modalities:
+                raise ProtocolError("not_supported", "image input is not granted")
+            elif self.is_input_ended:
+                raise ProtocolError("invalid_state", "input has ended")
+            elif len(image) > self.capabilities.max_image_bytes:
+                raise ProtocolError(
+                    "buffer_overflow", "image exceeds input budget", "image"
+                )
+            elif not image.startswith((b"\xff\xd8", b"\x89PNG")):
+                raise ProtocolError(
+                    "invalid_request", "image must be JPEG or PNG", "image"
+                )
+            elif unit_index < self.next_unit_index:
+                raise ProtocolError("invalid_state", "frame unit already cut")
+            elif unit_index in self.pending_frames:
+                raise ProtocolError("invalid_state", "unit already has a frame")
+            elif unit_index > accepted_units + MAX_FRAME_LOOKAHEAD_UNITS:
+                raise ProtocolError("buffer_overflow", "frame exceeds lookahead budget")
+            else:
+                self.pending_frames[unit_index] = image
+                self.notify(ImageAccepted(f"unit_{unit_index}", event_id))
+
     async def clear(self, event_id: str) -> None:
         async with self.command_lock:
             self.require_open()
             assert self.adapter is not None
             cleared_samples = self.pending_samples + await self.adapter.clear()
             self.pending_pcm.clear()
+            self.pending_frames.clear()
             self.discarded_samples += cleared_samples
             self.notify(
                 Cleared(self.capabilities.input_duration_ms(cleared_samples), event_id)
@@ -285,6 +319,7 @@ class SessionRuntime:
             real_samples,
             self.is_input_ended and not self.pending_pcm,
             tuple(self.granted["output_modalities"]),
+            image=self.pending_frames.pop(self.next_unit_index, None),
         )
         self.next_unit_index += 1
         return unit
@@ -386,6 +421,7 @@ class SessionRuntime:
         # teardown can run a VAD callback that must observe CLOSING.
         async with self.command_lock:
             self.state = "CLOSING"
+            self.pending_frames.clear()
         self.discarded_samples += self.pending_samples
         self.pending_pcm.clear()
         self.input_ready.set()

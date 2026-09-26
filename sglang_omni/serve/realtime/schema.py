@@ -22,6 +22,12 @@ class AudioFormat(TypedDict):
     rate: int
 
 
+class ImageFormat(TypedDict):
+    types: list[str]
+    max_bytes: int
+    max_per_unit: int
+
+
 class TurnDetectionConfig(TypedDict, total=False):
     type: str
     threshold: float | None
@@ -80,6 +86,7 @@ class GrantedCapabilities(TypedDict, total=False):
     client_commit: bool
     input_modalities: list[str]
     output_modalities: list[str]
+    input_image_format: ImageFormat
     input_audio_format: AudioFormat
     output_audio_format: AudioFormat
     native_unit_ms: int
@@ -130,6 +137,18 @@ class AudioAppendEvent(ClientEvent):
     sglang: AppendMetadata
 
 
+class ImageAppendMetadata(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+
+    t_ms: float
+
+
+class ImageAppendEvent(ClientEvent):
+    type: Literal["sglang.input_image.append"]
+    image: str
+    sglang: ImageAppendMetadata
+
+
 class SessionCommandEvent(ClientEvent):
     type: Literal[
         "input_audio_buffer.clear",
@@ -141,10 +160,10 @@ class SessionCommandEvent(ClientEvent):
 
 
 CLIENT_EVENT: TypeAdapter[
-    SessionUpdateEvent | AudioAppendEvent | SessionCommandEvent
+    SessionUpdateEvent | AudioAppendEvent | ImageAppendEvent | SessionCommandEvent
 ] = TypeAdapter(
     Annotated[
-        SessionUpdateEvent | AudioAppendEvent | SessionCommandEvent,
+        SessionUpdateEvent | AudioAppendEvent | ImageAppendEvent | SessionCommandEvent,
         Field(discriminator="type"),
     ]
 )
