@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Build the native duplex thinker on the shared generation engine."""
 
+from typing import ClassVar
+
 from sglang.srt.configs.model_config import ModelConfig
 from sglang.srt.mem_cache.allocator.base import BaseTokenToKVPoolAllocator
 from sglang.srt.mem_cache.base_prefix_cache import BasePrefixCache
@@ -28,6 +30,7 @@ class MiniCPMOThinkerEngineBuilder(SGLangGenerationEngineBuilder):
     model_name: str = "MiniCPM-o thinker"
     model_arch_override: str = "MiniCPMO"
     context_length: int = 8192
+    supports_context_length_override: ClassVar[bool] = True
     tokenizer: PreTrainedTokenizerBase
     adapter: ThinkerAdapter
 

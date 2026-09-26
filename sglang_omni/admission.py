@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Queue-full rejects. Stage IPC stringifies exceptions; use matches()."""
+"""Admission rejects. Stage IPC stringifies exceptions; use matches()."""
 
 from __future__ import annotations
 
@@ -23,3 +23,13 @@ class QueueFullError(RuntimeError):
         else:
             pass
         return RuntimeError(message or "Unknown error")
+
+
+class ContextExhaustedError(ValueError):
+    """A session unit that no longer fits the thinker context."""
+
+    CODE = "context_exhausted"
+
+    @classmethod
+    def matches(cls, exc: BaseException) -> bool:
+        return isinstance(exc, cls) or str(exc).startswith(f"{cls.CODE}:")

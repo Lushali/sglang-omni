@@ -7,14 +7,16 @@ import hashlib
 import inspect
 import json
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 from transformers import AutoConfig
 from transformers.models.auto.configuration_auto import CONFIG_MAPPING
 
-from sglang_omni.models.minicpm_o import native_stages, stages
+from sglang_omni.models.minicpm_o import engine_builder, native_stages, stages
 from sglang_omni.models.minicpm_o.components import audio_encoder, image_encoder
 from sglang_omni.models.minicpm_o.hf_config import MiniCPMOConfig
+from sglang_omni.scheduling import sglang_backend
 
 
 class ConfigLoaded(Exception):
@@ -116,6 +118,20 @@ def test_engine_factory_resolves_native_config_before_server_args(
     overrides = {} if trust_override is None else {"trust_remote_code": trust_override}
     with pytest.raises(ConfigLoaded):
         factory(str(snapshot), server_args_overrides=overrides)
+
+
+@pytest.mark.parametrize("context_length", [None, 32768])
+def test_native_thinker_context_length(
+    context_length: int | None, snapshot: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(engine_builder, "get_tokenizer", Mock())
+    server_args = Mock(side_effect=ConfigLoaded)
+    monkeypatch.setattr(sglang_backend, "build_sglang_server_args", server_args)
+    builder = engine_builder.MiniCPMOThinkerEngineBuilder()
+    overrides = {} if context_length is None else {"context_length": context_length}
+    with pytest.raises(ConfigLoaded):
+        builder.build(str(snapshot), device="cpu", server_args_overrides=overrides)
+    assert server_args.call_args.kwargs["context_length"] == (context_length or 8192)
 
 
 def test_native_engine_factories_declare_the_placement_fraction() -> None:

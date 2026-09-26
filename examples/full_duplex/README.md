@@ -25,3 +25,12 @@ speech stage to flush pending audio without an additional thinker request.
 This integration uses the current shared native protocol: open, append, and close.
 It does not expose the historical epoch/cancel or `sglang.microturn.done` events.
 Video input is not wired into this audio path.
+
+The thinker defaults to 8192 tokens; optionally set `stages.thinker.engine.context_length`
+up to the checkpoint's `max_position_embeddings` (40960 for
+MiniCPM-o 4.5), with KV storage approximately 144 KiB/token, or 4.5 GiB per full 32k session.
+
+When accumulated history plus a new unit exceeds the effective input limit, the
+server emits a fatal `context_exhausted` error naming the thinker context length,
+then closes the session; it does not truncate history or continue with later units.
+The effective limit can be lower than the configured context length due to KV capacity.

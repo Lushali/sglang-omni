@@ -44,7 +44,7 @@ from sglang.srt.runtime_context import get_model, get_serving
 from sglang.srt.session.session_controller import SessionController
 from sglang.srt.utils import broadcast_pyobj
 
-from sglang_omni.admission import QueueFullError
+from sglang_omni.admission import ContextExhaustedError, QueueFullError
 from sglang_omni.model_runner.base import PendingStep
 from sglang_omni.profiler.event_recorder import emit as _emit_event
 from sglang_omni.profiler.event_recorder import (
@@ -1549,7 +1549,15 @@ class OmniScheduler:
         if req_data.enforce_request_limits:
             error_msg = self.prepare_request_limits(req_data)
             if error_msg:
-                self.emit_request_error(req_id, ValueError(error_msg))
+                if session_unit is not None:
+                    error = ContextExhaustedError(
+                        f"{ContextExhaustedError.CODE}: thinker context length "
+                        f"{self.server_args.context_length} tokens exhausted "
+                        f"(effective input limit={self.max_req_input_len}). {error_msg}"
+                    )
+                else:
+                    error = ValueError(error_msg)
+                self.emit_request_error(req_id, error)
                 self.abort(req_id)
                 return
             else:

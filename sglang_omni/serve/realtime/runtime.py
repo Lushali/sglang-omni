@@ -10,6 +10,7 @@ import uuid
 from collections.abc import AsyncIterator
 from contextvars import ContextVar
 
+from sglang_omni.admission import ContextExhaustedError
 from sglang_omni.serve.realtime.control import (
     Accepted,
     Cleared,
@@ -355,7 +356,12 @@ class SessionRuntime:
             self.fail(str(exc), exc.code)
         except Exception as exc:
             logger.exception(f"Realtime session {self.session_id} input pump failed")
-            self.fail(str(exc))
+            code = (
+                ContextExhaustedError.CODE
+                if ContextExhaustedError.matches(exc)
+                else "internal"
+            )
+            self.fail(str(exc), code)
 
     def fail(
         self, message: str, code: str = "internal", event_id: str | None = None
