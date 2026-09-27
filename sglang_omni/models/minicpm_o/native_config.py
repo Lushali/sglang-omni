@@ -3,7 +3,7 @@
 
 from typing import ClassVar
 
-from pydantic import Field, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from sglang_omni.admission import REQUEST_TO_TOKEN_SLOTS_RESERVED_FOR_RETAINED_KV
 from sglang_omni.config import (
@@ -55,6 +55,20 @@ def stages() -> list[StageConfig]:
     ]
 
 
+class MiniCPMODuplexSampling(BaseModel):
+    """Deployment defaults for the thinker duplex sampler; a session may override them."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    greedy: bool = True
+    temperature: float = Field(default=0.7, ge=0)
+    top_k: int = Field(default=100, ge=-1)
+    top_p: float = Field(default=0.8, gt=0, le=1)
+    repetition_penalty: float = Field(default=1.05, gt=0)
+    listen_prob_scale: float = Field(default=1.0, ge=0)
+    force_listen_count: int = Field(default=3, ge=0)
+
+
 class MiniCPMODuplexPipelineConfig(PipelineConfig):
     architecture: ClassVar[str] = "MiniCPMO"
     stage_config_types: ClassVar[dict[str, type[StageConfig]]] = {
@@ -65,6 +79,7 @@ class MiniCPMODuplexPipelineConfig(PipelineConfig):
     reference_audio: str | None = None
     max_sessions: int = Field(default=2, ge=1)
     speech_state_bytes_per_session: int = Field(default=2 << 30, ge=1)
+    sampling: MiniCPMODuplexSampling = Field(default_factory=MiniCPMODuplexSampling)
     entry_stage: str = "perception"
     stages: list[StageConfig] = Field(default_factory=stages)
 

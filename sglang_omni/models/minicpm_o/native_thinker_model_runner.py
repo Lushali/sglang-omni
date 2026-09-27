@@ -166,7 +166,7 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
                     raise RuntimeError("duplex request lost its thinker session state")
                 else:
                     pass
-                sampling_config = data.sampling_config
+                sampling = data.sampling
                 sampler_state = DuplexSamplerState(
                     special_tokens=self.special_for_data(data),
                     generation_step=int(data.generation_steps),
@@ -174,27 +174,12 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
                     force_listen_counter=0,
                     generated_history=session.generated_history,
                     current_turn_ended=session.current_turn_ended,
-                    temperature=float(
-                        sampling_config.get(
-                            "temperature", DuplexSamplerState.temperature
-                        )
-                    ),
-                    top_k=int(sampling_config.get("top_k", DuplexSamplerState.top_k)),
-                    top_p=float(sampling_config.get("top_p", DuplexSamplerState.top_p)),
-                    repetition_penalty=float(
-                        sampling_config.get(
-                            "repetition_penalty", DuplexSamplerState.repetition_penalty
-                        )
-                    ),
-                    listen_prob_scale=float(
-                        sampling_config.get(
-                            "listen_prob_scale", DuplexSamplerState.listen_prob_scale
-                        )
-                    ),
-                    greedy=bool(
-                        sampling_config.get("greedy", DuplexSamplerState.greedy)
-                    )
-                    or str(sampling_config.get("decode_mode", "")) == "greedy",
+                    temperature=sampling.temperature,
+                    top_k=sampling.top_k,
+                    top_p=sampling.top_p,
+                    repetition_penalty=sampling.repetition_penalty,
+                    listen_prob_scale=sampling.listen_prob_scale,
+                    greedy=sampling.greedy,
                 )
                 token = duplex_sample(original_logits[index], sampler_state)
                 session.current_turn_ended = sampler_state.current_turn_ended

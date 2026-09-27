@@ -65,6 +65,7 @@ class Capabilities:
     partial_style: PartialStyle = "append_only"
     input_modalities: tuple[str, ...] = ("audio",)
     max_image_bytes: int = 512 * 1024
+    sampling_parameters: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.interaction != "native":
@@ -120,6 +121,7 @@ class Capabilities:
             partial_style=self.partial_style,
             pressure_policy="reject",
             strict_order=True,
+            sampling_parameters=list(self.sampling_parameters),
         )
 
         if "image" in self.input_modalities:

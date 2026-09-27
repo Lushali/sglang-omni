@@ -11,23 +11,23 @@ import torch.nn.functional as F
 from sglang_omni.models.minicpm_o.special_tokens import MiniCPMOSpecialTokenIds
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DuplexSamplerState:
     """Mutable sampling history and policy for one generated unit."""
 
     special_tokens: MiniCPMOSpecialTokenIds
+    temperature: float
+    top_k: int
+    top_p: float
+    repetition_penalty: float
+    listen_prob_scale: float
+    greedy: bool
     generation_step: int = 0
     force_listen_count: int = 0
     force_listen_counter: int = 0
     generated_history: list[int] = field(default_factory=list)
     current_turn_ended: bool = True
     forbidden_token_ids: set[int] = field(default_factory=set)
-    temperature: float = 0.7
-    top_k: int = 100
-    top_p: float = 0.8
-    repetition_penalty: float = 1.05
-    listen_prob_scale: float = 1.0
-    greedy: bool = False
 
 
 def top_k_top_p(logits: torch.Tensor, *, top_k: int, top_p: float) -> torch.Tensor:

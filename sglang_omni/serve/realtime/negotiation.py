@@ -124,6 +124,17 @@ class SessionNegotiation:
 
     def validate_extension(self, candidate: SessionConfiguration) -> None:
         extension = candidate.get("sglang", {})
+        unsupported_sampling = set(extension.get("sampling", {})) - set(
+            self.capabilities.sampling_parameters
+        )
+        if unsupported_sampling:
+            raise ProtocolError(
+                "not_applicable",
+                f"unsupported sampling parameters: {', '.join(sorted(unsupported_sampling))}",
+                "session.sglang.sampling",
+            )
+        else:
+            pass
         native_unit_ms = extension.get("timebase", {}).get(
             "native_unit_ms", self.capabilities.native_unit_ms
         )

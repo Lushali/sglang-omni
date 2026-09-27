@@ -56,10 +56,21 @@ class TimebaseConfig(TypedDict, total=False):
     native_unit_ms: int
 
 
+class SamplingConfig(TypedDict, total=False):
+    temperature: Annotated[float, Field(ge=0)]
+    top_k: Annotated[int, Field(ge=-1)]
+    top_p: Annotated[float, Field(gt=0, le=1)]
+    repetition_penalty: Annotated[float, Field(gt=0)]
+    listen_prob_scale: Annotated[float, Field(ge=0)]
+    greedy: bool
+    force_listen_count: Annotated[int, Field(ge=0)]
+
+
 class SessionExtension(TypedDict, total=False):
     interaction: Interaction
     tail_policy: TailPolicy
     timebase: TimebaseConfig
+    sampling: SamplingConfig
 
 
 class SessionConfiguration(TypedDict, total=False):
@@ -99,6 +110,7 @@ class GrantedCapabilities(TypedDict, total=False):
     partial_style: PartialStyle
     pressure_policy: Literal["reject"]
     strict_order: bool
+    sampling_parameters: list[str]
     limits: dict[str, int | float]
     rejections: list[Rejection]
 

@@ -12,13 +12,15 @@ from sglang_omni.client.client import Client
 from sglang_omni.models.minicpm_o.components.streaming_perception import (
     PerceptionStepPlan,
 )
-from sglang_omni.models.minicpm_o.native_config import MiniCPMODuplexPipelineConfig
+from sglang_omni.models.minicpm_o.native_config import (
+    MiniCPMODuplexPipelineConfig,
+    MiniCPMODuplexSampling,
+)
 from sglang_omni.models.minicpm_o.special_tokens import (
     MiniCPMOSpecialTokenIds,
     resolve_special_token_ids,
 )
 from sglang_omni.models.minicpm_o.thinker_state import (
-    DuplexSamplingConfig,
     DuplexUnitRequestData,
     MiniCPMOThinkerSessionState,
 )
@@ -100,7 +102,12 @@ class ThinkerAdapter(ARSessionAdapter):
         )
         req.tokenizer = self.tokenizer
         req.return_hidden_states = True
-        sampling_config: DuplexSamplingConfig = dict(payload.request.params)
+        sampling = MiniCPMODuplexSampling.model_validate(
+            {
+                key: payload.request.params[key]
+                for key in MiniCPMODuplexSampling.model_fields
+            }
+        )
         return DuplexUnitRequestData(
             req=req,
             input_ids=torch.tensor(ids),
@@ -108,9 +115,8 @@ class ThinkerAdapter(ARSessionAdapter):
             stage_payload=payload,
             thinker_state=state,
             unit_embedding_spans=spans,
-            sampling_config=sampling_config,
-            forced_listen=state.force_listen_counter
-            < sampling_config.get("force_listen_count", 0),
+            sampling=sampling,
+            forced_listen=state.force_listen_counter < sampling.force_listen_count,
             prefill_schema=plan["prefill_schema"],
         )
 
@@ -207,13 +213,13 @@ def build_realtime_deployment(
         return CoordinatorAdapter(
             client,
             stages=["perception", "thinker", "talker", "speech"],
-            request_builder=lambda config: OmniRequest(
+            request_builder=lambda session: OmniRequest(
                 None,
                 params={
-                    "instructions": config.get("instructions")
+                    "instructions": session.get("instructions")
                     or "Streaming Omni Conversation.",
-                    "greedy": True,
-                    "force_listen_count": 3,
+                    **config.sampling.model_dump(),
+                    **session.get("sglang", {}).get("sampling", {}),
                 },
             ),
             output_converter=OutputConverter(),
@@ -229,6 +235,7 @@ def build_realtime_deployment(
             output_modalities=("audio", "text"),
             input_modalities=("audio", "image"),
             tail_policy="pad",
+            sampling_parameters=tuple(MiniCPMODuplexSampling.model_fields),
         ),
         factory,
         max_connections=config.max_sessions,

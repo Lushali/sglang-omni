@@ -4,22 +4,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal, TypedDict
+from typing import Literal
 
 import torch
 
+from sglang_omni.models.minicpm_o.native_config import MiniCPMODuplexSampling
 from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
-
-
-class DuplexSamplingConfig(TypedDict, total=False):
-    temperature: float | str
-    top_k: int | float | str
-    top_p: float | str
-    repetition_penalty: float | str
-    listen_prob_scale: float | str
-    greedy: bool
-    decode_mode: str
-    force_listen_count: int | float
 
 
 @dataclass
@@ -42,5 +32,5 @@ class DuplexUnitRequestData(SGLangARRequestData):
     generated_unit_ids: list[int] = field(default_factory=list)
     pending_unit_token: int | None = None
     forced_listen: bool = False
-    sampling_config: DuplexSamplingConfig = field(default_factory=dict)
+    sampling: MiniCPMODuplexSampling = field(default_factory=MiniCPMODuplexSampling)
     enforce_request_limits: bool = True

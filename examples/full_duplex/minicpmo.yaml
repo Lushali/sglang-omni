@@ -5,6 +5,15 @@ reference_audio: null
 max_sessions: 2
 speech_state_bytes_per_session: 2147483648
 
+sampling:
+  greedy: true
+  temperature: 0.7
+  top_k: 100
+  top_p: 0.8
+  repetition_penalty: 1.05
+  listen_prob_scale: 1.0
+  force_listen_count: 3
+
 stages:
   perception:
     gpu_memory_fraction: 0.12

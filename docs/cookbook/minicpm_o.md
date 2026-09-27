@@ -38,3 +38,44 @@ The vocoder caches only the most recently used reference by audio content. A
 different reference, including switching back to the default, rebuilds the
 conditioning. Invalid references fail instead of silently using the default.
 Audio output remains non-streaming.
+
+## Native full-duplex sampling
+
+For the native full-duplex pipeline, configure sampling in `session.update`
+before sending the first audio packet:
+
+```json
+{
+  "type": "session.update",
+  "event_id": "sampling-1",
+  "session": {
+    "sglang": {
+      "sampling": {
+        "greedy": false,
+        "temperature": 0.7,
+        "top_k": 20,
+        "top_p": 0.8,
+        "repetition_penalty": 1.05,
+        "listen_prob_scale": 1.0,
+        "force_listen_count": 3
+      }
+    }
+  }
+}
+```
+
+`sglang.granted.sampling_parameters` lists the fields supported by the deployment.
+Unsupported fields are rejected. Sampling settings are fixed once the session
+opens; start a new session to change them after audio input has begun.
+
+Omitted fields use the deployment defaults from the `sampling` section of the pipeline config (see `examples/full_duplex/minicpmo.yaml`), which ship as `greedy=true`, `temperature=0.7`, `top_k=100`, `top_p=0.8`, `repetition_penalty=1.05`, `listen_prob_scale=1.0`, and `force_listen_count=3`. Values sent in `session.update` apply only to that session. Set `greedy=false` to enable temperature/top-k/top-p
+sampling; `temperature=0` selects the second-stage argmax. The initial
+chunk-end draw follows `greedy` and uses the unscaled distribution.
+`force_listen_count=0` disables the initial forced-listen units.
+
+Temperature and listen probability scale must be nonnegative, top-p must be in
+`(0, 1]`, repetition penalty must be positive, and forced-listen count must be a
+nonnegative integer. Top-k accepts `-1` or `0` to disable filtering and positive
+integers to enable it. These settings control the Thinker duplex sampler, not
+the Talker sampling policy. `length_penalty` is not implemented and is rejected.
+The official demo adapter must forward these fields explicitly to use them.

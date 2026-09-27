@@ -20,6 +20,7 @@ from PIL import Image
 from sglang_omni.models.minicpm_o.components.streaming_perception import (
     MiniCPMOPerceptionState,
 )
+from sglang_omni.models.minicpm_o.native_config import MiniCPMODuplexSampling
 from sglang_omni.models.minicpm_o.special_tokens import (
     REQUIRED_SPECIAL_TOKENS,
     resolve_special_token_ids,
@@ -62,6 +63,7 @@ def relay(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
         Capabilities=Mock(),
         RealtimeDeployment=Mock(),
         Image=Image,
+        MiniCPMODuplexSampling=MiniCPMODuplexSampling,
         logger=logging.getLogger("native_vision_test"),
     )
     root = Path(__file__).resolve().parents[3] / "sglang_omni"
@@ -72,7 +74,6 @@ def relay(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
             "splice_embedding_spans",
         },
         "models/minicpm_o/thinker_state.py": {
-            "DuplexSamplingConfig",
             "MiniCPMOThinkerSessionState",
             "DuplexUnitRequestData",
         },
@@ -135,7 +136,9 @@ def test_append_and_thinker_splice(
     chunk = TimedChunk(
         "audio", 0, 1000, 0, {"pcm": pcm, "image": b"frame"} if has_image else pcm
     )
-    payload = StagePayload("unit", OmniRequest(None), None)
+    payload = StagePayload(
+        "unit", OmniRequest(None, params=MiniCPMODuplexSampling().model_dump()), None
+    )
     result = hooks.append(chunk, payload, SimpleNamespace(session_identity=identity))
     assert result is payload
     np.testing.assert_array_equal(
@@ -180,7 +183,7 @@ def test_image_audio_commit_atomically(
     identity = SessionIdentity("vision")
     payload = StagePayload(
         "unit",
-        OmniRequest(None),
+        OmniRequest(None, params=MiniCPMODuplexSampling().model_dump()),
         perception.build_step_plan(torch.full((10, 4), 9.0), torch.full((64, 4), 6.0)),
     )
     adapter = relay.ThinkerAdapter(perception.tokenizer, 100)
@@ -236,7 +239,9 @@ def test_undecodable_frame_runs_unit_on_audio(
     )
     hooks.states[identity] = perception
     perception.encode_image.side_effect = error
-    payload = StagePayload("unit", OmniRequest(None), None)
+    payload = StagePayload(
+        "unit", OmniRequest(None, params=MiniCPMODuplexSampling().model_dump()), None
+    )
     hooks.append(
         TimedChunk("audio", 0, 1000, 0, {"pcm": b"\0\0", "image": b"bad"}),
         payload,
@@ -283,7 +288,9 @@ def test_empty_eos_does_not_encode(
     hooks = relay.PerceptionHooks(
         perception.tokenizer, Mock(), perception.audio_encoder
     )
-    payload = StagePayload("unit", OmniRequest(None), None)
+    payload = StagePayload(
+        "unit", OmniRequest(None, params=MiniCPMODuplexSampling().model_dump()), None
+    )
     hooks.append(TimedChunk("audio", 0, 0, 1, None, eos=True), payload, Mock())
     assert payload.data is None
     perception.encode_audio.assert_not_called()
