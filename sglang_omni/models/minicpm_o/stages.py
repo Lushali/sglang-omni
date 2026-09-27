@@ -172,14 +172,14 @@ def create_sglang_talker_executor_from_config(
 def vocode_code2wav_payloads(
     model: MiniCPMOCode2Wav, payloads: list[StagePayload]
 ) -> list[StagePayload]:
-    """Vocode talker payloads, one reference per row."""
+    """Vocode talker payloads in one batch, one speaker reference per row."""
     codec_tokens: list[list[int]] = []
-    references: list[str | bytes] = []
+    references: list[bytes | None] = []
     for payload in payloads:
         state = MiniCPMOPipelineState.from_dict(payload.data)
         tokens = state.engine_outputs[TALKER_STAGE]["codec_tokens"].reshape(-1).tolist()
         codec_tokens.append(tokens)
-        references.append(model.resolve_prompt_wav(code2wav_reference_audio(payload)))
+        references.append(code2wav_reference_audio(payload))
 
     logger.info(
         f"minicpm_code2wav_batch size={len(payloads)} "
@@ -211,13 +211,17 @@ def create_code2wav_executor(
     batch_wait_when_idle: bool = False,
     dtype: str | None = None,
     max_batch_cost: int | None = None,
-    enable_flow_variable_length: bool = False,
+    enable_flow_variable_length: bool,
+    reference_workers: int,
+    prompt_cache_capacity: int,
 ) -> SimpleScheduler:
     model = MiniCPMOCode2Wav(
         model_path,
         device=str(resolve_concrete_device(device, gpu_id)),
         dtype=dtype,
         enable_flow_variable_length=enable_flow_variable_length,
+        reference_workers=reference_workers,
+        prompt_cache_capacity=prompt_cache_capacity,
     )
 
     def codec_token_cost(payload: StagePayload) -> int:

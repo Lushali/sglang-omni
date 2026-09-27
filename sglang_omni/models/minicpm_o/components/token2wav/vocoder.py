@@ -148,8 +148,7 @@ class Token2Wav(torch.nn.Module):
         self.hift.to(device).eval()
 
     @torch.inference_mode()
-    def prepare_prompt(self, source: str | bytes | io.BytesIO) -> SpeakerPrompt:
-        # In-memory sources avoid spilling HTTP-supplied references to disk.
+    def prepare_prompt(self, source: str | io.BytesIO) -> SpeakerPrompt:
         audio, sample_rate = torchaudio.load(source)
         if sample_rate != 16000:
             speech = torchaudio.transforms.Resample(sample_rate, 16000)(audio)

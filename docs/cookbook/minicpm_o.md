@@ -42,8 +42,8 @@ length to preserve waveform boundaries. Invalid references fail instead of
 silently using the default. Audio output remains non-streaming.
 
 Reference preparation uses up to 8 worker threads, preparing each unique
-reference once per batch. Set `MINICPMO_REF_WORKERS=1` to prepare references
-serially, or set `MINICPMO_PROMPT_CACHE_CAPACITY` to change the cache capacity.
-Both settings must be positive integers and are read when Code2Wav is created.
-The stage drains reference preparation on shutdown; a closed vocoder rejects
-new preparation calls.
+reference once per batch. Set `stages.code2wav.factory.reference_workers` to
+change the thread count (1 prepares references serially) and
+`stages.code2wav.factory.prompt_cache_capacity` to change the cache capacity.
+Both must be positive integers. The stage drains reference preparation on
+shutdown and rejects later preparation of uncached references.

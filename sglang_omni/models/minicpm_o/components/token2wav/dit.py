@@ -14,6 +14,8 @@ from einops import pack, repeat
 from torch.nn.attention.varlen import varlen_attn
 
 TIMESTEP_MAX_PERIOD = 10000
+# A lone CFG pair has no padding for packing to remove.
+MIN_PACKED_BATCH_SIZE = 3
 
 
 class MLP(torch.nn.Module):
@@ -109,12 +111,9 @@ class Attention(torch.nn.Module):
         q = self.to_q(x).view(-1, self.num_heads, self.head_dim)
         k = self.to_k(x).view(-1, self.num_heads, self.head_dim)
         v = self.to_v(x).view(-1, self.num_heads, self.head_dim)
-        attention_dtype = q.dtype
-        q = self.q_norm(q)
-        k = self.k_norm(k)
-        q = q.to(attention_dtype)
-        k = k.to(attention_dtype)
-        v = v.to(attention_dtype)
+        # Autocast runs the norms in FP32; varlen attention needs one dtype.
+        q = self.q_norm(q).to(v.dtype)
+        k = self.k_norm(k).to(v.dtype)
         x = varlen_attn(q, k, v, cu_seqlens, cu_seqlens, max_length, max_length)
         x = self.proj(x.reshape(-1, self.inner_dim))
         return self.proj_drop(x)
@@ -147,11 +146,10 @@ class TimestepEmbedder(nn.Module):
             or self.frequency_cache.device != t.device
             or self.frequency_cache.dtype != t.dtype
         ):
-            frequencies = self.frequencies.to(t)
-            self.frequency_cache = frequencies
+            self.frequency_cache = self.frequencies.to(t)
         else:
-            frequencies = self.frequency_cache
-        args = (t * self.scale)[:, None] * frequencies[None]
+            pass
+        args = (t * self.scale)[:, None] * self.frequency_cache[None]
         embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
         if self.frequency_embedding_size % 2:
             embedding = torch.cat(
@@ -220,12 +218,11 @@ class CausalConvBlock(nn.Module):
     def forward_packed(
         self,
         x: torch.Tensor,
-        positions: torch.Tensor,
+        guarded_positions: torch.Tensor,
         guarded_valid: torch.Tensor,
     ) -> torch.Tensor:
-        guarded_length = guarded_valid.shape[0]
-        guarded = x.new_zeros(guarded_length, x.shape[1])
-        guarded[positions] = x
+        guarded = x.new_zeros(guarded_valid.shape[0], x.shape[1])
+        guarded[guarded_positions] = x
 
         guarded = self.block[1](guarded.transpose(0, 1).unsqueeze(0))
         guarded = guarded.squeeze(0).transpose(0, 1)
@@ -234,7 +231,7 @@ class CausalConvBlock(nn.Module):
         guarded = guarded * guarded_valid.unsqueeze(1)
         guarded = self.block[6](guarded.transpose(0, 1).unsqueeze(0))
         guarded = guarded.squeeze(0).transpose(0, 1)
-        return guarded[positions]
+        return guarded[guarded_positions]
 
 
 class DiTBlock(nn.Module):
@@ -291,12 +288,12 @@ class DiTBlock(nn.Module):
     def forward_packed(
         self,
         x: torch.Tensor,
-        c: torch.Tensor,
+        conditioning: torch.Tensor,
         sequence_ids: torch.Tensor,
         cu_seqlens: torch.Tensor,
         max_length: int,
-        conv_positions: torch.Tensor,
-        conv_valid: torch.Tensor,
+        guarded_positions: torch.Tensor,
+        guarded_valid: torch.Tensor,
     ) -> torch.Tensor:
         (
             shift_msa,
@@ -308,7 +305,7 @@ class DiTBlock(nn.Module):
             shift_conv,
             scale_conv,
             gate_conv,
-        ) = self.adaLN_modulation(c)[sequence_ids].chunk(9, dim=-1)
+        ) = self.adaLN_modulation(conditioning)[sequence_ids].chunk(9, dim=-1)
         x = x + gate_msa * self.attn.forward_packed(
             modulate(self.norm1(x), shift_msa, scale_msa),
             cu_seqlens,
@@ -316,8 +313,8 @@ class DiTBlock(nn.Module):
         )
         x = x + gate_conv * self.conv.forward_packed(
             modulate(self.norm3(x), shift_conv, scale_conv),
-            conv_positions,
-            conv_valid,
+            guarded_positions,
+            guarded_valid,
         )
         x = x + gate_mlp * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
         return x
@@ -423,55 +420,51 @@ class DiT(nn.Module):
             pass
         x = x.transpose(1, 2)
         attn_mask = mask.bool()
-        lengths = attn_mask.squeeze(1).sum(dim=1, dtype=torch.int32)
-        if self.enable_variable_length and x.shape[0] > 2:
+        if self.enable_variable_length and x.shape[0] >= MIN_PACKED_BATCH_SIZE:
+            lengths = attn_mask.squeeze(1).sum(dim=1, dtype=torch.int32)
             with torch.autocast("cuda", dtype=torch.bfloat16):
-                packed_input = self.in_proj(x).to(torch.bfloat16)
-                return self.forward_packed(packed_input, t.to(torch.bfloat16), lengths)
-        x = self.in_proj(x)
-        for block in self.blocks:
-            x = block(x, t, attn_mask)
-        x = self.final_layer(x, t)
-        x = x.transpose(1, 2)
+                x = self.forward_packed(self.in_proj(x), t.to(torch.bfloat16), lengths)
+        else:
+            x = self.in_proj(x)
+            for block in self.blocks:
+                x = block(x, t, attn_mask)
+            x = self.final_layer(x, t).transpose(1, 2)
         return x
 
     def forward_packed(
         self, x: torch.Tensor, conditioning: torch.Tensor, lengths: torch.Tensor
     ) -> torch.Tensor:
         batch_size, padded_length, _ = x.shape
-        valid = torch.arange(padded_length, device=x.device).unsqueeze(
-            0
-        ) < lengths.unsqueeze(1)
-        x = x[valid]
+        frame_indices = torch.arange(padded_length, device=x.device)
+        valid_frames = frame_indices.unsqueeze(0) < lengths.unsqueeze(1)
+        x = x[valid_frames]
         conditioning = conditioning.squeeze(1)
         cu_seqlens = torch.nn.functional.pad(
             lengths.cumsum(0, dtype=torch.int32), (1, 0)
         )
-        max_length = padded_length
+        # Zero guard frames keep causal convolutions from reading the previous row.
         guard_width = self.blocks[0].conv.kernel_size - 1
         sequence_ids = torch.repeat_interleave(
             torch.arange(batch_size, device=x.device), lengths
         )
-        conv_positions = (
+        guarded_positions = (
             torch.arange(x.shape[0], device=x.device) + (sequence_ids + 1) * guard_width
         )
-        conv_valid = torch.zeros(
-            x.shape[0] + batch_size * guard_width,
-            device=x.device,
-            dtype=torch.bool,
+        guarded_valid = torch.zeros(
+            x.shape[0] + batch_size * guard_width, device=x.device, dtype=torch.bool
         )
-        conv_valid[conv_positions] = True
+        guarded_valid[guarded_positions] = True
         for block in self.blocks:
             x = block.forward_packed(
                 x,
                 conditioning,
                 sequence_ids,
                 cu_seqlens,
-                max_length,
-                conv_positions,
-                conv_valid,
+                padded_length,
+                guarded_positions,
+                guarded_valid,
             )
         x = self.final_layer.forward_packed(x, conditioning, sequence_ids)
         dense = x.new_zeros(batch_size, padded_length, self.out_channels)
-        dense[valid] = x
+        dense[valid_frames] = x
         return dense.transpose(1, 2)
