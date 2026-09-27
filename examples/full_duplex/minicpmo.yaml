@@ -1,2 +1,18 @@
 config_cls: MiniCPMODuplexPipelineConfig
 model_path: /path/to/MiniCPM-o-4_5
+reference_audio: null
+
+max_sessions: 2
+speech_state_bytes_per_session: 2147483648
+
+stages:
+  perception:
+    gpu_memory_fraction: 0.12
+  thinker:
+    gpu_memory_fraction: 0.52
+    engine:
+      context_length: 8192
+  talker:
+    gpu_memory_fraction: 0.15
+  speech:
+    gpu_memory_fraction: 0.15
