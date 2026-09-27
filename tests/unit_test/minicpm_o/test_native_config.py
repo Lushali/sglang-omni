@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 from pathlib import Path
 
@@ -11,7 +12,7 @@ import pytest
 from transformers import AutoConfig
 from transformers.models.auto.configuration_auto import CONFIG_MAPPING
 
-from sglang_omni.models.minicpm_o import stages
+from sglang_omni.models.minicpm_o import native_stages, stages
 from sglang_omni.models.minicpm_o.components import audio_encoder, image_encoder
 from sglang_omni.models.minicpm_o.hf_config import MiniCPMOConfig
 
@@ -115,3 +116,11 @@ def test_engine_factory_resolves_native_config_before_server_args(
     overrides = {} if trust_override is None else {"trust_remote_code": trust_override}
     with pytest.raises(ConfigLoaded):
         factory(str(snapshot), server_args_overrides=overrides)
+
+
+def test_native_engine_factories_declare_the_placement_fraction() -> None:
+    for factory in (
+        native_stages.create_thinker_scheduler,
+        native_stages.create_talker_scheduler,
+    ):
+        assert "total_gpu_memory_fraction" in inspect.signature(factory).parameters

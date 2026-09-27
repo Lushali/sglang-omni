@@ -175,6 +175,7 @@ def create_thinker_scheduler(
     gpu_id: int | None = None,
     dtype: str = "bfloat16",
     server_args_overrides: dict[str, JsonValue] | None = None,
+    total_gpu_memory_fraction: float | None = None,
 ) -> OmniScheduler:
     return MiniCPMOThinkerEngineBuilder().build(
         model_path,
@@ -182,6 +183,7 @@ def create_thinker_scheduler(
         gpu_id=gpu_id,
         dtype=dtype,
         server_args_overrides=server_args_overrides,
+        total_gpu_memory_fraction=total_gpu_memory_fraction,
     )
 
 
@@ -213,11 +215,13 @@ def create_talker_scheduler(
     device: str | None = None,
     gpu_id: int | None = None,
     server_args_overrides: dict[str, JsonValue] | None = None,
+    total_gpu_memory_fraction: float | None = None,
 ) -> OmniScheduler:
     return create_sglang_talker_executor_from_config(
         model_path,
         device=device,
         gpu_id=gpu_id,
         server_args_overrides=server_args_overrides,
+        total_gpu_memory_fraction=total_gpu_memory_fraction,
         session_mode=True,
     )

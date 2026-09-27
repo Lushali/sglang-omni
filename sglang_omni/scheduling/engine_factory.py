@@ -65,6 +65,7 @@ class SGLangGenerationEngineBuilder(ABC):
         gpu_id: int | None = None,
         dtype: str = "bfloat16",
         server_args_overrides: dict[str, Any] | None = None,
+        total_gpu_memory_fraction: float | None = None,
     ) -> Any:
         from sglang_omni.platforms import current_platform
         from sglang_omni.scheduling import bootstrap as scheduling_bootstrap
@@ -180,6 +181,10 @@ class SGLangGenerationEngineBuilder(ABC):
             )
 
         infra_kwargs["before_memory_pool"] = before_memory_pool
+        if total_gpu_memory_fraction is not None:
+            infra_kwargs["total_gpu_memory_fraction"] = total_gpu_memory_fraction
+        else:
+            pass
         prefill_graph_backend = get_prefill_cuda_graph_backend(server_args)
         if prefill_graph_backend == CudaGraphBackend.BREAKABLE:
             if not self.supports_breakable_prefill_cuda_graph:
