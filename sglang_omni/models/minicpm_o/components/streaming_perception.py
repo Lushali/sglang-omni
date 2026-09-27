@@ -68,7 +68,6 @@ class StreamingAudioProcessor(Protocol):
         pass
 
     def get_streaming_chunk_size(self) -> int:
-
         pass
 
     def process_audio(

@@ -51,7 +51,6 @@ class SessionTreeCache(Protocol):
     slots: Mapping[str, SessionSlot]
 
     def evictable_size(self) -> int:
-
         pass
 
 
@@ -81,7 +80,6 @@ class BridgeScheduler(Protocol):
     max_running_requests: int
 
     def abort(self, request_id: str) -> None:
-
         pass
 
     def release_request_kv_cache(self, req: Req) -> None:

@@ -47,7 +47,7 @@ def relay(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
         ARSessionAdapter=object,
         MiniCPMOPerceptionState=MiniCPMOPerceptionState,
         resolve_special_token_ids=resolve_special_token_ids,
-        SamplingParams=Mock(side_effect=lambda **kwargs: Mock(**kwargs)),
+        SamplingParams=Mock(side_effect=Mock),
         Req=Mock(
             side_effect=lambda request_id, text, ids, params, **kwargs: Mock(
                 rid=request_id,
@@ -136,10 +136,8 @@ def test_append_and_thinker_splice(
         "audio", 0, 1000, 0, {"pcm": pcm, "image": b"frame"} if has_image else pcm
     )
     payload = StagePayload("unit", OmniRequest(None), None)
-    assert (
-        hooks.append(chunk, payload, SimpleNamespace(session_identity=identity))
-        is payload
-    )
+    result = hooks.append(chunk, payload, SimpleNamespace(session_identity=identity))
+    assert result is payload
     np.testing.assert_array_equal(
         perception.encode_audio.call_args.args[0],
         np.arange(16000, dtype=np.float32) / 32768,
