@@ -422,7 +422,7 @@ class DiT(nn.Module):
         attn_mask = mask.bool()
         if self.enable_variable_length and x.shape[0] >= MIN_PACKED_BATCH_SIZE:
             lengths = attn_mask.squeeze(1).sum(dim=1, dtype=torch.int32)
-            with torch.autocast("cuda", dtype=torch.bfloat16):
+            with torch.autocast(x.device.type, dtype=torch.bfloat16):
                 x = self.forward_packed(self.in_proj(x), t.to(torch.bfloat16), lengths)
         else:
             x = self.in_proj(x)

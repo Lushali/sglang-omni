@@ -41,6 +41,7 @@ from sglang_omni.serve.openai_api import (
     ChatCompletionRequest,
     build_chat_generate_request,
 )
+from sglang_omni.utils.device import resolve_concrete_device
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CHECKPOINT_CODEC_TOKENS = [1498, 1734, 3732, 3726, 3645]
@@ -221,8 +222,10 @@ def find_checkpoint_dir() -> Path | None:
 
 def require_checkpoint_dir() -> Path:
     checkpoint = find_checkpoint_dir()
-    if checkpoint is None or not torch.cuda.is_available():
-        pytest.skip("Set MINICPMO_CHECKPOINT and provide CUDA for vocoder validation")
+    if checkpoint is None or resolve_concrete_device(None).type not in ("cuda", "xpu"):
+        pytest.skip(
+            "Set MINICPMO_CHECKPOINT and provide CUDA or XPU for vocoder validation"
+        )
     else:
         pass
     return checkpoint
@@ -239,7 +242,7 @@ def load_checkpoint_model(
     factory = code2wav_stage_factory()
     return MiniCPMOCode2Wav(
         str(checkpoint),
-        device="cuda:0",
+        device=str(resolve_concrete_device(None)),
         enable_flow_variable_length=enable_flow_variable_length,
         reference_workers=factory.reference_workers,
         prompt_cache_capacity=factory.prompt_cache_capacity,
