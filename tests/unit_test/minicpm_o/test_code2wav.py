@@ -37,6 +37,8 @@ from sglang_omni.models.minicpm_o.routing import (
 )
 from sglang_omni.models.minicpm_o.stages import vocode_code2wav_payloads
 from sglang_omni.proto import OmniRequest, StagePayload
+from sglang_omni.scheduling.message import IncomingMessage
+from sglang_omni.scheduling.simple_scheduler import SimpleScheduler
 from sglang_omni.serve.openai_api import (
     ChatCompletionRequest,
     build_chat_generate_request,
@@ -236,6 +238,21 @@ def code2wav_stage_factory() -> FactoryArgs:
     return next(stage for stage in config.stages if stage.name == "code2wav").factory
 
 
+def build_code2wav_stage(
+    model: MiniCPMOCode2Wav, monkeypatch: pytest.MonkeyPatch
+) -> SimpleScheduler:
+    monkeypatch.setattr(stages, "MiniCPMOCode2Wav", MagicMock(return_value=model))
+    factory = code2wav_stage_factory()
+    return stages.create_code2wav_executor(
+        "unused",
+        device="cuda",
+        gpu_id=0,
+        enable_flow_variable_length=factory.enable_flow_variable_length,
+        reference_workers=factory.reference_workers,
+        prompt_cache_capacity=factory.prompt_cache_capacity,
+    )
+
+
 def load_checkpoint_model(
     checkpoint: Path, *, enable_flow_variable_length: bool = False
 ) -> MiniCPMOCode2Wav:
@@ -389,7 +406,7 @@ def test_variable_length_option_reaches_dit(
 def test_speech_pipeline_enables_code2wav_batching_by_default() -> None:
     factory = code2wav_stage_factory()
     assert factory.max_batch_size == 8
-    assert factory.max_batch_wait_ms == 0.0
+    assert factory.max_batch_wait_ms == 100.0
     assert factory.batch_wait_when_idle is False
     assert factory.dtype is None
     assert factory.enable_flow_variable_length is True
@@ -564,16 +581,7 @@ def test_stage_stop_rejects_new_reference_preparation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     model = build_code2wav_model()
-    monkeypatch.setattr(stages, "MiniCPMOCode2Wav", MagicMock(return_value=model))
-    factory = code2wav_stage_factory()
-    scheduler = stages.create_code2wav_executor(
-        "unused",
-        device="cuda",
-        gpu_id=0,
-        enable_flow_variable_length=factory.enable_flow_variable_length,
-        reference_workers=factory.reference_workers,
-        prompt_cache_capacity=factory.prompt_cache_capacity,
-    )
+    scheduler = build_code2wav_stage(model, monkeypatch)
     scheduler.stop()
     with pytest.raises(RuntimeError):
         model.prepare_references([b"a", b"b"])
@@ -622,3 +630,119 @@ def test_vocode_payloads_returns_each_row_with_its_reference(
             waveform,
             expected_waveform(codec_tokens, reference or DEFAULT_REFERENCE_AUDIO),
         )
+
+
+QUEUED_REFERENCES = (("req-a", b"a"), ("req-b", b"b"))
+
+
+def drain_reference_worker(model: MiniCPMOCode2Wav) -> None:
+    """With one worker, a no-op task runs only after earlier prompts are stored."""
+    model.reference_executor.submit(int).result(timeout=THREAD_WAIT_SECONDS)
+
+
+def enqueue_talker_request(
+    scheduler: SimpleScheduler, request_id: str, reference_audio: str
+) -> None:
+    payload = talker_payload(
+        request_id=request_id, params={"ref_audio": reference_audio}
+    )
+    scheduler.enqueue(IncomingMessage(request_id, "new_request", payload))
+
+
+def test_prefetched_reference_serves_its_batch_without_second_preparation(
+    build_code2wav_model: Code2WavBuilder, fake_token2wav: MagicMock
+) -> None:
+    model = build_code2wav_model()
+    model.prefetch_reference("req-a", b"a")
+    prompts = model.prepare_references([b"a"])
+    assert prompts[0][0][0, 0].item() == ord("a")
+    fake_token2wav.prepare_prompt.assert_called_once()
+
+
+def test_queued_references_survive_cache_overflow(
+    build_code2wav_model: Code2WavBuilder, fake_token2wav: MagicMock
+) -> None:
+    model = build_code2wav_model(reference_workers=1, prompt_cache_capacity=1)
+    for request_id, reference in QUEUED_REFERENCES:
+        model.prefetch_reference(request_id, reference)
+    drain_reference_worker(model)
+    model.prepare_references([reference for _, reference in QUEUED_REFERENCES])
+    assert fake_token2wav.prepare_prompt.call_count == len(QUEUED_REFERENCES)
+
+
+def test_released_references_become_evictable(
+    build_code2wav_model: Code2WavBuilder, fake_token2wav: MagicMock
+) -> None:
+    model = build_code2wav_model(reference_workers=1, prompt_cache_capacity=1)
+    for request_id, reference in QUEUED_REFERENCES:
+        model.prefetch_reference(request_id, reference)
+    drain_reference_worker(model)
+    for request_id, _ in QUEUED_REFERENCES:
+        model.release_reference(request_id)
+    model.prepare_references([b"a"])
+    assert fake_token2wav.prepare_prompt.call_count == len(QUEUED_REFERENCES) + 1
+
+
+def test_failed_prefetch_is_retried_by_its_batch(
+    build_code2wav_model: Code2WavBuilder, fake_token2wav: MagicMock
+) -> None:
+    fake_token2wav.prepare_prompt.side_effect = ValueError("invalid reference")
+    model = build_code2wav_model(reference_workers=1)
+    model.prefetch_reference("req-a", b"a")
+    drain_reference_worker(model)
+    fake_token2wav.prepare_prompt.side_effect = fake_prepare_prompt
+    prompts = model.prepare_references([b"a"])
+    assert prompts[0][0][0, 0].item() == ord("a")
+
+
+def test_code2wav_stage_prepares_reference_on_arrival(
+    build_code2wav_model: Code2WavBuilder,
+    fake_token2wav: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = build_code2wav_model(reference_workers=1)
+    scheduler = build_code2wav_stage(model, monkeypatch)
+    enqueue_talker_request(scheduler, "req-a", wav_data_uri(b"a"))
+    drain_reference_worker(model)
+    fake_token2wav.prepare_prompt.assert_called_once()
+
+
+def test_code2wav_stage_queues_invalid_reference_without_preparing_it(
+    build_code2wav_model: Code2WavBuilder,
+    fake_token2wav: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scheduler = build_code2wav_stage(build_code2wav_model(), monkeypatch)
+    enqueue_talker_request(scheduler, "req-a", "/tmp/ref.wav")
+    assert scheduler.inbox.get_nowait().request_id == "req-a"
+    fake_token2wav.prepare_prompt.assert_not_called()
+
+
+def test_code2wav_stage_abort_releases_queued_reference(
+    build_code2wav_model: Code2WavBuilder,
+    fake_token2wav: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = build_code2wav_model(reference_workers=1, prompt_cache_capacity=1)
+    scheduler = build_code2wav_stage(model, monkeypatch)
+    for request_id, reference in QUEUED_REFERENCES:
+        enqueue_talker_request(scheduler, request_id, wav_data_uri(reference))
+    drain_reference_worker(model)
+    for request_id, _ in QUEUED_REFERENCES:
+        scheduler.abort(request_id)
+    model.prepare_references([b"a"])
+    assert fake_token2wav.prepare_prompt.call_count == len(QUEUED_REFERENCES) + 1
+
+
+def test_code2wav_stage_batch_releases_its_references(
+    build_code2wav_model: Code2WavBuilder,
+    fake_token2wav: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = build_code2wav_model(reference_workers=1, prompt_cache_capacity=1)
+    scheduler = build_code2wav_stage(model, monkeypatch)
+    for request_id, reference in QUEUED_REFERENCES:
+        enqueue_talker_request(scheduler, request_id, wav_data_uri(reference))
+    scheduler.batch_fn([scheduler.inbox.get_nowait().data for _ in QUEUED_REFERENCES])
+    model.prepare_references([b"a"])
+    assert fake_token2wav.prepare_prompt.call_count == len(QUEUED_REFERENCES) + 1

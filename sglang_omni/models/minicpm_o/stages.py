@@ -228,15 +228,32 @@ def create_code2wav_executor(
         state = MiniCPMOPipelineState.from_dict(payload.data)
         return int(state.engine_outputs[TALKER_STAGE]["codec_tokens"].numel())
 
+    def prefetch_reference(payload: StagePayload) -> None:
+        try:
+            reference = code2wav_reference_audio(payload)
+        except ValueError:
+            # Invalid references fail in their batch, where the stage reports errors.
+            return
+        model.prefetch_reference(payload.request_id, reference)
+
+    def vocode_and_release(payloads: list[StagePayload]) -> list[StagePayload]:
+        try:
+            return vocode_code2wav_payloads(model, payloads)
+        finally:
+            for payload in payloads:
+                model.release_reference(payload.request_id)
+
     return SimpleScheduler(
-        lambda payload: vocode_code2wav_payloads(model, [payload])[0],
-        batch_compute_fn=lambda payloads: vocode_code2wav_payloads(model, payloads),
+        lambda payload: vocode_and_release([payload])[0],
+        batch_compute_fn=vocode_and_release,
         max_batch_size=max_batch_size,
         max_batch_wait_ms=max_batch_wait_ms,
         batch_wait_when_idle=batch_wait_when_idle,
         request_cost_fn=codec_token_cost,
         max_batch_cost=max_batch_cost,
+        abort_callback=model.release_reference,
         shutdown_callback=model.close_reference_pool,
+        request_arrival_hook=prefetch_reference,
     )
 
 
