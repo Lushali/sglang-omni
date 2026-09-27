@@ -183,14 +183,18 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
             cond=conds,
             n_timesteps=n_timesteps,
         )
-        generated = []
-        for i, (prompt_length, token_length) in enumerate(
-            zip(prompt_token_lens, token_lens, strict=True)
-        ):
-            first_frame = prompt_length * self.up_rate
-            generated.append(
-                feat[i, :, first_frame : first_frame + token_length * self.up_rate]
+        generated = [
+            feat[
+                i,
+                :,
+                prompt_length
+                * self.up_rate : (prompt_length + token_length)
+                * self.up_rate,
+            ]
+            for i, (prompt_length, token_length) in enumerate(
+                zip(prompt_token_lens, token_lens, strict=True)
             )
+        ]
         return pad_sequence(
             [row.transpose(0, 1) for row in generated], batch_first=True
         ).transpose(1, 2)
