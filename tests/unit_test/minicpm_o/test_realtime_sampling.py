@@ -67,7 +67,12 @@ async def test_native_session_receives_sampling(sampling: SamplingConfig) -> Non
     params = await open_session_params(
         MiniCPMODuplexPipelineConfig(model_path="unused"), sampling
     )
-    assert params == {"instructions": "be brief", **DEFAULT_SAMPLING, **sampling}
+    assert params == {
+        "instructions": "be brief",
+        **DEFAULT_SAMPLING,
+        **sampling,
+        "max_slice_nums": 1,
+    }
 
 
 @pytest.mark.asyncio

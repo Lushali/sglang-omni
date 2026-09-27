@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+from pydantic import ValidationError
 from transformers import AutoConfig
 from transformers.models.auto.configuration_auto import CONFIG_MAPPING
 
@@ -23,6 +24,7 @@ from sglang_omni.config.runtime import (
 from sglang_omni.models.minicpm_o import engine_builder, native_stages, stages
 from sglang_omni.models.minicpm_o.components import audio_encoder, image_encoder
 from sglang_omni.models.minicpm_o.hf_config import MiniCPMOConfig
+from sglang_omni.models.minicpm_o.native_config import MiniCPMODuplexVision
 from sglang_omni.models.minicpm_o.session_adapters import build_realtime_deployment
 from sglang_omni.scheduling import sglang_backend
 from sglang_omni.scheduling.session import SessionHooks
@@ -251,3 +253,15 @@ for name in ("MiniCPMODuplexPipelineConfig", "MiniCPMOPipelineConfig", "MiniCPMO
         timeout=60,
     )
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    "limits",
+    [
+        {"max_slice_nums": 4, "max_slice_nums_limit": 2},
+        {"max_tiles_per_unit": 9, "max_slice_nums_limit": 9},
+    ],
+)
+def test_vision_limits_must_fit_one_frame(limits: dict[str, int]) -> None:
+    with pytest.raises(ValidationError):
+        MiniCPMODuplexVision(**limits)

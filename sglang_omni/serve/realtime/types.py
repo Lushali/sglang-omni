@@ -67,6 +67,9 @@ class Capabilities:
     max_image_bytes: int = 512 * 1024
     sampling_parameters: tuple[str, ...] = ()
     supports_reference_audio: bool = False
+    # Frame cap per unit, indexed by the session's max_slice_nums minus one.
+    image_frames_per_unit: tuple[int, ...] = (1,)
+    default_max_slice_nums: int = 1
 
     def __post_init__(self) -> None:
         if self.interaction != "native":
@@ -79,8 +82,10 @@ class Capabilities:
             raise ValueError("positive rates and cadence required")
         elif self.input_sample_rate_hz * self.native_unit_ms % MS_PER_SECOND:
             raise ValueError("native cadence must contain whole samples")
-        elif self.max_image_bytes <= 0:
-            raise ValueError("positive image byte limit required")
+        elif self.max_image_bytes <= 0 or min(self.image_frames_per_unit) <= 0:
+            raise ValueError("positive image byte and frame limits required")
+        elif not 1 <= self.default_max_slice_nums <= len(self.image_frames_per_unit):
+            raise ValueError("default slice count exceeds the slice limit")
         elif self.tail_policy not in get_args(TailPolicy):
             raise ValueError("unsupported tail policy")
         elif (
@@ -130,7 +135,10 @@ class Capabilities:
             granted["input_image_format"] = dict(
                 types=["image/jpeg", "image/png"],
                 max_bytes=self.max_image_bytes,
-                max_per_unit=1,
+                max_per_unit=self.image_frames_per_unit[
+                    self.default_max_slice_nums - 1
+                ],
+                max_slice_nums=len(self.image_frames_per_unit),
             )
         else:
             pass
@@ -145,7 +153,7 @@ class Unit:
     real_samples: int
     eos: bool = False
     output_modalities: tuple[str, ...] | None = None
-    image: bytes | None = None
+    images: tuple[bytes, ...] = ()
 
     @property
     def unit_id(self) -> str:

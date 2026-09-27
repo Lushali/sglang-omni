@@ -102,3 +102,21 @@ update = {
 Each reference must be a base64-encoded PCM16 WAV file of at most 1 MiB: 8–48 kHz, mono or stereo, nonempty and at most 30 seconds. Header size fields are ignored and the length is taken from the samples present, so streamed WAV output with placeholder sizes is accepted. Paths and URLs are not accepted. Invalid references are rejected during negotiation.
 
 References are frozen once the session opens and apply only to that session. They are input-only and never echoed in `session.updated`.
+
+## Native duplex video and HD slices
+
+The native deployment accepts several frames per audio unit. Send one `sglang.input_image.append` event per frame before the unit is cut by audio input. Frames in a unit are ordered by `sglang.t_ms`, with equal timestamps kept in arrival order, and all frames precede the unit's audio. Each frame is limited to 512 KiB encoded bytes and 4096 × 4096 pixels. `sglang.t_ms` is audio media time; after `input_audio_buffer.clear`, frames at the cleared time are rejected as stale.
+
+Before the first audio packet, a session can request HD slicing:
+
+```json
+{
+  "type": "session.update",
+  "event_id": "vision-1",
+  "session": {"sglang": {"max_slice_nums": 4}}
+}
+```
+
+Each frame is encoded as one 64-embedding overview tile plus, when slicing, up to `max_slice_nums` 64-embedding crops; the processor picks the actual grid from the image size. The per-unit frame cap therefore shrinks as the slice count grows, and `sglang.granted.input_image_format` reports the negotiated `max_per_unit` together with the deployment's `max_slice_nums` limit. Extra frames are rejected before vision encoding. The setting is frozen once the session opens.
+
+The limits and the default slice count come from the `vision` section of the pipeline config (see `examples/full_duplex/minicpmo.yaml`): `max_frames_per_unit`, `max_tiles_per_unit`, the session default `max_slice_nums` and the highest value a session may request, `max_slice_nums_limit`. These bound per-unit vision work, not the session context, which images, audio, prompt and generated tokens all consume.

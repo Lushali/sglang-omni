@@ -14,6 +14,12 @@ sampling:
   listen_prob_scale: 1.0
   force_listen_count: 3
 
+vision:
+  max_frames_per_unit: 4
+  max_tiles_per_unit: 10
+  max_slice_nums: 1
+  max_slice_nums_limit: 9
+
 stages:
   perception:
     gpu_memory_fraction: 0.12

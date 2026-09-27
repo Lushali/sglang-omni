@@ -20,11 +20,14 @@ def state() -> MiniCPMOPerceptionState:
         "<unit>": 1,
         "<image>": 2,
         "</image>": 3,
+        "<slice>": 4,
+        "</slice>": 5,
     }.__getitem__
     return MiniCPMOPerceptionState(
         tokenizer=tokenizer,
         processor=Mock(),
         audio_encoder=Mock(),
+        max_slice_nums=1,
     )
 
 
@@ -80,7 +83,7 @@ def test_image_layout_and_relay_order(
     state.prefix_embeds = torch.full((2, 4), 5.0)
     image = torch.full((64, 4), 6.0)
     audio = torch.full((10, 4), 9.0)
-    plan = state.build_step_plan(audio, image)
+    plan = state.build_step_plan(audio, (image,))
     prefix = state.prefix_token_ids if chunk_index == 1 else []
     assert plan["token_ids"] == prefix + [1, 2] + [0] * 64 + [3] + [0] * 10
     assert plan["prefill_schema"] == [
@@ -152,7 +155,7 @@ def test_reject_invalid_embedding_slot(
     state: MiniCPMOPerceptionState, shape: tuple[int, ...]
 ) -> None:
     with pytest.raises(AssertionError):
-        state.build_step_plan(torch.zeros(10, 4), torch.zeros(shape))
+        state.build_step_plan(torch.zeros(10, 4), (torch.zeros(shape),))
 
 
 def test_reject_pixel_limit_before_decode(
@@ -162,7 +165,7 @@ def test_reject_pixel_limit_before_decode(
     Image.new("RGB", (16, 16)).save(encoded, format="PNG")
     monkeypatch.setattr(
         "sglang_omni.models.minicpm_o.components.streaming_perception.MAX_FRAME_PIXELS",
-        200,
+        15,
     )
     with pytest.raises(ValueError, match="pixel limit"):
         state.encode_image(encoded.getvalue())
@@ -175,3 +178,51 @@ def test_reject_truncated_png(state: MiniCPMOPerceptionState) -> None:
     with pytest.raises(OSError):
         state.encode_image(encoded.getvalue()[:45])
     state.processor.process_image.assert_not_called()
+
+
+def test_multiple_frames_and_slices_follow_official_order(
+    state: MiniCPMOPerceptionState,
+) -> None:
+    first = torch.cat([torch.full((64, 4), float(i)) for i in (1, 2, 3)])
+    second = torch.full((64, 4), 4.0)
+    audio = torch.full((10, 4), 9.0)
+    plan = state.build_step_plan(audio, (first, second))
+    assert plan["token_ids"] == (
+        [1, 2]
+        + [0] * 64
+        + [3, 4]
+        + [0] * 64
+        + [5, 4]
+        + [0] * 64
+        + [5, 2]
+        + [0] * 64
+        + [3]
+        + [0] * 10
+    )
+    assert torch.equal(plan["input_embeds"], torch.cat([first, second, audio]))
+    assert plan["prefill_schema"] == [
+        ("tok", 2),
+        ("image", 64),
+        ("tok", 2),
+        ("image", 64),
+        ("tok", 2),
+        ("image", 64),
+        ("tok", 2),
+        ("image", 64),
+        ("tok", 1),
+        ("audio", 10),
+    ]
+
+
+def test_hd_slice_count_reaches_processor(state: MiniCPMOPerceptionState) -> None:
+    state.max_slice_nums = 4
+    state.processor.process_image.return_value = {
+        "pixel_values": [[torch.zeros(3, 14, 28)]],
+        "tgt_sizes": [torch.tensor([[1, 2]])],
+    }
+    embeds = torch.zeros(5 * 64, 4)
+    state.image_encoder = Mock(return_value={"image_embeds": embeds})
+    encoded = BytesIO()
+    Image.new("RGB", (32, 32)).save(encoded, format="PNG")
+    assert torch.equal(state.encode_image(encoded.getvalue()), embeds)
+    assert state.processor.process_image.call_args.kwargs["max_slice_nums"] == 4

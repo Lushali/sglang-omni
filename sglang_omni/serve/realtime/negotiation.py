@@ -144,6 +144,25 @@ class SessionNegotiation:
                 )
             else:
                 pass
+        if (
+            "max_slice_nums" in extension
+            and "image" not in self.capabilities.input_modalities
+        ):
+            raise ProtocolError(
+                "not_applicable",
+                "image input is unavailable",
+                "session.sglang.max_slice_nums",
+            )
+        elif "max_slice_nums" in extension and extension["max_slice_nums"] > len(
+            self.capabilities.image_frames_per_unit
+        ):
+            raise ProtocolError(
+                "invalid_request",
+                "slice count exceeds deployment limit",
+                "session.sglang.max_slice_nums",
+            )
+        else:
+            pass
         native_unit_ms = extension.get("timebase", {}).get(
             "native_unit_ms", self.capabilities.native_unit_ms
         )
@@ -164,6 +183,15 @@ class SessionNegotiation:
         granted_modalities: list[str],
     ) -> tuple[SessionConfiguration, GrantedCapabilities]:
         granted = self.capabilities.to_granted_capabilities()
+        if "image" in self.capabilities.input_modalities:
+            slice_count = candidate.get("sglang", {}).get(
+                "max_slice_nums", self.capabilities.default_max_slice_nums
+            )
+            granted["input_image_format"]["max_per_unit"] = (
+                self.capabilities.image_frames_per_unit[slice_count - 1]
+            )
+        else:
+            pass
         granted.update(
             {
                 "output_modalities": granted_modalities,

@@ -3,7 +3,7 @@
 
 from typing import ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from sglang_omni.admission import REQUEST_TO_TOKEN_SLOTS_RESERVED_FOR_RETAINED_KV
 from sglang_omni.config import (
@@ -69,6 +69,28 @@ class MiniCPMODuplexSampling(BaseModel):
     force_listen_count: int = Field(default=3, ge=0)
 
 
+class MiniCPMODuplexVision(BaseModel):
+    """Per-unit image limits; each frame costs one overview tile plus its slices."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    max_frames_per_unit: int = Field(default=4, ge=1)
+    max_tiles_per_unit: int = Field(default=10, ge=1)
+    max_slice_nums: int = Field(default=1, ge=1)
+    max_slice_nums_limit: int = Field(default=9, ge=1, le=9)
+
+    @model_validator(mode="after")
+    def check_limits(self) -> "MiniCPMODuplexVision":
+        if self.max_slice_nums > self.max_slice_nums_limit:
+            raise ValueError("max_slice_nums exceeds max_slice_nums_limit")
+        elif self.max_slice_nums_limit > 1 and (
+            self.max_tiles_per_unit < self.max_slice_nums_limit + 1
+        ):
+            raise ValueError("max_tiles_per_unit cannot fit one frame at the limit")
+        else:
+            return self
+
+
 class MiniCPMODuplexPipelineConfig(PipelineConfig):
     architecture: ClassVar[str] = "MiniCPMO"
     stage_config_types: ClassVar[dict[str, type[StageConfig]]] = {
@@ -80,6 +102,7 @@ class MiniCPMODuplexPipelineConfig(PipelineConfig):
     max_sessions: int = Field(default=2, ge=1)
     speech_state_bytes_per_session: int = Field(default=2 << 30, ge=1)
     sampling: MiniCPMODuplexSampling = Field(default_factory=MiniCPMODuplexSampling)
+    vision: MiniCPMODuplexVision = Field(default_factory=MiniCPMODuplexVision)
     entry_stage: str = "perception"
     stages: list[StageConfig] = Field(default_factory=stages)
 

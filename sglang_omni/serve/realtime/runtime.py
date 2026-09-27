@@ -77,7 +77,7 @@ class SessionRuntime:
         self.discarded_samples = 0
         self.padding_samples = 0
         self.pending_pcm = bytearray()
-        self.pending_frames: dict[int, bytes] = {}
+        self.pending_frames: dict[int, list[tuple[float, bytes]]] = {}
         self.next_unit_index = 0
         self.is_input_ended = False
         self.end_event_id: str | None = None
@@ -240,10 +240,15 @@ class SessionRuntime:
     async def append_image(self, image: bytes, t_ms: float, event_id: str) -> None:
         async with self.command_lock:
             self.require_open()
-            unit_index = math.floor(t_ms / self.capabilities.native_unit_ms)
-            accepted_units = math.ceil(
-                self.capabilities.input_duration_ms(self.accepted_samples)
-                / self.capabilities.native_unit_ms
+            pending_start_ms = self.capabilities.input_duration_ms(
+                self.accepted_samples - self.pending_samples
+            )
+            pending_unit_offset = math.floor(
+                (t_ms - pending_start_ms) / self.capabilities.native_unit_ms
+            )
+            unit_index = self.next_unit_index + pending_unit_offset
+            pending_units = math.ceil(
+                len(self.pending_pcm) / self.capabilities.native_unit_bytes
             )
             if "image" not in self.capabilities.input_modalities:
                 raise ProtocolError("not_supported", "image input is not granted")
@@ -259,12 +264,15 @@ class SessionRuntime:
                 )
             elif unit_index < self.next_unit_index:
                 raise ProtocolError("invalid_state", "frame unit already cut")
-            elif unit_index in self.pending_frames:
-                raise ProtocolError("invalid_state", "unit already has a frame")
-            elif unit_index > accepted_units + MAX_FRAME_LOOKAHEAD_UNITS:
+            elif (
+                len(self.pending_frames.get(unit_index, ()))
+                >= self.granted["input_image_format"]["max_per_unit"]
+            ):
+                raise ProtocolError("buffer_overflow", "unit frame count exceeds limit")
+            elif pending_unit_offset > pending_units + MAX_FRAME_LOOKAHEAD_UNITS:
                 raise ProtocolError("buffer_overflow", "frame exceeds lookahead budget")
             else:
-                self.pending_frames[unit_index] = image
+                self.pending_frames.setdefault(unit_index, []).append((t_ms, image))
                 self.notify(ImageAccepted(f"unit_{unit_index}", event_id))
 
     async def clear(self, event_id: str) -> None:
@@ -327,7 +335,13 @@ class SessionRuntime:
             real_samples,
             self.is_input_ended and not self.pending_pcm,
             tuple(self.granted["output_modalities"]),
-            image=self.pending_frames.pop(self.next_unit_index, None),
+            images=tuple(
+                image
+                for _, image in sorted(
+                    self.pending_frames.pop(self.next_unit_index, []),
+                    key=lambda frame: frame[0],
+                )
+            ),
         )
         self.next_unit_index += 1
         return unit

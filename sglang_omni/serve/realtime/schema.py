@@ -33,6 +33,7 @@ class ImageFormat(TypedDict):
     types: list[str]
     max_bytes: int
     max_per_unit: int
+    max_slice_nums: int
 
 
 class TurnDetectionConfig(TypedDict, total=False):
@@ -105,6 +106,7 @@ class SessionExtension(TypedDict, total=False):
     sampling: SamplingConfig
     reference_audio: AudioReference
     tts_reference_audio: AudioReference
+    max_slice_nums: Annotated[int, Field(ge=1)]
 
 
 class SessionConfiguration(TypedDict, total=False):

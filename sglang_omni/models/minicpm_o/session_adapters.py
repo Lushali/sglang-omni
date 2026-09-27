@@ -226,6 +226,9 @@ def build_realtime_deployment(
                         if (reference := session.get("sglang", {}).get(field))
                         is not None
                     },
+                    "max_slice_nums": session.get("sglang", {}).get(
+                        "max_slice_nums", config.vision.max_slice_nums
+                    ),
                 },
             ),
             output_converter=OutputConverter(),
@@ -240,6 +243,15 @@ def build_realtime_deployment(
             output_sample_rate_hz=24000,
             output_modalities=("audio", "text"),
             input_modalities=("audio", "image"),
+            image_frames_per_unit=tuple(
+                min(
+                    config.vision.max_frames_per_unit,
+                    config.vision.max_tiles_per_unit
+                    // (1 if slices == 1 else slices + 1),
+                )
+                for slices in range(1, config.vision.max_slice_nums_limit + 1)
+            ),
+            default_max_slice_nums=config.vision.max_slice_nums,
             tail_policy="pad",
             supports_reference_audio=True,
             sampling_parameters=tuple(MiniCPMODuplexSampling.model_fields),

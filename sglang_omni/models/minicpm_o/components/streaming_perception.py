@@ -133,6 +133,7 @@ class MiniCPMOPerceptionState:
     tokenizer: PreTrainedTokenizerBase
     processor: StreamingAudioProcessor
     audio_encoder: MiniCPMOAudioEncoder
+    max_slice_nums: int
     image_encoder: ImageEncoder | None = None
     audio_buffer: np.ndarray = field(
         default_factory=lambda: np.zeros(0, dtype=np.float32)
@@ -156,6 +157,7 @@ class MiniCPMOPerceptionState:
         prompt: str,
         reference_audio: bytes | None,
         image_encoder: ImageEncoder | None = None,
+        max_slice_nums: int,
     ) -> MiniCPMOPerceptionState:
         processor.set_streaming_mode(
             mode="exact",
@@ -171,6 +173,7 @@ class MiniCPMOPerceptionState:
             processor=processor,
             audio_encoder=audio_encoder,
             image_encoder=image_encoder,
+            max_slice_nums=max_slice_nums,
         )
         prompt_ids = list(
             tokenizer.encode(
@@ -282,17 +285,19 @@ class MiniCPMOPerceptionState:
                 raise ValueError("unit image exceeds pixel limit")
             else:
                 frame = image.convert("RGB")
-        processed = self.processor.process_image([frame], max_slice_nums=1)
+        processed = self.processor.process_image(
+            [frame], max_slice_nums=self.max_slice_nums
+        )
         assert self.image_encoder is not None
         image_embeds = self.image_encoder(
             pixel_values=processed["pixel_values"][0],
             tgt_sizes=processed["tgt_sizes"][0],
         )["image_embeds"]
-        assert image_embeds.ndim == 2 and image_embeds.shape[0] == IMAGE_TOKENS
+        assert image_embeds.ndim == 2 and image_embeds.shape[0] % IMAGE_TOKENS == 0
         return image_embeds
 
     def build_step_plan(
-        self, audio_embeds: torch.Tensor, image_embeds: torch.Tensor | None = None
+        self, audio_embeds: torch.Tensor, image_embeds: tuple[torch.Tensor, ...] = ()
     ) -> PerceptionStepPlan:
         token_ids: list[int] = []
         embed_blocks: list[torch.Tensor] = []
@@ -332,20 +337,25 @@ class MiniCPMOPerceptionState:
             pass
 
         token_ids.append(self.tokenizer.convert_tokens_to_ids("<unit>"))
-        schema: list[tuple[Literal["tok", "audio", "image"], int]]
-        if image_embeds is None:
-            schema = [("tok", 1), ("audio", int(audio_embeds.shape[0]))]
-        else:
-            assert image_embeds.shape == (IMAGE_TOKENS, audio_embeds.shape[1])
-            token_ids.append(self.tokenizer.convert_tokens_to_ids("<image>"))
-            add_embeds(image_embeds, "image")
-            token_ids.append(self.tokenizer.convert_tokens_to_ids("</image>"))
-            schema = [
-                ("tok", 2),
-                ("image", IMAGE_TOKENS),
-                ("tok", 1),
-                ("audio", int(audio_embeds.shape[0])),
-            ]
+        schema: list[tuple[Literal["tok", "audio", "image"], int]] = [("tok", 1)]
+        for frame_embeds in image_embeds:
+            assert (
+                frame_embeds.ndim == 2
+                and frame_embeds.shape[1] == audio_embeds.shape[1]
+            )
+            assert (
+                frame_embeds.shape[0] > 0 and frame_embeds.shape[0] % IMAGE_TOKENS == 0
+            )
+            for slice_index, slice_embeds in enumerate(
+                frame_embeds.split(IMAGE_TOKENS)
+            ):
+                marker = "image" if slice_index == 0 else "slice"
+                token_ids.append(self.tokenizer.convert_tokens_to_ids(f"<{marker}>"))
+                schema[-1] = ("tok", schema[-1][1] + 1)
+                add_embeds(slice_embeds, "image")
+                token_ids.append(self.tokenizer.convert_tokens_to_ids(f"</{marker}>"))
+                schema.extend([("image", IMAGE_TOKENS), ("tok", 1)])
+        schema.append(("audio", int(audio_embeds.shape[0])))
         add_embeds(audio_embeds)
         return PerceptionStepPlan(
             token_ids=token_ids,

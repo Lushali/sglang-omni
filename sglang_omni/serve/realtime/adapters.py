@@ -169,7 +169,11 @@ class CoordinatorAdapter(InteractionAdapter):
             samples_to_ms(unit.start_sample, self.input_sample_rate_hz),
             samples_to_ms(unit.real_samples, self.input_sample_rate_hz),
             unit.index,
-            unit.pcm if unit.image is None else {"pcm": unit.pcm, "image": unit.image},
+            (
+                unit.pcm
+                if not unit.images
+                else {"pcm": unit.pcm, "images": list(unit.images)}
+            ),
             format="pcm16",
             eos=unit.eos,
         )

@@ -61,6 +61,7 @@ class PerceptionHooks(SessionHooks):
             reference_audio=request.params.get("reference_audio")
             or self.reference_audio,
             image_encoder=self.image_encoder,
+            max_slice_nums=request.params["max_slice_nums"],
         )
 
     def append(
@@ -71,21 +72,22 @@ class PerceptionHooks(SessionHooks):
         else:
             state = self.states[context.session_identity]
             if isinstance(chunk.payload, dict):
-                # Note (Junnan Li): The frame is client data acknowledged before decoding;
-                # an undecodable frame is dropped so the unit still runs on its audio.
-                try:
-                    image_embeds = state.encode_image(chunk.payload["image"])
-                except (OSError, ValueError, Image.DecompressionBombError) as exc:
-                    logger.warning(
-                        f"Dropping undecodable frame of unit {chunk.seq}: {exc}"
-                    )
-                    image_embeds = None
+                # Note (Junnan Li): Frames are client data acknowledged before decoding;
+                # an undecodable frame is dropped so the unit still runs on the rest.
+                image_embeds = []
+                for image in chunk.payload["images"]:
+                    try:
+                        image_embeds.append(state.encode_image(image))
+                    except (OSError, ValueError, Image.DecompressionBombError) as exc:
+                        logger.warning(
+                            f"Dropping undecodable frame of unit {chunk.seq}: {exc}"
+                        )
                 pcm = (
                     np.frombuffer(chunk.payload["pcm"], dtype="<i2").astype(np.float32)
                     / 32768.0
                 )
                 payload.data = state.build_step_plan(
-                    state.encode_audio(pcm), image_embeds
+                    state.encode_audio(pcm), tuple(image_embeds)
                 )
             else:
                 pcm = (

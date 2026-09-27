@@ -18,9 +18,13 @@ import torch
 from PIL import Image
 
 from sglang_omni.models.minicpm_o.components.streaming_perception import (
+    IMAGE_TOKENS,
     MiniCPMOPerceptionState,
 )
-from sglang_omni.models.minicpm_o.native_config import MiniCPMODuplexSampling
+from sglang_omni.models.minicpm_o.native_config import (
+    MiniCPMODuplexPipelineConfig,
+    MiniCPMODuplexSampling,
+)
 from sglang_omni.models.minicpm_o.special_tokens import (
     REQUIRED_SPECIAL_TOKENS,
     resolve_special_token_ids,
@@ -42,6 +46,7 @@ def relay(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
         Protocol=Protocol,
         TypedDict=TypedDict,
         ARRequestData=ARRequestData,
+        IMAGE_TOKENS=IMAGE_TOKENS,
         np=np,
         torch=torch,
         array=array,
@@ -113,7 +118,7 @@ def perception() -> MiniCPMOPerceptionState:
         zip(REQUIRED_SPECIAL_TOKENS, range(1, 17))
     ).__getitem__
     state = MiniCPMOPerceptionState(
-        tokenizer=tokenizer, processor=Mock(), audio_encoder=Mock()
+        tokenizer=tokenizer, processor=Mock(), audio_encoder=Mock(), max_slice_nums=1
     )
     state.encode_audio = Mock(return_value=torch.full((10, 4), 9.0))
     state.encode_image = Mock(return_value=torch.full((64, 4), 6.0))
@@ -135,7 +140,7 @@ def test_append_and_thinker_splice(
     hooks.states[identity] = perception
     pcm = np.arange(16000, dtype="<i2").tobytes()
     chunk = TimedChunk(
-        "audio", 0, 1000, 0, {"pcm": pcm, "image": b"frame"} if has_image else pcm
+        "audio", 0, 1000, 0, {"pcm": pcm, "images": [b"frame"]} if has_image else pcm
     )
     payload = StagePayload(
         "unit", OmniRequest(None, params=MiniCPMODuplexSampling().model_dump()), None
@@ -185,7 +190,9 @@ def test_image_audio_commit_atomically(
     payload = StagePayload(
         "unit",
         OmniRequest(None, params=MiniCPMODuplexSampling().model_dump()),
-        perception.build_step_plan(torch.full((10, 4), 9.0), torch.full((64, 4), 6.0)),
+        perception.build_step_plan(
+            torch.full((10, 4), 9.0), (torch.full((64, 4), 6.0),)
+        ),
     )
     adapter = relay.ThinkerAdapter(perception.tokenizer, 100)
     adapter.open(identity, payload.request)
@@ -244,7 +251,7 @@ def test_undecodable_frame_runs_unit_on_audio(
         "unit", OmniRequest(None, params=MiniCPMODuplexSampling().model_dump()), None
     )
     hooks.append(
-        TimedChunk("audio", 0, 1000, 0, {"pcm": b"\0\0", "image": b"bad"}),
+        TimedChunk("audio", 0, 1000, 0, {"pcm": b"\0\0", "images": [b"bad"]}),
         payload,
         SimpleNamespace(session_identity=identity),
     )
@@ -253,10 +260,15 @@ def test_undecodable_frame_runs_unit_on_audio(
 
 
 def test_deployment_grants_image_with_default_limit(relay: ModuleType) -> None:
-    relay.build_realtime_deployment(Mock(), Mock(max_sessions=2))
+    relay.build_realtime_deployment(
+        Mock(), MiniCPMODuplexPipelineConfig(model_path="unused")
+    )
+    kwargs = relay.Capabilities.call_args.kwargs
     assert relay.RealtimeDeployment.call_args.args[0] is relay.Capabilities.return_value
-    assert relay.Capabilities.call_args.kwargs["input_modalities"] == ("audio", "image")
-    assert "max_image_bytes" not in relay.Capabilities.call_args.kwargs
+    assert kwargs["input_modalities"] == ("audio", "image")
+    assert "max_image_bytes" not in kwargs
+    assert kwargs["image_frames_per_unit"] == (4, 3, 2, 2, 1, 1, 1, 1, 1)
+    assert kwargs["default_max_slice_nums"] == 1
 
 
 def test_encoders_share_stage_device(relay: ModuleType, tmp_path: Path) -> None:
@@ -298,3 +310,27 @@ def test_empty_eos_does_not_encode(
     assert payload.data is None
     perception.encode_audio.assert_not_called()
     perception.encode_image.assert_not_called()
+
+
+def test_bad_frame_does_not_drop_valid_siblings(
+    relay: ModuleType, perception: MiniCPMOPerceptionState
+) -> None:
+    identity = SessionIdentity("vision")
+    hooks = relay.PerceptionHooks(
+        perception.tokenizer, Mock(), perception.audio_encoder
+    )
+    hooks.states[identity] = perception
+    first = torch.full((64, 4), 3.0)
+    last = torch.full((64, 4), 7.0)
+    perception.encode_image.side_effect = [first, ValueError("bad frame"), last]
+    payload = StagePayload("unit", OmniRequest(None), None)
+    hooks.append(
+        TimedChunk(
+            "audio", 0, 1000, 0, {"pcm": b"\0\0", "images": [b"first", b"bad", b"last"]}
+        ),
+        payload,
+        SimpleNamespace(session_identity=identity),
+    )
+    spans = payload.data["embedding_spans"]
+    assert [span["modality"] for span in spans] == ["image", "image", "audio"]
+    assert torch.equal(payload.data["input_embeds"][:128], torch.cat([first, last]))
