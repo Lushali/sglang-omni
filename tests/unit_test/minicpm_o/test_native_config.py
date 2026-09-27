@@ -152,10 +152,12 @@ def test_duplex_yaml_session_limits(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    reference_path = tmp_path / "reference.wav"
+    reference_path.write_bytes(b"reference")
     config_path = tmp_path / "duplex.yaml"
     config_path.write_text(
         "config_cls: MiniCPMODuplexPipelineConfig\n"
-        "model_path: unused\nreference_audio: reference.wav\n" + settings
+        f"model_path: unused\nreference_audio: {reference_path}\n" + settings
     )
     config = ConfigManager.from_file(str(config_path)).config
     hooks = SessionHooks()
@@ -163,7 +165,11 @@ def test_duplex_yaml_session_limits(
     monkeypatch.setattr(native_stages, "MiniCPMOAudioEncoder", Mock())
     monkeypatch.setattr(native_stages, "MiniCPMOImageEncoder", Mock())
     monkeypatch.setattr(native_stages, "PerceptionHooks", Mock(return_value=hooks))
-    monkeypatch.setattr(native_stages, "MiniCPMOCode2Wav", Mock())
+    monkeypatch.setattr(
+        native_stages,
+        "MiniCPMOCode2Wav",
+        Mock(return_value=Mock(default_prompt_wav=str(reference_path))),
+    )
     monkeypatch.setattr(native_stages, "MiniCPMOVocoderRuntime", Mock())
     monkeypatch.setattr(native_stages, "SpeechHooks", Mock(return_value=hooks))
     perception = native_stages.create_perception_scheduler(

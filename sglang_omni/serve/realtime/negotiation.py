@@ -135,6 +135,15 @@ class SessionNegotiation:
             )
         else:
             pass
+        for field in ("reference_audio", "tts_reference_audio"):
+            if field in extension and not self.capabilities.supports_reference_audio:
+                raise ProtocolError(
+                    "not_applicable",
+                    "reference audio is unavailable",
+                    f"session.sglang.{field}",
+                )
+            else:
+                pass
         native_unit_ms = extension.get("timebase", {}).get(
             "native_unit_ms", self.capabilities.native_unit_ms
         )

@@ -66,6 +66,7 @@ class Capabilities:
     input_modalities: tuple[str, ...] = ("audio",)
     max_image_bytes: int = 512 * 1024
     sampling_parameters: tuple[str, ...] = ()
+    supports_reference_audio: bool = False
 
     def __post_init__(self) -> None:
         if self.interaction != "native":
@@ -122,6 +123,7 @@ class Capabilities:
             pressure_policy="reject",
             strict_order=True,
             sampling_parameters=list(self.sampling_parameters),
+            supports_reference_audio=self.supports_reference_audio,
         )
 
         if "image" in self.input_modalities:

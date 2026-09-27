@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
 from typing_extensions import TypedDict
+
+from sglang_omni.serve.realtime.reference_audio import (
+    MAX_REFERENCE_AUDIO_BYTES,
+    normalize_reference_wav,
+)
 
 JsonValue = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 JsonObject = dict[str, JsonValue]
@@ -66,11 +73,38 @@ class SamplingConfig(TypedDict, total=False):
     force_listen_count: Annotated[int, Field(ge=0)]
 
 
+class AudioReference(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+
+    media_type: Literal["audio/wav"]
+    data: bytes = Field(repr=False)
+
+    @field_validator("data", mode="before", json_schema_input_type=str)
+    @classmethod
+    def decode_wav(cls, value: JsonValue) -> bytes:
+        if not isinstance(value, str):
+            raise ValueError("reference audio must be base64 text")
+        elif len(value) > (MAX_REFERENCE_AUDIO_BYTES + 2) // 3 * 4:
+            raise ValueError("reference audio exceeds byte limit")
+        else:
+            pass
+        try:
+            audio = base64.b64decode(value, validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise ValueError("invalid base64 reference audio") from exc
+        if len(audio) > MAX_REFERENCE_AUDIO_BYTES:
+            raise ValueError("reference audio exceeds byte limit")
+        else:
+            return normalize_reference_wav(audio)
+
+
 class SessionExtension(TypedDict, total=False):
     interaction: Interaction
     tail_policy: TailPolicy
     timebase: TimebaseConfig
     sampling: SamplingConfig
+    reference_audio: AudioReference
+    tts_reference_audio: AudioReference
 
 
 class SessionConfiguration(TypedDict, total=False):
@@ -111,6 +145,7 @@ class GrantedCapabilities(TypedDict, total=False):
     pressure_policy: Literal["reject"]
     strict_order: bool
     sampling_parameters: list[str]
+    supports_reference_audio: bool
     limits: dict[str, int | float]
     rejections: list[Rejection]
 

@@ -35,6 +35,7 @@ def relay(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
     module = ModuleType("native_vision_test")
     monkeypatch.setitem(sys.modules, module.__name__, module)
     module.__dict__.update(
+        Path=Path,
         collections=collections,
         dataclass=dataclass,
         field=field,
@@ -258,7 +259,9 @@ def test_deployment_grants_image_with_default_limit(relay: ModuleType) -> None:
     assert "max_image_bytes" not in relay.Capabilities.call_args.kwargs
 
 
-def test_encoders_share_stage_device(relay: ModuleType) -> None:
+def test_encoders_share_stage_device(relay: ModuleType, tmp_path: Path) -> None:
+    reference = tmp_path / "reference.wav"
+    reference.write_bytes(b"reference")
     relay.AutoTokenizer = Mock()
     relay.AutoProcessor = Mock()
     relay.MiniCPMOAudioEncoder = Mock()
@@ -269,7 +272,7 @@ def test_encoders_share_stage_device(relay: ModuleType) -> None:
         "checkpoint",
         device="cpu",
         dtype="float32",
-        reference_audio="reference.wav",
+        reference_audio=str(reference),
         max_open_sessions=2,
     )
     relay.MiniCPMOAudioEncoder.assert_called_once_with(

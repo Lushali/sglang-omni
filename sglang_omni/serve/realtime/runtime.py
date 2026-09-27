@@ -172,6 +172,14 @@ class SessionRuntime:
             else:
                 pass
             self.config, self.granted = candidate, granted
+            public_config = {
+                **candidate,
+                "sglang": {
+                    key: value
+                    for key, value in candidate.get("sglang", {}).items()
+                    if key not in ("reference_audio", "tts_reference_audio")
+                },
+            }
             self.notify(
                 Updated(
                     self.session_id,
@@ -179,7 +187,7 @@ class SessionRuntime:
                     candidate["type"],
                     granted,
                     event_id,
-                    copy.deepcopy(candidate),
+                    copy.deepcopy(public_config),
                 )
             )
 

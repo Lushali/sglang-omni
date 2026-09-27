@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from io import BytesIO
 from pathlib import Path
 
 import numpy as np
@@ -155,8 +156,8 @@ class Token2Wav(torch.nn.Module):
         )
 
     @torch.inference_mode()
-    def prepare_prompt(self, path: str) -> SpeakerPrompt:
-        audio, sample_rate = torchaudio.load(path)
+    def prepare_prompt(self, source: str | BytesIO) -> SpeakerPrompt:
+        audio, sample_rate = torchaudio.load(source)
         if sample_rate != 16000:
             speech = torchaudio.transforms.Resample(sample_rate, 16000)(audio)
         else:

@@ -42,7 +42,7 @@ class PerceptionHooks(SessionHooks):
         tokenizer: PreTrainedTokenizerBase,
         processor_factory: ProcessorFactory,
         audio_encoder: MiniCPMOAudioEncoder,
-        reference_audio: str | None = None,
+        reference_audio: bytes | None = None,
         image_encoder: MiniCPMOImageEncoder | None = None,
     ) -> None:
         self.tokenizer = tokenizer
@@ -58,7 +58,8 @@ class PerceptionHooks(SessionHooks):
             processor=self.processor_factory(),
             audio_encoder=self.audio_encoder,
             prompt=request.params.get("instructions", ""),
-            reference_audio=self.reference_audio,
+            reference_audio=request.params.get("reference_audio")
+            or self.reference_audio,
             image_encoder=self.image_encoder,
         )
 
@@ -108,12 +109,17 @@ class SpeechState:
 
 
 class SpeechHooks(SessionHooks):
-    def __init__(self, runtime: MiniCPMOVocoderRuntime, prompt_wav: str) -> None:
+    def __init__(self, runtime: MiniCPMOVocoderRuntime, prompt_wav: bytes) -> None:
         self.runtime, self.prompt_wav = runtime, prompt_wav
         self.states: dict[SessionIdentity, SpeechState] = {}
 
     def open(self, session_identity: SessionIdentity, request: OmniRequest) -> None:
-        self.runtime.open_session(session_identity.id, prompt_wav=self.prompt_wav)
+        self.runtime.open_session(
+            session_identity.id,
+            prompt_wav=request.params.get("tts_reference_audio")
+            or request.params.get("reference_audio")
+            or self.prompt_wav,
+        )
         self.states[session_identity] = SpeechState(session_identity.id)
 
     def append(
@@ -192,9 +198,11 @@ def create_perception_scheduler(
         tokenizer,
         lambda: AutoProcessor.from_pretrained(model_path, trust_remote_code=True),
         encoder,
+        reference_audio=Path(
+            reference_audio
+            or Path(resolve_model_path(model_path)) / "assets" / "HT_ref_audio.wav"
+        ).read_bytes(),
         image_encoder=image_encoder,
-        reference_audio=reference_audio
-        or str(Path(resolve_model_path(model_path)) / "assets" / "HT_ref_audio.wav"),
     )
     return SessionScheduler(
         hooks, max_open_sessions=max_open_sessions, max_concurrency=1
@@ -236,7 +244,7 @@ def create_speech_scheduler(
     codec = MiniCPMOCode2Wav(model_path, device=device, prompt_wav=reference_audio)
     runtime = MiniCPMOVocoderRuntime(codec.token2wav)
     return SessionScheduler(
-        SpeechHooks(runtime, codec.default_prompt_wav),
+        SpeechHooks(runtime, Path(codec.default_prompt_wav).read_bytes()),
         max_open_sessions=max_open_sessions,
         max_concurrency=1,
         max_state_bytes=max_state_bytes,

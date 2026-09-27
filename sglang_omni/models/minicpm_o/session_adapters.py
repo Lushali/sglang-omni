@@ -220,6 +220,12 @@ def build_realtime_deployment(
                     or "Streaming Omni Conversation.",
                     **config.sampling.model_dump(),
                     **session.get("sglang", {}).get("sampling", {}),
+                    **{
+                        field: reference.data
+                        for field in ("reference_audio", "tts_reference_audio")
+                        if (reference := session.get("sglang", {}).get(field))
+                        is not None
+                    },
                 },
             ),
             output_converter=OutputConverter(),
@@ -235,6 +241,7 @@ def build_realtime_deployment(
             output_modalities=("audio", "text"),
             input_modalities=("audio", "image"),
             tail_policy="pad",
+            supports_reference_audio=True,
             sampling_parameters=tuple(MiniCPMODuplexSampling.model_fields),
         ),
         factory,

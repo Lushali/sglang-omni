@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from io import BytesIO
 
 import numpy as np
 
@@ -63,13 +64,13 @@ class MiniCPMOVocoderRuntime:
         self.sessions: dict[str, MiniCPMOVocoderSessionState] = {}
 
     def open_session(
-        self, session_id: str, *, prompt_wav: str
+        self, session_id: str, *, prompt_wav: bytes
     ) -> MiniCPMOVocoderSessionState:
         if session_id in self.sessions:
             raise ValueError(f"TTS session {session_id!r} is already open")
         else:
             pass
-        prompt = self.token2wav.prepare_prompt(prompt_wav)
+        prompt = self.token2wav.prepare_prompt(BytesIO(prompt_wav))
         base_caches = self.token2wav.open_stream(prompt)
         state = MiniCPMOVocoderSessionState(
             prompt=prompt,

@@ -79,3 +79,26 @@ nonnegative integer. Top-k accepts `-1` or `0` to disable filtering and positive
 integers to enable it. These settings control the Thinker duplex sampler, not
 the Talker sampling policy. `length_penalty` is not implemented and is rejected.
 The official demo adapter must forward these fields explicitly to use them.
+
+## Native full-duplex reference audio
+
+Deployments advertising `sglang.granted.supports_reference_audio=true` accept per-session WAV references before the first audio append:
+
+```python
+reference = base64.b64encode(Path("reference.wav").read_bytes()).decode("ascii")
+update = {
+    "type": "session.update",
+    "event_id": "voice-1",
+    "session": {
+        "sglang": {
+            "reference_audio": {"media_type": "audio/wav", "data": reference}
+        }
+    },
+}
+```
+
+`reference_audio` supplies the Perception system-prompt audio and the default speaker conditioning for Speech. An optional `tts_reference_audio` object with the same structure overrides only Speech. Omitting the fields uses the deployment's `reference_audio`, or the checkpoint reference when none is configured.
+
+Each reference must be a base64-encoded PCM16 WAV file of at most 1 MiB: 8–48 kHz, mono or stereo, nonempty and at most 30 seconds. Header size fields are ignored and the length is taken from the samples present, so streamed WAV output with placeholder sizes is accepted. Paths and URLs are not accepted. Invalid references are rejected during negotiation.
+
+References are frozen once the session opens and apply only to that session. They are input-only and never echoed in `session.updated`.

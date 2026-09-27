@@ -15,7 +15,7 @@ from transformers import PreTrainedTokenizerBase
 
 from sglang_omni.models.minicpm_o.components.audio_encoder import MiniCPMOAudioEncoder
 from sglang_omni.models.minicpm_o.components.whisper_encoder import AudioEncoderState
-from sglang_omni.preprocessing.audio import load_audio_path
+from sglang_omni.preprocessing.audio import AudioMediaIO
 from sglang_omni.proto.session import ResourceUsage
 from sglang_omni.scheduling.speaker_cache import estimate_cache_bytes
 
@@ -154,7 +154,7 @@ class MiniCPMOPerceptionState:
         processor: StreamingAudioProcessor,
         audio_encoder: MiniCPMOAudioEncoder,
         prompt: str,
-        reference_audio: str | None,
+        reference_audio: bytes | None,
         image_encoder: ImageEncoder | None = None,
     ) -> MiniCPMOPerceptionState:
         processor.set_streaming_mode(
@@ -186,10 +186,10 @@ class MiniCPMOPerceptionState:
             state.prefix_token_ids.append(
                 tokenizer.convert_tokens_to_ids("<|audio_start|>")
             )
-            waveform = np.asarray(
-                load_audio_path(reference_audio, target_sr=SAMPLE_RATE),
-                dtype=np.float32,
-            ).reshape(-1)
+            reference_waveform, _ = AudioMediaIO(target_sr=SAMPLE_RATE).load_bytes(
+                reference_audio
+            )
+            waveform = np.asarray(reference_waveform, dtype=np.float32).reshape(-1)
             batch = audio_feature_batch(
                 processor.process_audio(waveform, sampling_rate=SAMPLE_RATE)
             )
