@@ -12,6 +12,8 @@ Set `model_path` in `minicpmo.yaml` to a prepared MiniCPM-o 4.5 checkpoint, then
 sgl-omni serve --config examples/full_duplex/minicpmo.yaml --enable-realtime
 ```
 
+`minicpmo.yaml` samples the thinker the way the MiniCPM-o demo does. Regression and parity recordings need repeatable output, so launch those servers from `minicpmo-parity.yaml` instead; it differs only in `sampling.greedy: true` and `sampling.top_k: 100`, the values every existing golden recording used.
+
 The `MiniCPMODuplexPipelineConfig` is also available as the `session` model variant.
 The existing `text` and `speech` variants keep their ordinary request pipelines.
 An optional top-level `reference_audio` path supplies the reference for both
