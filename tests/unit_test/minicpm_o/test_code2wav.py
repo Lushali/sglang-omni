@@ -239,6 +239,23 @@ def test_vocode_payloads_uses_one_batch_path() -> None:
     assert output.data["audio_waveform_shape"] == [3 * SAMPLES_PER_CODEC_TOKEN]
 
 
+def test_vocode_payloads_skip_empty_codec_sequences() -> None:
+    fake = fake_code2wav_model()
+    empty = StagePayload(
+        request_id="empty",
+        request=OmniRequest(inputs=None, params={}, metadata={}),
+        data=MiniCPMOPipelineState(
+            engine_outputs={
+                "talker": {"codec_tokens": torch.empty(0, dtype=torch.long)}
+            }
+        ).to_dict(),
+    )
+    outputs = vocode_code2wav_payloads(fake, [empty, make_payload(tokens=[4, 5])])
+    fake.vocode.assert_called_once_with([[4, 5]], b"default")
+    assert outputs[0].data["audio_waveform_shape"] == [0]
+    assert outputs[1].data["audio_waveform_shape"] == [2 * SAMPLES_PER_CODEC_TOKEN]
+
+
 def test_vocode_payloads_groups_by_resolved_reference() -> None:
     fake = fake_code2wav_model()
     outputs = vocode_code2wav_payloads(

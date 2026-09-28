@@ -8,6 +8,7 @@ import os
 from collections import defaultdict
 from typing import Any
 
+import numpy as np
 import torch
 import torch.nn as nn
 from sglang.srt.arg_groups.model_override_base import resolved_view
@@ -204,13 +205,17 @@ def vocode_code2wav_payloads(
         f"minicpm_code2wav_batch size={len(payloads)} groups={len(groups)} "
         f"max_codec_tokens={max(len(tokens) for tokens in codec_tokens)}"
     )
-    waveforms_by_index = {}
+    waveforms_by_index = {
+        idx: np.zeros(0, dtype=np.float32)
+        for idx, tokens in enumerate(codec_tokens)
+        if not tokens
+    }
     for group_indices in groups.values():
+        voiced = [idx for idx in group_indices if codec_tokens[idx]]
         group_waveforms = model.vocode(
-            [codec_tokens[idx] for idx in group_indices],
-            references[group_indices[0]],
+            [codec_tokens[idx] for idx in voiced], references[group_indices[0]]
         )
-        for idx, waveform in zip(group_indices, group_waveforms, strict=True):
+        for idx, waveform in zip(voiced, group_waveforms, strict=True):
             waveforms_by_index[idx] = waveform
 
     outputs: list[StagePayload] = []
