@@ -26,7 +26,9 @@ def shm_create_from_tensor(tensor: torch.Tensor) -> _shm.SharedMemory:
     t_np = tensor.numpy().reshape(-1)
     size = t_np.nbytes
 
-    shm = _shm.SharedMemory(create=True, size=size)
+    # Note (Junnan Li): SharedMemory rejects size 0; an empty tensor still needs a
+    # block so the receiver's metadata and copy stay uniform.
+    shm = _shm.SharedMemory(create=True, size=max(size, 1))
     shm_view = np.ndarray(t_np.shape, dtype=t_np.dtype, buffer=shm.buf)
     shm_view[:] = t_np[:]
 
@@ -184,7 +186,7 @@ class ShmRelay(Relay):
 
         try:
             shm = shm_create_from_tensor(tensor)
-            size_bytes = shm.size
+            size_bytes = tensor.numel() * tensor.element_size()
             metadata = {
                 "engine_id": self.engine_id,
                 "transfer_info": {
