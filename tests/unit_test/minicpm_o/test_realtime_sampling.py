@@ -16,9 +16,9 @@ from sglang_omni.serve.realtime.negotiation import SessionNegotiation
 from sglang_omni.serve.realtime.schema import JsonObject, SamplingConfig
 
 DEFAULT_SAMPLING = {
-    "greedy": True,
+    "greedy": False,
     "temperature": 0.7,
-    "top_k": 100,
+    "top_k": 20,
     "top_p": 0.8,
     "repetition_penalty": 1.05,
     "listen_prob_scale": 1.0,
@@ -54,11 +54,11 @@ async def open_session_params(
         {},
         {
             "temperature": 0.4,
-            "top_k": 20,
+            "top_k": 50,
             "top_p": 0.6,
             "repetition_penalty": 1.2,
             "listen_prob_scale": 0.5,
-            "greedy": False,
+            "greedy": True,
             "force_listen_count": 0,
         },
     ],

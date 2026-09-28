@@ -60,9 +60,9 @@ class MiniCPMODuplexSampling(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    greedy: bool = True
+    greedy: bool = False
     temperature: float = Field(default=0.7, ge=0)
-    top_k: int = Field(default=100, ge=-1)
+    top_k: int = Field(default=20, ge=-1)
     top_p: float = Field(default=0.8, gt=0, le=1)
     repetition_penalty: float = Field(default=1.05, gt=0)
     listen_prob_scale: float = Field(default=1.0, ge=0)
