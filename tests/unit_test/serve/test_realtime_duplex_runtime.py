@@ -9,10 +9,13 @@ import pytest
 
 from sglang_omni.serve.realtime.control import Closed, Drained, Failure, UnitCompleted
 from sglang_omni.serve.realtime.output import (
+    AudioDelta,
     OutputEvent,
     ResponseFinished,
     ResponseStarted,
+    TextDelta,
 )
+from sglang_omni.serve.realtime.output_buffer import OutputBuffer
 from sglang_omni.serve.realtime.runtime import SessionRuntime
 from sglang_omni.serve.realtime.schema import SessionConfiguration
 from sglang_omni.serve.realtime.types import (
@@ -140,3 +143,43 @@ async def test_context_exhaustion_closes_session(exhausted: bool) -> None:
     assert failures[0].code == ("context_exhausted" if exhausted else "internal")
     assert failures[0].is_fatal
     assert message in failures[0].message
+
+
+def test_input_unit_bytes_do_not_count_toward_output_budget() -> None:
+    buffer = OutputBuffer(RuntimeLimits())
+    unit = Unit(0, 0, bytes(32000), 16000, images=(bytes(512 * 1024),) * 4)
+    for _ in range(8):
+        buffer.enqueue(Envelope(event=UnitCompleted(unit.unit_id), unit=unit))
+    assert buffer.queued_bytes < 8 * 1024
+    for _ in range(8):
+        envelope = buffer.dequeue()
+        assert envelope is not None
+        assert envelope.unit is unit
+    assert buffer.queued_bytes == 0
+    assert buffer.dequeue() is None
+
+
+@pytest.mark.parametrize(
+    "event",
+    [
+        AudioDelta("response", "item", bytes(2048)),
+        TextDelta("response", "item", "x" * 2048),
+    ],
+)
+def test_outbound_payload_still_counts_toward_output_budget(event: OutputEvent) -> None:
+    buffer = OutputBuffer(RuntimeLimits(max_output_bytes=1024))
+    with pytest.raises(RuntimeError, match="outbound event budget exhausted"):
+        buffer.enqueue(Envelope(event=event))
+    assert buffer.queued_bytes == 0
+    assert buffer.dequeue() is None
+
+
+def test_outbound_event_count_limit_is_preserved() -> None:
+    buffer = OutputBuffer(RuntimeLimits(max_output_events=1))
+    envelope = Envelope(event=UnitCompleted(0))
+    buffer.enqueue(envelope)
+    with pytest.raises(RuntimeError, match="outbound event budget exhausted"):
+        buffer.enqueue(envelope)
+    assert buffer.dequeue() is envelope
+    assert buffer.queued_bytes == 0
+    buffer.enqueue(envelope)
