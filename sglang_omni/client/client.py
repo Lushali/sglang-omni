@@ -34,6 +34,13 @@ from sglang_omni.client.types import (
 from sglang_omni.pipeline.coordinator import Coordinator, CoordinatorHealth
 from sglang_omni.proto import OmniRequest, RequestState, StreamMessage
 from sglang_omni.proto.admin import AdminResponse
+from sglang_omni.proto.request import EXPLICIT_STAGE_SAMPLING_PARAMS_KEY
+from sglang_omni.proto.session import (
+    OutputChunk,
+    SessionIdentity,
+    SessionLimits,
+    TimedChunk,
+)
 
 PayloadValue = TypeVar("PayloadValue")
 
@@ -57,6 +64,32 @@ class Client:
         self.coordinator = coordinator
         self.result_builder = result_builder or self.default_result_builder
         self.stream_builder = stream_builder or self.default_stream_builder
+
+    async def open_session(
+        self,
+        request: OmniRequest,
+        *,
+        stages: list[str],
+        limits: SessionLimits | None = None,
+        session_id: str | None = None,
+    ) -> SessionIdentity:
+        """Open an explicitly configured stateful pipeline route."""
+        return await self.coordinator.open_session(
+            request, stages=stages, limits=limits, session_id=session_id
+        )
+
+    async def append_session(
+        self, session_identity: SessionIdentity, chunk: TimedChunk
+    ) -> int:
+        return await self.coordinator.append_session(session_identity, chunk)
+
+    def session_outputs(
+        self, session_identity: SessionIdentity
+    ) -> AsyncIterator[OutputChunk]:
+        return self.coordinator.session_outputs(session_identity)
+
+    async def close_session(self, session_identity: SessionIdentity) -> None:
+        await self.coordinator.close_session(session_identity)
 
     # ------------------------------------------------------------------
     # Low-level generate (backward compatible)
@@ -532,6 +565,16 @@ class Client:
         inputs = extract_inputs(request)
         params = build_params(request)
         metadata = dict(request.metadata)
+        if (
+            request.stage_sampling
+            and EXPLICIT_STAGE_SAMPLING_PARAMS_KEY not in metadata
+        ):
+            metadata[EXPLICIT_STAGE_SAMPLING_PARAMS_KEY] = {
+                stage: list(sampling)
+                for stage, sampling in params["stage_sampling"].items()
+            }
+        else:
+            pass
         if request.model:
             metadata.setdefault("model", request.model)
         else:

@@ -74,11 +74,18 @@ class Qwen3TTSModelRunner(ModelRunner):
     tp_worker: ModelWorker
 
     def __init__(
-        self, tp_worker: ModelWorker, output_processor: SGLangOutputProcessor
+        self,
+        tp_worker: ModelWorker,
+        output_processor: SGLangOutputProcessor,
+        *,
+        leading_silence_mask_frames: int,
+        silence_codec_ids: torch.Tensor,
     ) -> None:
         super().__init__(tp_worker, output_processor)
         self.has_pending_code_step = False
         self.row_ids_cache: torch.Tensor | None = None
+        self.leading_silence_mask_frames = leading_silence_mask_frames
+        self.silence_codec_ids = silence_codec_ids
 
     def before_prefill(
         self,
@@ -202,6 +209,24 @@ class Qwen3TTSModelRunner(ModelRunner):
             active_logits[:, codec_eos + 1 : suppress_stop] = float("-inf")
         else:
             active_logits[:, suppress_start:suppress_stop] = float("-inf")
+
+        # note (luojiaxuan): a cold-start clone that samples a silence id first
+        # tends to stay silent for several frames, so silence ids are excluded
+        # from its opening frames.
+        if self.leading_silence_mask_frames > 0:
+            for row_index, scheduled_request in enumerate(requests):
+                if (
+                    scheduled_request.data.mask_leading_silence
+                    and len(scheduled_request.data.output_codes)
+                    < self.leading_silence_mask_frames
+                ):
+                    active_logits[row_index].index_fill_(
+                        0, self.silence_codec_ids, float("-inf")
+                    )
+                else:
+                    pass
+        else:
+            pass
 
     def install_semantic_sampling_seeds(
         self,

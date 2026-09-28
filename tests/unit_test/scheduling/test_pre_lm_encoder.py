@@ -16,7 +16,7 @@ from sglang_omni.scheduling.pre_lm_encoder import (
 )
 
 
-class _Service(PreLMEncoderService[int, list[int], int]):
+class Service(PreLMEncoderService[int, list[int], int]):
     def __init__(self, *, controlled_drain: bool = False) -> None:
         self.attachments: list[tuple[int, int]] = []
         self.cached: list[tuple[int, int, object | None]] = []
@@ -99,7 +99,7 @@ class _Service(PreLMEncoderService[int, list[int], int]):
 
 
 def test_successful_dispatch_attaches_and_caches() -> None:
-    service = _Service()
+    service = Service()
     try:
         future = service.submit(3)
 
@@ -111,7 +111,7 @@ def test_successful_dispatch_attaches_and_caches() -> None:
 
 
 def test_stage_host_copy_runs_in_batch_context_and_reaches_cache() -> None:
-    service = _Service()
+    service = Service()
     service.stage_host_copies = True
     try:
         future = service.submit(4)
@@ -126,7 +126,7 @@ def test_stage_host_copy_runs_in_batch_context_and_reaches_cache() -> None:
 
 
 def test_batch_failure_recovers_each_item() -> None:
-    service = _Service(controlled_drain=True)
+    service = Service(controlled_drain=True)
     service.fail_multi = True
     service.retry = True
     try:
@@ -142,7 +142,7 @@ def test_batch_failure_recovers_each_item() -> None:
 
 @pytest.mark.parametrize("split_mode", ["too_few", "too_many"])
 def test_wrong_embedding_cardinality_fails_future(split_mode: str) -> None:
-    service = _Service()
+    service = Service()
     service.split_mode = split_mode
     try:
         future = service.submit(1)
@@ -155,7 +155,7 @@ def test_wrong_embedding_cardinality_fails_future(split_mode: str) -> None:
 
 
 def test_statistics_hook_failure_does_not_kill_worker() -> None:
-    service = _Service()
+    service = Service()
     service.start_hook_error = True
     try:
         assert service.submit(1).result(timeout=2) == 2
@@ -166,7 +166,7 @@ def test_statistics_hook_failure_does_not_kill_worker() -> None:
 
 
 def test_fatal_policy_failure_completes_current_future_and_rejects_submits() -> None:
-    service = _Service(controlled_drain=True)
+    service = Service(controlled_drain=True)
     service.fail_items.add(1)
     service.retry_hook_error = True
     first = service.submit(1)

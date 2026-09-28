@@ -33,6 +33,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Coroutine, Mapping, Sequence
+from types import ModuleType
 
 import torch
 from typing_extensions import Generic, TypeVar
@@ -85,6 +86,18 @@ def resolve_initial_codec_chunk_frames(
         pass
 
     return min(frames, int(steady_chunk_frames))
+
+
+def vocoder_decode_stream_priority(device_module: ModuleType) -> int:
+    """The second-highest stream priority of the device: ahead of the talker's
+    default-priority stream, with the top level left free. A device with two levels
+    uses the top one."""
+    least_priority, greatest_priority = device_module.Stream.priority_range()
+    if greatest_priority + 1 < least_priority:
+        return greatest_priority + 1
+    else:
+        pass
+    return greatest_priority
 
 
 class StreamingVocoderBase(
@@ -596,4 +609,5 @@ __all__ = [
     "INITIAL_CODEC_CHUNK_FRAMES_PARAM",
     "StreamingVocoderBase",
     "resolve_initial_codec_chunk_frames",
+    "vocoder_decode_stream_priority",
 ]
