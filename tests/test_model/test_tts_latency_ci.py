@@ -2,8 +2,8 @@
 """Streaming first-audio latency for the Qwen3-TTS CI arms.
 
 One TTS worker behind the router takes open-loop Poisson arrivals at each point
-of the preset's ``latency`` table, and the stage gates the first playable
-latency against the calibrated references in ``tts_ci_config.py``.
+of the preset's ``latency`` table, and the stage gates the median first
+playable latency against the calibrated references in ``tts_ci_config.py``.
 
 It is a module of its own so that its worker is the only server on the GPU:
 the stages in ``test_tts_ci.py`` keep a two-worker router alive for the whole
@@ -198,13 +198,6 @@ def test_streaming_first_audio_latency(
                 f"{label}: first playable median from arrival {median} s exceeds "
                 f"{point.ttfp_median_max_s} s",
             )
-            if point.ttfp_p95_max_s is not None:
-                p95 = summary["audio_ttfp_from_arrival_p95_s"]
-                checks.check(
-                    p95 <= point.ttfp_p95_max_s,
-                    f"{label}: first playable p95 from arrival {p95} s exceeds "
-                    f"{point.ttfp_p95_max_s} s",
-                )
     checks.assert_all()
 
 

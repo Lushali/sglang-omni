@@ -203,15 +203,22 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           OMNI_CI_MAX_ATTEMPTS: "1"
           TTS_CI_MODEL: ${{ inputs.tts_ci_model }}
-          TTS_STAGE_OUTPUT_ROOT: ${{ env.OMNI_CI_HOME }}/tts-stage-results/latency
+          TTS_STAGE_OUTPUT_ROOT: >-
+            ${{ env.OMNI_CI_HOME }}/tts-stage-results/latency/run-${{ github.run_id }}/attempt-${{ github.run_attempt }}
           TORCHINDUCTOR_CACHE_DIR: ${{ env.OMNI_CI_HOME }}/.torchinductor
 
+      # note (luojiaxuan): a run that trips a gate is the one whose numbers
+      # matter, so this uploads after a failure too; the run and attempt keyed
+      # root keeps an earlier push's results out of it. Missing files are an
+      # error only when the stage passed.
       - name: Upload latency artifact
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: tts-stage-latency-results
-          path: ${{ env.OMNI_CI_HOME }}/tts-stage-results/latency/**/speed_results.json
-          if-no-files-found: error
+          path: >-
+            ${{ env.OMNI_CI_HOME }}/tts-stage-results/latency/run-${{ github.run_id }}/attempt-${{ github.run_attempt }}/**/speed_results.json
+          if-no-files-found: ${{ job.status == 'success' && 'error' || 'warn' }}
           retention-days: 30
           overwrite: true
 
@@ -220,7 +227,8 @@ jobs:
         uses: ./.github/actions/omni-post-stage
         with:
           stage-label: TTS stage latency (streaming first audio)
-          artifact-search-root: ${{ env.OMNI_CI_HOME }}/tts-stage-results/latency
+          artifact-search-root: >-
+            ${{ env.OMNI_CI_HOME }}/tts-stage-results/latency/run-${{ github.run_id }}/attempt-${{ github.run_attempt }}
           artifact-path-globs: |
             */speed_results.json
 

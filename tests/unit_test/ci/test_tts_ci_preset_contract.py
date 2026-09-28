@@ -82,17 +82,11 @@ def test_a_latency_preset_gates_every_point_or_none(name: str) -> None:
         return
     assert latency.points
     assert all(point.samples > 0 and point.request_rate > 0 for point in latency.points)
-    thresholds = [
-        value
-        for point in latency.points
-        for value in (point.ttfp_median_max_s, point.ttfp_p95_max_s)
-        if value is not None
-    ]
+    thresholds = [point.ttfp_median_max_s for point in latency.points]
     if latency.calibrated:
-        assert all(point.ttfp_median_max_s is not None for point in latency.points)
-        assert all(value > 0 for value in thresholds)
+        assert all(value is not None and value > 0 for value in thresholds)
     else:
-        assert not thresholds
+        assert all(value is None for value in thresholds)
 
 
 @pytest.mark.parametrize("name", sorted(TTS_CI_PRESETS))

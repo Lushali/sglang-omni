@@ -50,7 +50,6 @@ class TtsCiLatencyPoint:
     # note (luojiaxuan): None until the point is calibrated, so the stage
     # prints the value without judging it.
     ttfp_median_max_s: float | None = None
-    ttfp_p95_max_s: float | None = None
 
 
 @dataclass(frozen=True)
@@ -261,17 +260,16 @@ COSYVOICE3_VC_STREAM_THRESHOLDS = apply_slack(
 # Each arm has its own references because a cloned voice encodes the reference
 # audio before the first chunk and a named voice does not. First playable is
 # timed from each request's planned arrival. These are raw worst-of-five
-# references; the gates below apply the slack once. The Base arm's 20 rps p95
-# is printed only: an idle-lane reference for it has failed on the busy CI host
-# before, so it waits for a calibration under CI co-load. The c50 continuity
-# rate is printed at every point: with three to seven streams per 1088 over a
-# 50 ms underrun, a ratio slack on a near-100% rate is either far too loose or
-# flaky.
+# references; the gates below apply the slack once. Only medians are gated.
+# The references come from an idle calibration lane, and an idle-lane p95
+# reference has failed on the busy CI host before, so the 20 rps p95 of both
+# arms is printed until it is calibrated under CI co-load. The c50 continuity
+# rate is printed too: with three to seven streams per 1088 over a 50 ms
+# underrun, a ratio slack on a near-100% rate is either far too loose or flaky.
 QWEN3_TTS_LATENCY_VC_R1_TTFP_MEDIAN_REF_S = 0.0581
 QWEN3_TTS_LATENCY_VC_R20_TTFP_MEDIAN_REF_S = 0.1041
 QWEN3_TTS_LATENCY_CUSTOM_VOICE_R1_TTFP_MEDIAN_REF_S = 0.0218
 QWEN3_TTS_LATENCY_CUSTOM_VOICE_R20_TTFP_MEDIAN_REF_S = 0.0355
-QWEN3_TTS_LATENCY_CUSTOM_VOICE_R20_TTFP_P95_REF_S = 0.0487
 
 
 def latency_gate(reference_s: float) -> float:
@@ -307,9 +305,6 @@ QWEN3_TTS_CUSTOM_VOICE_LATENCY_GATES = TtsCiLatencyPreset(
             samples=1088,
             ttfp_median_max_s=latency_gate(
                 QWEN3_TTS_LATENCY_CUSTOM_VOICE_R20_TTFP_MEDIAN_REF_S
-            ),
-            ttfp_p95_max_s=latency_gate(
-                QWEN3_TTS_LATENCY_CUSTOM_VOICE_R20_TTFP_P95_REF_S
             ),
         ),
     ),

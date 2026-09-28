@@ -415,8 +415,9 @@ python3 -m pytest tests/test_model/test_ming_tp_parity_ci.py -q -s
   transcription concurrency at 4.
 - `test_tts_latency_ci.py`: streaming first-audio latency for the Qwen3-TTS
   presets. One worker behind the router takes open-loop Poisson arrivals at
-  1 rps (60 samples) and 20 rps (the full EN set), and the first playable
-  latency is gated against the calibrated references in `tts_ci_config.py`.
+  1 rps (60 samples) and 20 rps (the full EN set), and the median first
+  playable latency is gated against the calibrated references in
+  `tts_ci_config.py`; tail percentiles and continuity rates are printed.
   It runs in its own pytest invocation so its worker is alone on the GPU.
 - `test_tts_consistency_artifacts.py`: CPU-only stage-3 check that compares
   TTS non-stream and streaming `speed_results.json` under
