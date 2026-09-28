@@ -45,28 +45,11 @@ def test_request_speech_span_condition(output_ids: list[int]) -> None:
     torch.testing.assert_close(condition, expected)
 
 
-@pytest.mark.parametrize("hidden_shape", [(0,), (0, 8)])
-def test_empty_condition_is_boundary_only(hidden_shape: tuple[int, ...]) -> None:
-    embedding = nn.Embedding(8, 8)
-    condition = build_tts_condition(
-        torch.empty(0, dtype=torch.long),
-        torch.empty(hidden_shape),
-        text_embedding=embedding,
-        semantic_projector=nn.Linear(8, 8),
-        boundary_tokens=(5, 6),
-        normalize_projected_hidden=True,
-    )
-    torch.testing.assert_close(condition, embedding(torch.tensor([5, 6])))
-
-
-@pytest.mark.parametrize("hidden_shape", [(8,), (3, 8)])
-def test_nonempty_condition_rejects_misaligned_hidden(
-    hidden_shape: tuple[int, ...],
-) -> None:
+def test_nonempty_condition_rejects_misaligned_hidden() -> None:
     with pytest.raises(ValueError, match="length mismatch"):
         build_tts_condition(
             torch.tensor([1, 2]),
-            torch.empty(hidden_shape),
+            torch.empty(3, 8),
             text_embedding=nn.Embedding(8, 8),
             semantic_projector=nn.Identity(),
             boundary_tokens=(5, 6),

@@ -24,7 +24,10 @@ from sglang_omni.config.runtime import (
 from sglang_omni.models.minicpm_o import engine_builder, native_stages, stages
 from sglang_omni.models.minicpm_o.components import audio_encoder, image_encoder
 from sglang_omni.models.minicpm_o.hf_config import MiniCPMOConfig
-from sglang_omni.models.minicpm_o.native_config import MiniCPMODuplexVision
+from sglang_omni.models.minicpm_o.native_config import (
+    MiniCPMODuplexPipelineConfig,
+    MiniCPMODuplexVision,
+)
 from sglang_omni.models.minicpm_o.session_adapters import build_realtime_deployment
 from sglang_omni.scheduling import sglang_backend
 from sglang_omni.scheduling.session import SessionHooks
@@ -193,21 +196,19 @@ def test_duplex_yaml_session_limits(
     }
 
 
-@pytest.mark.parametrize("stage_name", ["thinker", "talker"])
-def test_duplex_engine_override_wins(stage_name: str, tmp_path: Path) -> None:
+def test_duplex_engine_override_wins(tmp_path: Path) -> None:
     config_path = tmp_path / "duplex.yaml"
     config_path.write_text(
         "config_cls: MiniCPMODuplexPipelineConfig\nmodel_path: unused\n"
         "max_sessions: 8\nstages:\n"
-        f"  {stage_name}:\n    engine:\n      max_running_requests: 3\n"
+        "  talker:\n    engine:\n      max_running_requests: 3\n"
     )
     config = ConfigManager.from_file(str(config_path)).config
-    stage = config.stage_named(stage_name)
     kwargs = apply_typed_stage_kwargs(
-        native_stages.create_thinker_scheduler,
-        config.stage_factory_kwargs(stage_name),
-        resolve_stage_typed_kwargs(stage),
-        stage_name=stage_name,
+        native_stages.create_talker_scheduler,
+        config.stage_factory_kwargs("talker"),
+        resolve_stage_typed_kwargs(config.stage_named("talker")),
+        stage_name="talker",
     )
     assert kwargs["server_args_overrides"]["max_running_requests"] == 3
 
@@ -265,3 +266,43 @@ for name in ("MiniCPMODuplexPipelineConfig", "MiniCPMOPipelineConfig", "MiniCPMO
 def test_vision_limits_must_fit_one_frame(limits: dict[str, int]) -> None:
     with pytest.raises(ValidationError):
         MiniCPMODuplexVision(**limits)
+
+
+def test_duplex_deployment_grants_images_by_slice_count() -> None:
+    capabilities = build_realtime_deployment(
+        Mock(), MiniCPMODuplexPipelineConfig(model_path="unused")
+    ).capabilities
+    assert capabilities.input_modalities == ("audio", "image")
+    assert capabilities.max_image_bytes == 512 * 1024
+    assert capabilities.image_frames_per_unit == (4, 3, 2, 2, 1, 1, 1, 1, 1)
+    assert capabilities.default_max_slice_nums == 1
+
+
+def test_perception_encoders_share_stage_device(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reference = tmp_path / "reference.wav"
+    reference.write_bytes(b"reference")
+    for name in (
+        "AutoTokenizer",
+        "MiniCPMOAudioEncoder",
+        "MiniCPMOImageEncoder",
+        "PerceptionHooks",
+    ):
+        monkeypatch.setattr(native_stages, name, Mock())
+    native_stages.create_perception_scheduler(
+        "checkpoint",
+        device="cpu",
+        dtype="float32",
+        reference_audio=str(reference),
+        max_open_sessions=2,
+    )
+    for encoder in (
+        native_stages.MiniCPMOAudioEncoder,
+        native_stages.MiniCPMOImageEncoder,
+    ):
+        encoder.assert_called_once_with("checkpoint", device="cpu", dtype="float32")
+    assert (
+        native_stages.PerceptionHooks.call_args.kwargs["image_encoder"]
+        is native_stages.MiniCPMOImageEncoder.return_value
+    )

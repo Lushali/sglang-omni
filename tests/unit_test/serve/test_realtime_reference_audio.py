@@ -29,52 +29,42 @@ def wav_reference(rate: int = 16000, frames: int = 160) -> str:
     return base64.b64encode(output.getvalue()).decode("ascii")
 
 
-@pytest.mark.parametrize("field", ["reference_audio", "tts_reference_audio"])
-def test_reference_is_negotiated_and_frozen(field: str) -> None:
-    negotiation = SessionNegotiation(
-        model="test",
-        capabilities=Capabilities(supports_reference_audio=True),
-        limits=RuntimeLimits(),
-    )
-    reference = {"media_type": "audio/wav", "data": wav_reference()}
-    config, granted = negotiation.negotiate(
-        {}, "CREATED", {"sglang": {field: reference}}
-    )
-    assert config["sglang"][field].data == base64.b64decode(reference["data"])
-    assert granted["supports_reference_audio"] is True
-    with pytest.raises(ProtocolError, match="frozen"):
-        negotiation.negotiate(
-            config,
-            "OPEN",
-            {
-                "sglang": {
-                    field: {"media_type": "audio/wav", "data": wav_reference(frames=80)}
-                }
-            },
-        )
+WAV = base64.b64decode(wav_reference())
+NEGOTIATION = SessionNegotiation(
+    model="test",
+    capabilities=Capabilities(supports_reference_audio=True),
+    limits=RuntimeLimits(),
+)
 
 
 @pytest.mark.parametrize(
     "data",
     [
-        "%%%%",
-        "AAAA",
-        "/tmp/reference.wav",
-        "https://example.com/reference.wav",
-        base64.b64encode(bytes(MAX_REFERENCE_AUDIO_BYTES + 1)).decode("ascii"),
-        5,
-        None,
-        ["AAAA"],
+        pytest.param("%%%%", id="not_base64"),
+        pytest.param(5, id="not_text"),
+        pytest.param(
+            base64.b64encode(bytes(MAX_REFERENCE_AUDIO_BYTES + 1)).decode("ascii"),
+            id="over_byte_limit",
+        ),
+        pytest.param("AAAA", id="truncated_riff"),
+        pytest.param(
+            base64.b64encode(b"RIFF" + (4).to_bytes(4, "little") + b"WAVE").decode(),
+            id="header_only",
+        ),
+        pytest.param(
+            base64.b64encode(
+                b"RIFF" + (12).to_bytes(4, "little") + b"WAVEJUNK" + b"\xff" * 4
+            ).decode(),
+            id="chunk_overflow",
+        ),
+        pytest.param(wav_reference(1, 100), id="rate_out_of_range"),
+        pytest.param(wav_reference(8000, 240001), id="over_30_seconds"),
+        pytest.param(wav_reference(16000, 0), id="empty"),
     ],
 )
 def test_invalid_reference_is_rejected(data: JsonValue) -> None:
-    negotiation = SessionNegotiation(
-        model="test",
-        capabilities=Capabilities(supports_reference_audio=True),
-        limits=RuntimeLimits(),
-    )
     with pytest.raises(ProtocolError) as error:
-        negotiation.negotiate(
+        NEGOTIATION.negotiate(
             {},
             "CREATED",
             {"sglang": {"reference_audio": {"media_type": "audio/wav", "data": data}}},
@@ -82,109 +72,85 @@ def test_invalid_reference_is_rejected(data: JsonValue) -> None:
     assert error.value.code == "invalid_request"
 
 
-def test_reference_is_rejected_without_capability() -> None:
-    negotiation = SessionNegotiation(
-        model="test", capabilities=Capabilities(), limits=RuntimeLimits()
-    )
-    with pytest.raises(ProtocolError) as error:
-        negotiation.negotiate(
-            {},
-            "CREATED",
-            {
-                "sglang": {
-                    "reference_audio": {
-                        "media_type": "audio/wav",
-                        "data": wav_reference(),
-                    }
-                }
-            },
-        )
-    assert error.value.code == "not_applicable"
-
-
-@pytest.mark.parametrize("field", ["reference_audio", "tts_reference_audio"])
-@pytest.mark.parametrize("rate,frames", [(1, 100), (8000, 240001), (16000, 0)])
-def test_unbounded_or_empty_reference_is_rejected(
-    field: str, rate: int, frames: int
+@pytest.mark.parametrize(
+    ("audio", "expected"),
+    [
+        pytest.param(
+            base64.b64decode(wav_reference(8000, 240000)),
+            base64.b64decode(wav_reference(8000, 240000)),
+            id="30_seconds_at_8k",
+        ),
+        pytest.param(
+            base64.b64decode(wav_reference(48000, 160)),
+            base64.b64decode(wav_reference(48000, 160)),
+            id="48k",
+        ),
+        pytest.param(
+            WAV[:4] + b"\xff" * 4 + WAV[8:40] + b"\xff" * 4 + WAV[44:],
+            WAV,
+            id="placeholder_sizes",
+        ),
+        pytest.param(
+            WAV[:4] + (len(WAV) - 9).to_bytes(4, "little") + WAV[8:-1],
+            base64.b64decode(wav_reference(frames=159)),
+            id="odd_tail",
+        ),
+        pytest.param(
+            WAV[:4]
+            + (len(WAV) + 16).to_bytes(4, "little")
+            + WAV[8:]
+            + WAV[12:24]
+            + (1).to_bytes(4, "little")
+            + WAV[28:36],
+            WAV,
+            id="later_format_chunk",
+        ),
+    ],
+)
+def test_reference_is_normalized_to_canonical_wav(
+    audio: bytes, expected: bytes
 ) -> None:
-    negotiation = SessionNegotiation(
-        model="test",
-        capabilities=Capabilities(supports_reference_audio=True),
-        limits=RuntimeLimits(),
-    )
-    with pytest.raises(ProtocolError) as error:
-        negotiation.negotiate(
-            {},
-            "CREATED",
-            {
-                "sglang": {
-                    field: {
-                        "media_type": "audio/wav",
-                        "data": wav_reference(rate, frames),
-                    }
-                }
-            },
-        )
-    assert error.value.code == "invalid_request"
-
-
-@pytest.mark.parametrize("damage", ["zero_rate", "header_only", "chunk_overflow"])
-def test_malformed_wav_is_rejected(damage: str) -> None:
-    audio = bytearray(base64.b64decode(wav_reference()))
-    if damage == "zero_rate":
-        audio[24:28] = bytes(4)
-    elif damage == "chunk_overflow":
-        audio = bytearray(
-            b"RIFF" + (12).to_bytes(4, "little") + b"WAVEJUNK" + b"\xff" * 4
-        )
-    else:
-        audio = bytearray(b"RIFF" + (4).to_bytes(4, "little") + b"WAVE")
-    negotiation = SessionNegotiation(
-        model="test",
-        capabilities=Capabilities(supports_reference_audio=True),
-        limits=RuntimeLimits(),
-    )
-    with pytest.raises(ProtocolError):
-        negotiation.negotiate(
-            {},
-            "CREATED",
-            {
-                "sglang": {
-                    "reference_audio": {
-                        "media_type": "audio/wav",
-                        "data": base64.b64encode(audio).decode(),
-                    }
-                }
-            },
-        )
-
-
-@pytest.mark.parametrize("rate,frames", [(8000, 240000), (48000, 160)])
-def test_reference_rate_and_duration_boundaries_are_supported(
-    rate: int, frames: int
-) -> None:
-    negotiation = SessionNegotiation(
-        model="test",
-        capabilities=Capabilities(supports_reference_audio=True),
-        limits=RuntimeLimits(),
-    )
-    reference = wav_reference(rate, frames)
-    config, _ = negotiation.negotiate(
+    config, _ = NEGOTIATION.negotiate(
         {},
         "CREATED",
-        {"sglang": {"reference_audio": {"media_type": "audio/wav", "data": reference}}},
+        {
+            "sglang": {
+                "tts_reference_audio": {
+                    "media_type": "audio/wav",
+                    "data": base64.b64encode(audio).decode(),
+                }
+            }
+        },
     )
-    assert config["sglang"]["reference_audio"].data == base64.b64decode(reference)
+    assert config["sglang"]["tts_reference_audio"].data == expected
 
 
-def test_updates_never_echo_references_and_do_not_decode_again(
+def test_reference_is_validated_before_admission_and_never_echoed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    adapter = ScriptedAdapter()
     reference = wav_reference(8000, 240000)
     with build_test_client(
-        ScriptedAdapter(), capabilities=Capabilities(supports_reference_audio=True)
+        adapter, capabilities=Capabilities(supports_reference_audio=True)
     ).websocket_connect("/v1/realtime") as websocket:
         websocket.receive_json()
+        send_event(
+            websocket,
+            "session.update",
+            session={
+                "sglang": {
+                    "reference_audio": {
+                        "media_type": "audio/wav",
+                        "data": wav_reference(1, 100),
+                    }
+                }
+            },
+        )
+        error = websocket.receive_json()
+        assert error["error"]["code"] == "invalid_request"
+        assert error["sglang"]["fatal"] is False
+        assert adapter.output_sink is None
+
         send_event(
             websocket,
             "session.update",
@@ -209,87 +175,3 @@ def test_updates_never_echo_references_and_do_not_decode_again(
         updated = websocket.receive_json()
         assert updated["type"] == "session.updated"
         assert len(json.dumps(updated)) < 4096
-
-
-def test_invalid_reference_does_not_open_adapter_and_session_can_retry() -> None:
-    adapter = ScriptedAdapter()
-    with build_test_client(
-        adapter, capabilities=Capabilities(supports_reference_audio=True)
-    ).websocket_connect("/v1/realtime") as websocket:
-        websocket.receive_json()
-        send_event(
-            websocket,
-            "session.update",
-            session={
-                "sglang": {
-                    "reference_audio": {
-                        "media_type": "audio/wav",
-                        "data": wav_reference(1, 100),
-                    }
-                }
-            },
-        )
-        error = websocket.receive_json()
-        assert error["error"]["code"] == "invalid_request"
-        assert error["sglang"]["fatal"] is False
-        assert adapter.output_sink is None
-        send_event(websocket, "session.update", session={})
-        assert websocket.receive_json()["type"] == "session.updated"
-
-
-@pytest.mark.parametrize("damage", ["placeholder_sizes", "odd_tail"])
-def test_header_sizes_yield_to_samples_present(damage: str) -> None:
-    audio = bytearray(base64.b64decode(wav_reference(frames=160)))
-    if damage == "placeholder_sizes":
-        audio[4:8] = audio[40:44] = (0xFFFFFFFF).to_bytes(4, "little")
-        frames = 160
-    else:
-        audio.pop()
-        audio[4:8] = (len(audio) - 8).to_bytes(4, "little")
-        frames = 159
-    negotiation = SessionNegotiation(
-        model="test",
-        capabilities=Capabilities(supports_reference_audio=True),
-        limits=RuntimeLimits(),
-    )
-    config, _ = negotiation.negotiate(
-        {},
-        "CREATED",
-        {
-            "sglang": {
-                "reference_audio": {
-                    "media_type": "audio/wav",
-                    "data": base64.b64encode(audio).decode(),
-                }
-            }
-        },
-    )
-    assert config["sglang"]["reference_audio"].data == base64.b64decode(
-        wav_reference(frames=frames)
-    )
-
-
-def test_later_format_chunks_cannot_override_validated_audio() -> None:
-    audio = bytearray(base64.b64decode(wav_reference()))
-    later_format = bytearray(audio[12:36])
-    later_format[12:16] = (1).to_bytes(4, "little")
-    audio.extend(later_format)
-    audio[4:8] = (len(audio) - 8).to_bytes(4, "little")
-    negotiation = SessionNegotiation(
-        model="test",
-        capabilities=Capabilities(supports_reference_audio=True),
-        limits=RuntimeLimits(),
-    )
-    config, _ = negotiation.negotiate(
-        {},
-        "CREATED",
-        {
-            "sglang": {
-                "reference_audio": {
-                    "media_type": "audio/wav",
-                    "data": base64.b64encode(audio).decode(),
-                }
-            }
-        },
-    )
-    assert config["sglang"]["reference_audio"].data == base64.b64decode(wav_reference())

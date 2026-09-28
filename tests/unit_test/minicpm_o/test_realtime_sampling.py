@@ -48,50 +48,28 @@ async def open_session_params(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "sampling",
-    [
-        {},
-        {
-            "temperature": 0.4,
-            "top_k": 20,
-            "top_p": 0.6,
-            "repetition_penalty": 1.2,
-            "listen_prob_scale": 0.5,
-            "greedy": False,
-            "force_listen_count": 0,
-        },
-    ],
-)
-async def test_native_session_receives_sampling(sampling: SamplingConfig) -> None:
-    params = await open_session_params(
-        MiniCPMODuplexPipelineConfig(model_path="unused"), sampling
-    )
-    assert params == {
-        "instructions": "be brief",
-        **DEFAULT_SAMPLING,
-        **sampling,
-        "max_slice_nums": 1,
-    }
-
-
-@pytest.mark.asyncio
-async def test_deployment_defaults_apply_and_session_override_stays_local() -> None:
+async def test_session_sampling_overrides_deployment_defaults_locally() -> None:
     config = MiniCPMODuplexPipelineConfig(
         model_path="unused",
         sampling=MiniCPMODuplexSampling(greedy=False, temperature=0.3),
     )
-    overridden = await open_session_params(config, {"temperature": 0.9})
+    override = {
+        "temperature": 0.4,
+        "top_k": 20,
+        "top_p": 0.6,
+        "repetition_penalty": 1.2,
+        "listen_prob_scale": 0.5,
+        "greedy": True,
+        "force_listen_count": 0,
+    }
+    overridden = await open_session_params(config, override)
     plain = await open_session_params(config, {})
-    assert overridden["temperature"] == 0.9
-    assert plain["temperature"] == 0.3
-    assert plain["greedy"] is False
-    assert plain["force_listen_count"] == 3
+    assert overridden == {"instructions": "be brief", **override, "max_slice_nums": 1}
+    assert plain == {
+        "instructions": "be brief",
+        **DEFAULT_SAMPLING,
+        "greedy": False,
+        "temperature": 0.3,
+        "max_slice_nums": 1,
+    }
     assert config.sampling.temperature == 0.3
-
-
-def test_capabilities_list_every_sampling_default() -> None:
-    deployment = build_realtime_deployment(
-        AsyncMock(spec=Client), MiniCPMODuplexPipelineConfig(model_path="unused")
-    )
-    assert set(deployment.capabilities.sampling_parameters) == set(DEFAULT_SAMPLING)

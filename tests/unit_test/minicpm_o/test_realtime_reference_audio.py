@@ -2,8 +2,6 @@
 """Per-session references reach the model without replacing deployment defaults."""
 
 import base64
-import io
-import wave
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -16,6 +14,7 @@ from sglang_omni.models.minicpm_o.session_adapters import build_realtime_deploym
 from sglang_omni.proto.request import OmniRequest
 from sglang_omni.proto.session import SessionIdentity
 from sglang_omni.serve.realtime.schema import SessionConfiguration, SessionUpdateRequest
+from tests.unit_test.serve.test_realtime_reference_audio import wav_reference
 
 
 @pytest.mark.asyncio
@@ -25,25 +24,10 @@ async def test_reference_bytes_reach_session_request() -> None:
     deployment = build_realtime_deployment(
         client, MiniCPMODuplexPipelineConfig(model_path="unused")
     )
-    output = io.BytesIO()
-    with wave.open(output, "wb") as audio:
-        audio.setnchannels(1)
-        audio.setsampwidth(2)
-        audio.setframerate(16000)
-        audio.writeframes(bytes(320))
-    reference = output.getvalue()
+    reference = {"media_type": "audio/wav", "data": wav_reference()}
     config: SessionConfiguration = {
         "audio": {"input": {"format": {"type": "audio/pcm", "rate": 16000}}},
-        "sglang": {
-            "reference_audio": {
-                "media_type": "audio/wav",
-                "data": base64.b64encode(reference).decode(),
-            },
-            "tts_reference_audio": {
-                "media_type": "audio/wav",
-                "data": base64.b64encode(reference).decode(),
-            },
-        },
+        "sglang": {"reference_audio": reference, "tts_reference_audio": reference},
     }
     adapter = deployment.adapter_factory()
     await adapter.open(
@@ -51,8 +35,9 @@ async def test_reference_bytes_reach_session_request() -> None:
     )
     try:
         request = client.open_session.call_args.args[0]
-        assert request.params["reference_audio"] == reference
-        assert request.params["tts_reference_audio"] == reference
+        audio = base64.b64decode(reference["data"])
+        assert request.params["reference_audio"] == audio
+        assert request.params["tts_reference_audio"] == audio
     finally:
         await adapter.close()
 

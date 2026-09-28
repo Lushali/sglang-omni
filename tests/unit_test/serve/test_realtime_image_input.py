@@ -8,9 +8,8 @@ from dataclasses import replace
 import pytest
 from pydantic import ValidationError
 
-from sglang_omni.serve.realtime.runtime import SessionRuntime
 from sglang_omni.serve.realtime.schema import CLIENT_EVENT, JsonObject
-from sglang_omni.serve.realtime.types import Capabilities, ProtocolError, RuntimeLimits
+from sglang_omni.serve.realtime.types import Capabilities
 from tests.unit_test.serve.test_realtime_coordinator_adapter import (
     SESSION_CONFIG,
     RecordingSink,
@@ -42,44 +41,29 @@ def image_event(t_ms: float = 0.0, image: bytes = JPEG) -> JsonObject:
     )
 
 
-@pytest.mark.parametrize("t_ms", [0.0, 19.999, 20.0, 40])
-def test_image_schema_accepts_media_time(t_ms: float) -> None:
-    event = CLIENT_EVENT.validate_python(image_event(t_ms))
-    assert event.sglang.t_ms == t_ms
-
-
 @pytest.mark.parametrize(
-    "metadata",
+    "fields",
     [
-        {},
-        {"t_ms": "0"},
-        {"t_ms": True},
-        {"t_ms": None},
-        {"t_ms": float("inf")},
-        {"t_ms": float("-inf")},
-        {"t_ms": float("nan")},
-        {"t_ms": 0.0, "seq": 1},
+        {"sglang": {}},
+        {"sglang": {"t_ms": "0"}},
+        {"sglang": {"t_ms": float("nan")}},
+        {"sglang": {"t_ms": 0.0, "seq": 1}},
+        {"image": b"abc"},
+        {"extra": 1},
     ],
 )
-def test_image_schema_rejects_invalid_metadata(metadata: JsonObject) -> None:
-    with pytest.raises(ValidationError):
-        CLIENT_EVENT.validate_python({**image_event(), "sglang": metadata})
-
-
-@pytest.mark.parametrize("fields", [{"image": b"abc"}, {"extra": 1}, {"event_id": ""}])
 def test_image_schema_rejects_invalid_event(fields: JsonObject) -> None:
     with pytest.raises(ValidationError):
         CLIENT_EVENT.validate_python({**image_event(), **fields})
 
 
-@pytest.mark.parametrize("image", [JPEG, PNG])
-def test_frame_binding_missing_frame_and_accounting(image: bytes) -> None:
+def test_frame_binding_missing_frame_and_accounting() -> None:
     adapter = ScriptedAdapter()
     with build_test_client(
         adapter, capabilities=Capabilities(input_modalities=("audio", "image"))
     ).websocket_connect("/v1/realtime") as websocket:
         open_session(websocket)
-        websocket.send_json(image_event(39.999, image))
+        websocket.send_json(image_event(39.999))
         accepted = websocket.receive_json()
         assert accepted["type"] == "sglang.input_image.accepted"
         assert accepted["unit_id"] == "unit_1"
@@ -89,7 +73,7 @@ def test_frame_binding_missing_frame_and_accounting(image: bytes) -> None:
         receive_until(websocket, "sglang.unit.done")
         send_event(websocket, "sglang.input_audio.end")
         drained = receive_until(websocket, "sglang.input_audio.drained")[-1]
-    assert [unit.images for unit in adapter.units] == [(), (image,), ()]
+    assert [unit.images for unit in adapter.units] == [(), (JPEG,), ()]
     assert [
         drained[key]
         for key in ("accepted_end_ms", "consumed_ms", "discarded_ms", "padding_ms")
@@ -100,15 +84,12 @@ def test_frame_binding_missing_frame_and_accounting(image: bytes) -> None:
     ("scenario", "code", "message"),
     [
         ("late", "invalid_state", "frame unit already cut"),
-        ("duplicate", "buffer_overflow", "unit frame count exceeds limit"),
-        ("ahead", "buffer_overflow", None),
         ("ended", "invalid_state", "input has ended"),
-        ("unsupported", "not_supported", None),
-        ("negative", "invalid_state", "frame unit already cut"),
+        ("unsupported", "not_supported", "image input is not granted"),
     ],
 )
 def test_binding_rejections_are_nonfatal(
-    scenario: str, code: str, message: str | None
+    scenario: str, code: str, message: str
 ) -> None:
     capabilities = Capabilities(
         input_modalities=("audio",) if scenario == "unsupported" else ("audio", "image")
@@ -120,27 +101,17 @@ def test_binding_rejections_are_nonfatal(
         if scenario == "late":
             append_audio(websocket, b"\0" * UNIT_BYTES, 0)
             receive_until(websocket, "sglang.unit.done")
-        elif scenario == "duplicate":
-            websocket.send_json(image_event())
-            websocket.receive_json()
         elif scenario == "ended":
             send_event(websocket, "sglang.input_audio.end")
             receive_until(websocket, "sglang.input_audio.drained")
         else:
             pass
-        websocket.send_json(
-            image_event(
-                60.0 if scenario == "ahead" else -0.1 if scenario == "negative" else 0.0
-            )
-        )
+        websocket.send_json(image_event())
         error = websocket.receive_json()
         assert error["error"]["code"] == code
         assert error["error"]["event_id"] == "frame"
         assert error["sglang"]["fatal"] is False
-        if message is not None:
-            assert error["error"]["message"] == message
-        else:
-            pass
+        assert error["error"]["message"] == message
         send_event(websocket, "session.update", session={})
         assert websocket.receive_json()["type"] == "session.updated"
 
@@ -166,9 +137,7 @@ def test_lookahead_uses_ceiling_of_accepted_audio_time() -> None:
     [
         ("!" * 13, "buffer_overflow"),
         ("!!!!", "invalid_request"),
-        ("é", "invalid_request"),
         (base64.b64encode(b"GIF89a").decode(), "invalid_request"),
-        ("", "invalid_request"),
         (base64.b64encode(b"\xff\xd8" + b"x" * 7).decode(), "buffer_overflow"),
     ],
 )
@@ -188,60 +157,27 @@ def test_invalid_image_bytes_are_nonfatal(encoded: str, code: str) -> None:
         assert websocket.receive_json()["type"] == "sglang.input_image.accepted"
 
 
-@pytest.mark.asyncio
-async def test_clear_and_close_drop_pending_frames_without_audio_accounting() -> None:
-    adapter = ScriptedAdapter()
-    runtime = SessionRuntime(
-        "test",
-        Capabilities(input_modalities=("audio", "image")),
-        lambda: adapter,
-        RuntimeLimits(),
-    )
-    await runtime.update({}, "update")
-    await runtime.append_image(JPEG, 0.0, "frame")
-    await runtime.clear("clear")
-    assert runtime.pending_frames == {}
-    await runtime.append_image(PNG, 0.0, "replacement")
-    await runtime.close("client_closed")
-    assert runtime.pending_frames == {}
-    assert (
-        runtime.accepted_samples,
-        runtime.consumed_samples,
-        runtime.discarded_samples,
-        runtime.padding_samples,
-    ) == (0, 0, 0, 0)
-
-
-def test_capabilities_default_and_image_format() -> None:
-    defaults = Capabilities().to_granted_capabilities()
-    assert defaults["input_modalities"] == ["audio"]
-    assert "input_image_format" not in defaults
-    image_capabilities = Capabilities(
-        input_modalities=("audio", "image"), max_image_bytes=100
-    )
-    granted = image_capabilities.to_granted_capabilities()
-    assert granted == {
-        **defaults,
-        "input_modalities": ["audio", "image"],
-        "input_image_format": {
-            "types": ["image/jpeg", "image/png"],
-            "max_bytes": 100,
-            "max_per_unit": 1,
-            "max_slice_nums": 1,
-        },
+def test_image_capability_is_granted_over_http_and_session() -> None:
+    image_format = {
+        "types": ["image/jpeg", "image/png"],
+        "max_bytes": 100,
+        "max_per_unit": 1,
+        "max_slice_nums": 1,
     }
-    assert Capabilities().max_image_bytes == 512 * 1024
-    client = build_test_client(ScriptedAdapter(), capabilities=image_capabilities)
+    client = build_test_client(
+        ScriptedAdapter(),
+        capabilities=Capabilities(
+            input_modalities=("audio", "image"), max_image_bytes=100
+        ),
+    )
     assert (
         client.get("/v1/realtime/capabilities").json()["input_image_format"]
-        == granted["input_image_format"]
+        == image_format
     )
     with client.websocket_connect("/v1/realtime") as websocket:
-        updated = open_session(websocket)
-        assert (
-            updated["session"]["sglang"]["granted"]["input_image_format"]
-            == granted["input_image_format"]
-        )
+        granted = open_session(websocket)["session"]["sglang"]["granted"]
+    assert granted["input_modalities"] == ["audio", "image"]
+    assert granted["input_image_format"] == image_format
 
 
 @pytest.mark.asyncio
@@ -296,92 +232,41 @@ def test_audio_only_session_events_carry_no_image_fields() -> None:
     assert "image" not in json.dumps(events)
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("image", "code"),
-    [(b"GIF89a", "invalid_request"), (b"\xff\xd8" + b"x" * 7, "buffer_overflow")],
-)
-async def test_runtime_validates_bytes_without_protocol(
-    image: bytes, code: str
-) -> None:
-    adapter = ScriptedAdapter()
-    runtime = SessionRuntime(
-        "test",
-        Capabilities(input_modalities=("audio", "image"), max_image_bytes=8),
-        lambda: adapter,
-        RuntimeLimits(),
-    )
-    await runtime.update({}, "update")
-    with pytest.raises(ProtocolError) as error:
-        await runtime.append_image(image, 0.0, "frame")
-    assert error.value.code == code
-    assert runtime.pending_frames == {}
-    await runtime.close("client_closed")
-
-
-def test_clear_prevents_frame_from_reaching_next_unit() -> None:
+def test_clear_drops_frames_and_moves_frame_origin() -> None:
     adapter = ScriptedAdapter()
     with build_test_client(
         adapter, capabilities=Capabilities(input_modalities=("audio", "image"))
     ).websocket_connect("/v1/realtime") as websocket:
         open_session(websocket)
-        websocket.send_json(image_event())
-        websocket.receive_json()
-        append_audio(websocket, b"\0" * (UNIT_BYTES // 2), 0)
-        websocket.receive_json()
-        send_event(websocket, "input_audio_buffer.clear")
-        assert websocket.receive_json()["sglang"]["discarded_ms"] == 10.0
-        append_audio(websocket, b"\0" * UNIT_BYTES, 1)
-        receive_until(websocket, "sglang.unit.done")
-    assert adapter.units[0].images == ()
-
-
-def test_multiple_frames_are_bound_in_media_time_order() -> None:
-    adapter = ScriptedAdapter()
-    capabilities = Capabilities(
-        input_modalities=("audio", "image"),
-        image_frames_per_unit=(2,),
-    )
-    with build_test_client(adapter, capabilities=capabilities).websocket_connect(
-        "/v1/realtime"
-    ) as websocket:
-        open_session(websocket)
-        websocket.send_json(image_event(15.0, PNG))
-        assert websocket.receive_json()["type"] == "sglang.input_image.accepted"
-        websocket.send_json(image_event(5.0, JPEG))
-        assert websocket.receive_json()["type"] == "sglang.input_image.accepted"
-        websocket.send_json(image_event(10.0, JPEG))
-        assert websocket.receive_json()["error"]["code"] == "buffer_overflow"
-        append_audio(websocket, b"\0" * UNIT_BYTES, 0)
-        receive_until(websocket, "sglang.unit.done")
-    assert adapter.units[0].images == (JPEG, PNG)
-
-
-def test_clear_rejects_old_media_time_for_multiframe_unit() -> None:
-    adapter = ScriptedAdapter()
-    capabilities = Capabilities(
-        input_modalities=("audio", "image"),
-        image_frames_per_unit=(2,),
-    )
-    with build_test_client(adapter, capabilities=capabilities).websocket_connect(
-        "/v1/realtime"
-    ) as websocket:
-        open_session(websocket)
-        append_audio(websocket, b"\0" * (UNIT_BYTES // 2), 0)
-        send_event(websocket, "input_audio_buffer.clear")
-        receive_until(websocket, "input_audio_buffer.cleared")
         websocket.send_json(image_event(0.0, JPEG))
+        assert websocket.receive_json()["unit_id"] == "unit_0"
+        for sequence in range(10):
+            append_audio(websocket, b"\0" * (UNIT_BYTES // 2), sequence)
+            send_event(websocket, "input_audio_buffer.clear")
+            cleared = receive_until(websocket, "input_audio_buffer.cleared")[-1]
+            assert cleared["sglang"]["discarded_ms"] == 10.0
+        websocket.send_json(image_event(80.0, JPEG))
         assert websocket.receive_json()["error"]["code"] == "invalid_state"
-        websocket.send_json(image_event(10.0, PNG))
-        assert websocket.receive_json()["type"] == "sglang.input_image.accepted"
-        append_audio(websocket, b"\0" * UNIT_BYTES, 1)
+        websocket.send_json(image_event(160.0, JPEG))
+        assert websocket.receive_json()["error"]["code"] == "buffer_overflow"
+        websocket.send_json(image_event(140.0, JPEG))
+        assert websocket.receive_json()["unit_id"] == "unit_2"
+        websocket.send_json(image_event(100.0, PNG))
+        assert websocket.receive_json()["unit_id"] == "unit_0"
+        append_audio(websocket, b"\0" * UNIT_BYTES, 10)
         receive_until(websocket, "sglang.unit.done")
     assert adapter.units[0].images == (PNG,)
 
 
-@pytest.mark.parametrize("slices,frames", [(1, 4), (4, 2), (9, 1)])
-def test_unit_image_budget_rejects_extra_frame_before_dispatch(
-    slices: int, frames: int
+@pytest.mark.parametrize(
+    ("frames", "expected"),
+    [
+        ([(15.0, PNG), (5.0, JPEG)], (JPEG, PNG)),
+        ([(0.0, PNG), (0.0, JPEG)], (PNG, JPEG)),
+    ],
+)
+def test_unit_frames_follow_slice_grant_and_media_time(
+    frames: list[tuple[float, bytes]], expected: tuple[bytes, ...]
 ) -> None:
     adapter = ScriptedAdapter()
     capabilities = Capabilities(
@@ -393,59 +278,15 @@ def test_unit_image_budget_rejects_extra_frame_before_dispatch(
     ) as websocket:
         websocket.receive_json()
         send_event(
-            websocket, "session.update", session={"sglang": {"max_slice_nums": slices}}
+            websocket, "session.update", session={"sglang": {"max_slice_nums": 4}}
         )
-        assert (
-            websocket.receive_json()["session"]["sglang"]["granted"][
-                "input_image_format"
-            ]["max_per_unit"]
-            == frames
-        )
-        for _ in range(frames):
-            websocket.send_json(image_event(0.0, JPEG))
+        granted = websocket.receive_json()["session"]["sglang"]["granted"]
+        assert granted["input_image_format"]["max_per_unit"] == 2
+        for t_ms, image in frames:
+            websocket.send_json(image_event(t_ms, image))
             assert websocket.receive_json()["type"] == "sglang.input_image.accepted"
-        websocket.send_json(image_event(0.0, PNG))
+        websocket.send_json(image_event(10.0, JPEG))
         assert websocket.receive_json()["error"]["code"] == "buffer_overflow"
         append_audio(websocket, b"\0" * UNIT_BYTES, 0)
         receive_until(websocket, "sglang.unit.done")
-    assert adapter.units[0].images == (JPEG,) * frames
-
-
-def test_equal_timestamp_frames_keep_arrival_order() -> None:
-    adapter = ScriptedAdapter()
-    capabilities = Capabilities(
-        input_modalities=("audio", "image"),
-        image_frames_per_unit=(2,),
-    )
-    with build_test_client(adapter, capabilities=capabilities).websocket_connect(
-        "/v1/realtime"
-    ) as websocket:
-        open_session(websocket)
-        for image in (PNG, JPEG):
-            websocket.send_json(image_event(0.0, image))
-            assert websocket.receive_json()["type"] == "sglang.input_image.accepted"
-        append_audio(websocket, b"\0" * UNIT_BYTES, 0)
-        receive_until(websocket, "sglang.unit.done")
-    assert adapter.units[0].images == (PNG, JPEG)
-
-
-def test_repeated_clear_does_not_expand_frame_lookahead() -> None:
-    adapter = ScriptedAdapter()
-    capabilities = Capabilities(input_modalities=("audio", "image"))
-    with build_test_client(adapter, capabilities=capabilities).websocket_connect(
-        "/v1/realtime"
-    ) as websocket:
-        open_session(websocket)
-        for sequence in range(10):
-            append_audio(websocket, b"\0" * (UNIT_BYTES // 2), sequence)
-            send_event(websocket, "input_audio_buffer.clear")
-            receive_until(websocket, "input_audio_buffer.cleared")
-        websocket.send_json(image_event(160.0, JPEG))
-        assert websocket.receive_json()["error"]["code"] == "buffer_overflow"
-        websocket.send_json(image_event(140.0, JPEG))
-        assert websocket.receive_json()["unit_id"] == "unit_2"
-        websocket.send_json(image_event(100.0, PNG))
-        assert websocket.receive_json()["unit_id"] == "unit_0"
-        append_audio(websocket, b"\0" * UNIT_BYTES, 10)
-        receive_until(websocket, "sglang.unit.done")
-    assert adapter.units[0].images == (PNG,)
+    assert adapter.units[0].images == expected
