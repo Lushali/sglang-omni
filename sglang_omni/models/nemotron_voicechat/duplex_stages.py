@@ -37,8 +37,8 @@ from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputP
 from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
 from sglang_omni.utils.device import resolve_concrete_device
 
-# note (Codex): One request slot remains available while a session retains KV.
-SESSION_REQUEST_SLOTS = 2
+# MAX 2 requests a time, one is for storing context, another is to safely enter and reuse the stored one
+MAX_RUNNING_REQUESTS = 2
 SESSION_KV_TOKEN_BUDGET = 16_384
 REQUEST_BUILD_WORKERS = 1
 
@@ -63,15 +63,14 @@ class DuplexSessionBuilderMixin:
         return {
             **super().generation_defaults(dtype=dtype),
             "enable_streaming_session": True,
-            "max_running_requests": SESSION_REQUEST_SLOTS,
+            "max_running_requests": MAX_RUNNING_REQUESTS,
             "max_total_tokens": SESSION_KV_TOKEN_BUDGET,
-            # note (Codex): Triton supports one-position extends and the Talker head_dim of 72.
+            # Otherwise the attn backend would be trtllm_mha which does not support 1 page size attn
             "attention_backend": "triton",
             "page_size": 1,
         }
 
     def extra_scheduler_kwargs(self) -> dict[str, ARSessionAdapter | int]:
-        # note (Codex): Adapter builds mutate per-session history and must stay ordered.
         return {
             "session_adapter": self.adapter,
             "request_build_max_workers": REQUEST_BUILD_WORKERS,
