@@ -34,16 +34,16 @@ def build_tts_condition(
     device, dtype = text_embedding.weight.device, text_embedding.weight.dtype
     tokens = token_ids.to(device=device, dtype=torch.long).reshape(-1)
     hidden = hidden_states.to(device=device, dtype=dtype)
-    if hidden.ndim != 2 or hidden.shape[0] != tokens.numel():
-        raise ValueError(
-            "talker condition length mismatch: token ids and hidden states must be position-aligned"
-        )
-    else:
-        pass
     boundary = text_embedding(torch.tensor(boundary_tokens, device=device))
     if not tokens.numel():
         return boundary
     else:
+        if hidden.ndim != 2 or hidden.shape[0] != tokens.numel():
+            raise ValueError(
+                "talker condition length mismatch: token ids and hidden states must be position-aligned"
+            )
+        else:
+            pass
         projected = semantic_projector(hidden)
         if normalize_projected_hidden:
             projected = F.normalize(projected, p=2, dim=-1)
