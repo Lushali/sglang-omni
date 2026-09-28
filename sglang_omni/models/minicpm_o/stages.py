@@ -211,9 +211,9 @@ def create_code2wav_executor(
     batch_wait_when_idle: bool = False,
     dtype: str | None = None,
     max_batch_cost: int | None = None,
-    enable_flow_variable_length: bool,
-    reference_workers: int,
-    prompt_cache_capacity: int,
+    enable_flow_variable_length: bool = True,
+    reference_workers: int = 8,
+    prompt_cache_capacity: int = 32,
 ) -> SimpleScheduler:
     model = MiniCPMOCode2Wav(
         model_path,

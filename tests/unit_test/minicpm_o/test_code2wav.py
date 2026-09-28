@@ -245,7 +245,7 @@ def build_code2wav_stage(
     factory = code2wav_stage_factory()
     return stages.create_code2wav_executor(
         "unused",
-        device="cuda",
+        device=None,
         gpu_id=0,
         enable_flow_variable_length=factory.enable_flow_variable_length,
         reference_workers=factory.reference_workers,
