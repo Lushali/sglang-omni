@@ -27,7 +27,17 @@ class DuplexSamplerState:
     force_listen_counter: int = 0
     generated_history: list[int] = field(default_factory=list)
     current_turn_ended: bool = True
-    forbidden_token_ids: set[int] = field(default_factory=set)
+    forbidden_index: torch.Tensor
+
+
+def forbidden_token_index(
+    special: MiniCPMOSpecialTokenIds, vocab_size: int, device: torch.device
+) -> torch.Tensor:
+    """Rows the second-stage draw never picks, resolved once instead of per step."""
+    tokens = sorted(
+        token for token in {special.chunk_eos, *special.forbidden} if token < vocab_size
+    )
+    return torch.tensor(tokens, dtype=torch.long, device=device)
 
 
 def top_k_top_p(logits: torch.Tensor, *, top_k: int, top_p: float) -> torch.Tensor:
@@ -95,18 +105,7 @@ def duplex_sample(logits: torch.Tensor, state: DuplexSamplerState) -> int:
             if draw(row, greedy=state.greedy) == special.chunk_eos:
                 return special.chunk_eos
             else:
-                forbidden = {
-                    special.chunk_eos,
-                    *special.forbidden,
-                    *state.forbidden_token_ids,
-                }
-                valid_forbidden = [
-                    token for token in forbidden if 0 <= token < row.numel()
-                ]
-                if valid_forbidden:
-                    row[valid_forbidden] = -torch.inf
-                else:
-                    pass
+                row[state.forbidden_index] = -torch.inf
 
                 penalty = float(state.repetition_penalty)
                 if penalty <= 0:

@@ -51,7 +51,9 @@ class ThinkerAdapter(ARSessionAdapter):
     def __init__(self, tokenizer: PreTrainedTokenizerBase, vocab_size: int) -> None:
         self.tokenizer: PreTrainedTokenizerBase = tokenizer
         self.vocab_size: int = vocab_size
-        self.special: MiniCPMOSpecialTokenIds = resolve_special_token_ids(tokenizer)
+        self.special: MiniCPMOSpecialTokenIds = resolve_special_token_ids(
+            tokenizer, bad_token_ids=tuple(tokenizer.bad_token_ids)
+        )
         self.states: dict[SessionIdentity, MiniCPMOThinkerSessionState] = {}
 
     def open(self, session_identity: SessionIdentity, request: OmniRequest) -> None:

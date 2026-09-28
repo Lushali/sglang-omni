@@ -17,6 +17,7 @@ from sglang_omni.model_runner.prefill_inputs import (
 from sglang_omni.models.minicpm_o.duplex_sampler import (
     DuplexSamplerState,
     duplex_sample,
+    forbidden_token_index,
 )
 from sglang_omni.models.minicpm_o.special_tokens import (
     MiniCPMOSpecialTokenIds,
@@ -43,6 +44,7 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
     ) -> None:
         super().__init__(tp_worker, output_processor)
         self.special_tokens: MiniCPMOSpecialTokenIds | None = None
+        self.forbidden_index: torch.Tensor | None = None
 
     @staticmethod
     def is_duplex_request(request: SchedulerRequest) -> bool:
@@ -116,7 +118,10 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
 
     def special_for_data(self, data: DuplexUnitRequestData) -> MiniCPMOSpecialTokenIds:
         if self.special_tokens is None:
-            self.special_tokens = resolve_special_token_ids(data.req.tokenizer)
+            self.special_tokens = resolve_special_token_ids(
+                data.req.tokenizer,
+                bad_token_ids=tuple(data.req.tokenizer.bad_token_ids),
+            )
         else:
             pass
         return self.special_tokens
@@ -167,8 +172,16 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
                 else:
                     pass
                 sampling = data.sampling
+                special = self.special_for_data(data)
+                if self.forbidden_index is None:
+                    self.forbidden_index = forbidden_token_index(
+                        special, original_logits.shape[-1], original_logits.device
+                    )
+                else:
+                    pass
                 sampler_state = DuplexSamplerState(
-                    special_tokens=self.special_for_data(data),
+                    special_tokens=special,
+                    forbidden_index=self.forbidden_index,
                     generation_step=int(data.generation_steps),
                     force_listen_count=1 if data.forced_listen else 0,
                     force_listen_counter=0,

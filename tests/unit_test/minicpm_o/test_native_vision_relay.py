@@ -21,6 +21,11 @@ from sglang_omni.models.minicpm_o.components.streaming_perception import (
     IMAGE_TOKENS,
     MiniCPMOPerceptionState,
 )
+from sglang_omni.models.minicpm_o.duplex_sampler import (
+    DuplexSamplerState,
+    duplex_sample,
+    forbidden_token_index,
+)
 from sglang_omni.models.minicpm_o.native_config import (
     MiniCPMODuplexPipelineConfig,
     MiniCPMODuplexSampling,
@@ -52,6 +57,7 @@ def relay(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
         array=array,
         SessionHooks=object,
         ARSessionAdapter=object,
+        OfflineThinkerModelRunner=object,
         MiniCPMOPerceptionState=MiniCPMOPerceptionState,
         resolve_special_token_ids=resolve_special_token_ids,
         SamplingParams=Mock(side_effect=Mock),
@@ -91,6 +97,9 @@ def relay(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
             "ThinkerAdapter",
             "build_realtime_deployment",
         },
+        "models/minicpm_o/native_thinker_model_runner.py": {
+            "MiniCPMOThinkerModelRunner",
+        },
         "scheduling/sglang_backend/ar_session.py": {"ARSessionBridge"},
     }
     for filename, names in sources.items():
@@ -113,7 +122,7 @@ def relay(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
 
 @pytest.fixture
 def perception() -> MiniCPMOPerceptionState:
-    tokenizer = Mock(unk_token_id=0)
+    tokenizer = Mock(unk_token_id=0, bad_token_ids=[])
     tokenizer.convert_tokens_to_ids.side_effect = dict(
         zip(REQUIRED_SPECIAL_TOKENS, range(1, 17))
     ).__getitem__
@@ -123,6 +132,43 @@ def perception() -> MiniCPMOPerceptionState:
     state.encode_audio = Mock(return_value=torch.full((10, 4), 9.0))
     state.encode_image = Mock(return_value=torch.full((64, 4), 6.0))
     return state
+
+
+@pytest.mark.parametrize("greedy", [True, False])
+@pytest.mark.parametrize("use_runner", [True, False])
+def test_checkpoint_bad_tokens_are_not_sampled(
+    relay: ModuleType, greedy: bool, use_runner: bool
+) -> None:
+    """Both duplex initialization paths retain the checkpoint sampling mask."""
+    tokenizer = Mock(unk_token_id=0, bad_token_ids=[7, 8, 94])
+    tokenizer.convert_tokens_to_ids.side_effect = dict(
+        zip(REQUIRED_SPECIAL_TOKENS, range(100, 116))
+    ).__getitem__
+    if use_runner:
+        runner = relay.MiniCPMOThinkerModelRunner.__new__(
+            relay.MiniCPMOThinkerModelRunner
+        )
+        runner.special_tokens = None
+        special = runner.special_for_data(
+            SimpleNamespace(req=Mock(tokenizer=tokenizer))
+        )
+    else:
+        special = relay.ThinkerAdapter(tokenizer, 128).special
+    logits = torch.full((128,), -torch.inf)
+    logits[7] = 100.0
+    logits[special.tts_pad] = 99.0
+    logits[42] = 0.0
+    state = DuplexSamplerState(
+        special_tokens=special,
+        forbidden_index=forbidden_token_index(special, 128, torch.device("cpu")),
+        temperature=0.7,
+        top_k=1,
+        top_p=0.8,
+        repetition_penalty=1.0,
+        listen_prob_scale=1.0,
+        greedy=greedy,
+    )
+    assert duplex_sample(logits, state) == 42
 
 
 @pytest.mark.parametrize("has_image", [False, True])
