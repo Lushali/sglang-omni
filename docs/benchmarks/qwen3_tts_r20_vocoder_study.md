@@ -1714,3 +1714,50 @@ lane `32-47,96-111`):1 rps 中位数 21.9 ms(gate 27.3)、20 rps 中位数 34.3 
 而前两次在 lane `48-63,112-127` 上都偏高 7% 到 9%,更像是那条 lane 的差异。squash 合并为 `20329946`,
 带 `Co-authored-by: JiaxinD`,已复核。标定工具 #1 已由 zhaochenyang20 在 09-26 合并,但合的是 `a53be90`,
 少了删除 p95 指标的 `86d562f`;补在 zhaochenyang20/sglang-omni-calibration#2(对 main `20329946` 覆盖检查通过、49 项测试通过)。
+
+## 第三十九轮:重启 #1998,rebase 并在 H200 上重做带重启对照的输出一致性检查(2026-09-28 20:30-21:40 PT)
+
+**背景**:#1998 让 CustomVoice 的 prefill 走整图 CUDA graph(`full`),已由 zhaochenyang20 approve,09-19 我把它转回 draft:
+上游把 `full` 标为实验性、收益在三项里最小、当时 CI 测不到 CustomVoice。#2293 合并后 CI 能测 CustomVoice 的首帧,
+luojiaxuan 让重启它。上游的"不稳定"说法没有具体 issue 可查:SGLang 代码里只有一条"experimental,生产请用 breakable 或
+tc_piecewise"的警告,它的自动禁用规则列表是空的,而且它自己给一个多模态模型默认开 `full`。
+
+**rebase**(原提交链备份在 `luojiaxuan/sglang-omni` 的 `backup-qwen3-tts-full-prefill-graph-6b953c01`):基点从 09-10 的 main 到
+`20329946`,中间 131 个提交。三处实质变化要消化:#2244(Ratish1)已把 breakable prefill 图设为所有 Qwen3-TTS checkpoint 的默认,
+并删掉了按 checkpoint 类型区分的函数;#2365 的公开名规则;#2339 的"`if` 必须带 `else`"规则。现在的行为:所有 checkpoint 默认 breakable,
+只有 `tts_model_type` 为 CustomVoice 的改成 full(Base 带参考音频、形状不同,没测过);类型从 checkpoint 的 `config.json` 读,
+用 main 已有的 `load_qwen3_tts_checkpoint_config`(本地目录和 HF 仓库名都支持,Qwen3-TTS 的 builder 不把模型路径解析成本地目录)。
+main 期间新增的 nemotron_voicechat、personaplex 补了 `supports_full_prefill_cuda_graph=False`,启动日志的能力清单补了这一项。
+第一次推送 lint 红了(漏了一个 `else`,原因是我本地只看了过滤后的 pre-commit 输出,没核对退出码,已记进记忆);
+节点上第一次跑单元测试有 2 项失败,都是重放时测试只合了一半(#2244 删了按类型区分的测试),补回后 376 项全过。
+提交:`777fa01e`、`ecc2d418`、`b0b25ed7`、`d0452883`。
+
+**一致性检查**(hyper01,Radix 租约 `01M3NN0V85WBDBNKE6YCRNKMZR`,1 张 H200,CI 镜像按 digest,代码 `b0b25ed7`):
+每个后端(不用 prefill 图 `disabled`、`breakable`、`full`)各起两个全新服务器,a、b 两轮交错;每臂同一组 56 条 SeedTTS EN,
+CustomVoice 音色 Ryan,流式,2 rps 开环,到达种子 7,请求种子 1234。同后端 a/b 之间的一致率就是"重启本身"的底噪。
+脚本在 `docs/benchmarks/scripts/qwen3_tts_backend_parity/`,数据在 `docs/benchmarks/data/2026-09-28-qwen3-tts-prefill-backend-parity/`
+(不含音频)。服务器日志确认各臂抓取的后端就是设定的那个。
+
+| 配对 | 整段 PCM 一致 | 首秒相关 < 0.9 |
+|---|---|---|
+| 不用图 a / b(重启对照) | 56/56 | 0 |
+| breakable a / b(重启对照) | 54/56 | 0 |
+| full a / b(重启对照) | 54/56 | 0 |
+| full 对 breakable(4 个交叉配对) | 52 到 54/56 | 0 |
+| breakable 对 不用图(4 个) | 39 到 41/56 | 0 |
+| full 对 不用图(4 个) | 38 到 40/56 | 0 |
+
+首帧(从计划到达算起的中位数,56 条,越小越好):不用图 31.7 到 32.0 ms,breakable 21.2 到 21.3 ms,full 19.1 到 19.3 ms;
+p95:breakable 26.0 到 26.1 ms,full 23.4 到 23.5 ms。所有臂 56/56 完成、排队 0。
+
+**读法**
+- full 对 breakable 的差异落在重启底噪里:两者各自重启就有 2/56 条整段不同,交叉配对最多 4/56 不同,正是两份各带 2 条噪声叠加的量级;
+  没有一条在首秒内就不同。所以 full 图没有在 breakable 之外再改变输出。
+- 用图(无论 breakable 还是 full)与不用图之间有约 30% 的整段不同,但首秒全部一致:这是图路径本身的浮点差异,在 main 默认的 breakable 上
+  已经存在并被接受,full 没有让它变大(38 到 40 对 39 到 41)。不用图的两次重启完全一致,说明这台机器上重启噪声来自图路径。
+- 与 09-10 在 eval-h100 上的结果一致(当时 full 对 breakable 84%/82%,都在重启对照 79% 到 93% 的带内),这次在 H200 上更干净。
+- 收益:2 rps 下 full 比 breakable 首帧中位数快约 2 ms(9% 到 10%),p95 快约 2.6 ms(10%),超过 5% 的门槛。
+- 脚本教训:`--temperature 0` 在 Qwen3-TTS 上不是确定性解码,连同配置重启都 0/56 一致,那一轮作废,脚本已改成只跑固定种子。
+
+**收尾**:容器已删、map 已清;节点运行目录(含音频与 3 GB 的 venv)已删,正本是本仓库的数据目录;保留 CI 镜像(约 40 GB)与 HF 缓存;
+租约 21:36 PT 释放,`radix machines mine` 为空,额度 62 未变(一次申请、未续期)。

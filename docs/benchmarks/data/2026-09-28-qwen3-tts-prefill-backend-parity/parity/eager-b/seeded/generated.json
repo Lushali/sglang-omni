@@ -1,0 +1,450 @@
+[
+  {
+    "sample_id": "common_voice_en_10119832-common_voice_en_10119840",
+    "target_text": "Get the trust fund to the bank early.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_10119832-common_voice_en_10119840.wav",
+    "is_success": true,
+    "latency_s": 0.6052,
+    "audio_duration_s": 7.44
+  },
+  {
+    "sample_id": "common_voice_en_10119832-common_voice_en_10119847",
+    "target_text": "The stained glass offered a hypnotic atmosphere.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_10119832-common_voice_en_10119847.wav",
+    "is_success": true,
+    "latency_s": 1.4565,
+    "audio_duration_s": 17.92
+  },
+  {
+    "sample_id": "common_voice_en_103675-common_voice_en_103676",
+    "target_text": "One by one, the campfires were extinguished, and the oasis fell as quiet as the desert.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_103675-common_voice_en_103676.wav",
+    "is_success": true,
+    "latency_s": 0.5597,
+    "audio_duration_s": 6.56
+  },
+  {
+    "sample_id": "common_voice_en_103675-common_voice_en_103677",
+    "target_text": "The boy knew the desert sensed his fear.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_103675-common_voice_en_103677.wav",
+    "is_success": true,
+    "latency_s": 0.2556,
+    "audio_duration_s": 2.56
+  },
+  {
+    "sample_id": "common_voice_en_10933823-common_voice_en_10933822",
+    "target_text": "When it comes to the crunch, our company will become insolvent.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_10933823-common_voice_en_10933822.wav",
+    "is_success": true,
+    "latency_s": 0.352,
+    "audio_duration_s": 4.08
+  },
+  {
+    "sample_id": "common_voice_en_10933823-common_voice_en_10933825",
+    "target_text": "The primary coil has fifty turns.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_10933823-common_voice_en_10933825.wav",
+    "is_success": true,
+    "latency_s": 0.2465,
+    "audio_duration_s": 2.56
+  },
+  {
+    "sample_id": "common_voice_en_120405-common_voice_en_120402",
+    "target_text": "I'm never more aware of a room's acoustics than when I'm trying to enjoy a snack I have no intention of sharing.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_120405-common_voice_en_120402.wav",
+    "is_success": true,
+    "latency_s": 0.7513,
+    "audio_duration_s": 9.44
+  },
+  {
+    "sample_id": "common_voice_en_120405-common_voice_en_120406",
+    "target_text": "The only shadow was that of the few scattered pine trees.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_120405-common_voice_en_120406.wav",
+    "is_success": true,
+    "latency_s": 0.3664,
+    "audio_duration_s": 4.24
+  },
+  {
+    "sample_id": "common_voice_en_1205005-common_voice_en_1205007",
+    "target_text": "The work of the tailor is seen on each side.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_1205005-common_voice_en_1205007.wav",
+    "is_success": true,
+    "latency_s": 0.2572,
+    "audio_duration_s": 2.64
+  },
+  {
+    "sample_id": "common_voice_en_1205005-common_voice_en_1205008",
+    "target_text": "NASA plans to launch the rocket tomorrow.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_1205005-common_voice_en_1205008.wav",
+    "is_success": true,
+    "latency_s": 0.219,
+    "audio_duration_s": 2.4
+  },
+  {
+    "sample_id": "common_voice_en_123125-common_voice_en_123126",
+    "target_text": "After all, who doesn’t want to overcome new challenges and achieve great heights?",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_123125-common_voice_en_123126.wav",
+    "is_success": true,
+    "latency_s": 0.4222,
+    "audio_duration_s": 5.04
+  },
+  {
+    "sample_id": "common_voice_en_123125-common_voice_en_123127",
+    "target_text": "Later, we simply let life proceed, in its own direction, toward its own fate.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_123125-common_voice_en_123127.wav",
+    "is_success": true,
+    "latency_s": 0.5672,
+    "audio_duration_s": 6.8
+  },
+  {
+    "sample_id": "common_voice_en_125386-common_voice_en_125388",
+    "target_text": "The two men hurried back and found the cylinder still lying in the same position.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_125386-common_voice_en_125388.wav",
+    "is_success": true,
+    "latency_s": 0.3371,
+    "audio_duration_s": 4.0
+  },
+  {
+    "sample_id": "common_voice_en_125386-common_voice_en_125389",
+    "target_text": "I thought about the difficulties in translation that might arise.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_125386-common_voice_en_125389.wav",
+    "is_success": true,
+    "latency_s": 0.3029,
+    "audio_duration_s": 3.76
+  },
+  {
+    "sample_id": "common_voice_en_137148-common_voice_en_137152",
+    "target_text": "Elvis Presley is often called the \"King of Rock and Roll\".",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_137148-common_voice_en_137152.wav",
+    "is_success": true,
+    "latency_s": 0.3096,
+    "audio_duration_s": 3.44
+  },
+  {
+    "sample_id": "common_voice_en_13900-common_voice_en_13901",
+    "target_text": "We don't have the budget to produce it in studio quality.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_13900-common_voice_en_13901.wav",
+    "is_success": true,
+    "latency_s": 0.3948,
+    "audio_duration_s": 4.8
+  },
+  {
+    "sample_id": "common_voice_en_1416089-common_voice_en_1416090",
+    "target_text": "Also, will numbers be written as digits or as words?",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_1416089-common_voice_en_1416090.wav",
+    "is_success": true,
+    "latency_s": 0.4431,
+    "audio_duration_s": 5.28
+  },
+  {
+    "sample_id": "common_voice_en_1416089-common_voice_en_1416093",
+    "target_text": "I do not like sushi, so I did not really enjoy the meal.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_1416089-common_voice_en_1416093.wav",
+    "is_success": true,
+    "latency_s": 0.5611,
+    "audio_duration_s": 6.72
+  },
+  {
+    "sample_id": "common_voice_en_15265-common_voice_en_15266",
+    "target_text": "Large brown dog walks up a blue staircase.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_15265-common_voice_en_15266.wav",
+    "is_success": true,
+    "latency_s": 0.2842,
+    "audio_duration_s": 3.28
+  },
+  {
+    "sample_id": "common_voice_en_15265-common_voice_en_15268",
+    "target_text": "A sky jumper falls toward the sea and the earth.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_15265-common_voice_en_15268.wav",
+    "is_success": true,
+    "latency_s": 0.4481,
+    "audio_duration_s": 4.88
+  },
+  {
+    "sample_id": "common_voice_en_153872-common_voice_en_153873",
+    "target_text": "They set off running wildly into the trees.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_153872-common_voice_en_153873.wav",
+    "is_success": true,
+    "latency_s": 0.3611,
+    "audio_duration_s": 3.92
+  },
+  {
+    "sample_id": "common_voice_en_153872-common_voice_en_153874",
+    "target_text": "A thin circle of bright metal showed between the top and the body of the cylinder.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_153872-common_voice_en_153874.wav",
+    "is_success": true,
+    "latency_s": 0.4569,
+    "audio_duration_s": 5.44
+  },
+  {
+    "sample_id": "common_voice_en_155313-common_voice_en_155315",
+    "target_text": "Replace the Ts in Tim Tebow's name with any other consonant to get a Star Wars character",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_155313-common_voice_en_155315.wav",
+    "is_success": true,
+    "latency_s": 0.4536,
+    "audio_duration_s": 5.44
+  },
+  {
+    "sample_id": "common_voice_en_15734837-common_voice_en_15734838",
+    "target_text": "Tyler, Lucy, Michelle, we're going to space!",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_15734837-common_voice_en_15734838.wav",
+    "is_success": true,
+    "latency_s": 0.2982,
+    "audio_duration_s": 3.52
+  },
+  {
+    "sample_id": "common_voice_en_15735839-common_voice_en_15735837",
+    "target_text": "Get out of this!",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_15735839-common_voice_en_15735837.wav",
+    "is_success": true,
+    "latency_s": 0.1373,
+    "audio_duration_s": 1.44
+  },
+  {
+    "sample_id": "common_voice_en_15903802-common_voice_en_15903807",
+    "target_text": "Thousands of people die every year as a consequence of air pollution.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_15903802-common_voice_en_15903807.wav",
+    "is_success": true,
+    "latency_s": 0.3486,
+    "audio_duration_s": 4.0
+  },
+  {
+    "sample_id": "common_voice_en_15903802-common_voice_en_15903815",
+    "target_text": "History teaches us that humans do not learn from history.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_15903802-common_voice_en_15903815.wav",
+    "is_success": true,
+    "latency_s": 0.3367,
+    "audio_duration_s": 4.0
+  },
+  {
+    "sample_id": "common_voice_en_16666041-common_voice_en_16666040",
+    "target_text": "I was well, but I'm all the better for being here.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_16666041-common_voice_en_16666040.wav",
+    "is_success": true,
+    "latency_s": 0.4192,
+    "audio_duration_s": 4.64
+  },
+  {
+    "sample_id": "common_voice_en_167249-common_voice_en_167246",
+    "target_text": "what is the forecast for California for rain",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_167249-common_voice_en_167246.wav",
+    "is_success": true,
+    "latency_s": 0.3593,
+    "audio_duration_s": 3.76
+  },
+  {
+    "sample_id": "common_voice_en_167249-common_voice_en_167247",
+    "target_text": "Take these capsules over to Mrs. David's house.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_167249-common_voice_en_167247.wav",
+    "is_success": true,
+    "latency_s": 0.2754,
+    "audio_duration_s": 2.72
+  },
+  {
+    "sample_id": "common_voice_en_17147545-common_voice_en_17147546",
+    "target_text": "Lions hunt their prey with sprints, whereas wolves take advantage of their stamina.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17147545-common_voice_en_17147546.wav",
+    "is_success": true,
+    "latency_s": 0.5613,
+    "audio_duration_s": 6.72
+  },
+  {
+    "sample_id": "common_voice_en_17161-common_voice_en_17159",
+    "target_text": "He must be disguised to avoid encounters with thieves.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17161-common_voice_en_17159.wav",
+    "is_success": true,
+    "latency_s": 0.2856,
+    "audio_duration_s": 3.36
+  },
+  {
+    "sample_id": "common_voice_en_17161-common_voice_en_17160",
+    "target_text": "The area was swirling in dust so intense that it hid the moon from view.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17161-common_voice_en_17160.wav",
+    "is_success": true,
+    "latency_s": 0.3903,
+    "audio_duration_s": 4.88
+  },
+  {
+    "sample_id": "common_voice_en_17249419-common_voice_en_17249428",
+    "target_text": "I heard the land where the hobbits live, the Shire, has actually been filmed in New Zealand.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17249419-common_voice_en_17249428.wav",
+    "is_success": true,
+    "latency_s": 1.3827,
+    "audio_duration_s": 16.72
+  },
+  {
+    "sample_id": "common_voice_en_17255102-common_voice_en_17255101",
+    "target_text": "The salesman was like the rest of them, untrustworthy.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17255102-common_voice_en_17255101.wav",
+    "is_success": true,
+    "latency_s": 0.3085,
+    "audio_duration_s": 3.44
+  },
+  {
+    "sample_id": "common_voice_en_17256676-common_voice_en_17256678",
+    "target_text": "To her amazement, she found a supermarket trolley lying on the seabed.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17256676-common_voice_en_17256678.wav",
+    "is_success": true,
+    "latency_s": 0.4503,
+    "audio_duration_s": 4.8
+  },
+  {
+    "sample_id": "common_voice_en_17259121-common_voice_en_17259122",
+    "target_text": "This pepperoni tastes off, she said.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17259121-common_voice_en_17259122.wav",
+    "is_success": true,
+    "latency_s": 0.418,
+    "audio_duration_s": 4.64
+  },
+  {
+    "sample_id": "common_voice_en_17263752-common_voice_en_17263750",
+    "target_text": "Try to make eye contact with a stranger on the bus, and hold it for five seconds, without speaking.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17263752-common_voice_en_17263750.wav",
+    "is_success": true,
+    "latency_s": 0.4641,
+    "audio_duration_s": 5.68
+  },
+  {
+    "sample_id": "common_voice_en_17263752-common_voice_en_17263755",
+    "target_text": "Spain is producing lots of lettuce, paprika and tomatoes.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17263752-common_voice_en_17263755.wav",
+    "is_success": true,
+    "latency_s": 0.3429,
+    "audio_duration_s": 4.24
+  },
+  {
+    "sample_id": "common_voice_en_17263780-common_voice_en_17263781",
+    "target_text": "The more you read, the better you will be understood.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17263780-common_voice_en_17263781.wav",
+    "is_success": true,
+    "latency_s": 0.3319,
+    "audio_duration_s": 4.08
+  },
+  {
+    "sample_id": "common_voice_en_17263780-common_voice_en_17263782",
+    "target_text": "If my stepfather sold this old sculpture, he'd probably become a millionaire.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17263780-common_voice_en_17263782.wav",
+    "is_success": true,
+    "latency_s": 0.5386,
+    "audio_duration_s": 6.96
+  },
+  {
+    "sample_id": "common_voice_en_17267923-common_voice_en_17267922",
+    "target_text": "Can we please leave now?",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17267923-common_voice_en_17267922.wav",
+    "is_success": true,
+    "latency_s": 0.1902,
+    "audio_duration_s": 2.16
+  },
+  {
+    "sample_id": "common_voice_en_17268075-common_voice_en_17268076",
+    "target_text": "Contrary to common belief, children won't gain computer literacy, if you just hand them tablet computers and smartphones.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17268075-common_voice_en_17268076.wav",
+    "is_success": true,
+    "latency_s": 0.743,
+    "audio_duration_s": 8.48
+  },
+  {
+    "sample_id": "common_voice_en_17271507-common_voice_en_17271509",
+    "target_text": "Regarding your request, I have decided to heed your warnings.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17271507-common_voice_en_17271509.wav",
+    "is_success": true,
+    "latency_s": 0.4094,
+    "audio_duration_s": 4.4
+  },
+  {
+    "sample_id": "common_voice_en_17271507-common_voice_en_17271510",
+    "target_text": "It was such a thrill, her veins were pumped full of adrenaline.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17271507-common_voice_en_17271510.wav",
+    "is_success": true,
+    "latency_s": 0.44,
+    "audio_duration_s": 5.04
+  },
+  {
+    "sample_id": "common_voice_en_17274522-common_voice_en_17274523",
+    "target_text": "Nora finds herself ugly, because she has pimples.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17274522-common_voice_en_17274523.wav",
+    "is_success": true,
+    "latency_s": 0.3571,
+    "audio_duration_s": 4.16
+  },
+  {
+    "sample_id": "common_voice_en_17274522-common_voice_en_17274525",
+    "target_text": "Ninety five lines and no more, that's it.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17274522-common_voice_en_17274525.wav",
+    "is_success": true,
+    "latency_s": 0.2793,
+    "audio_duration_s": 3.36
+  },
+  {
+    "sample_id": "common_voice_en_17274533-common_voice_en_17274531",
+    "target_text": "If possible, we'd like the papers a week before and after each of these dates please.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17274533-common_voice_en_17274531.wav",
+    "is_success": true,
+    "latency_s": 0.4862,
+    "audio_duration_s": 5.44
+  },
+  {
+    "sample_id": "common_voice_en_17275818-common_voice_en_17275816",
+    "target_text": "Television can make you dumb, but it can also be good education.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17275818-common_voice_en_17275816.wav",
+    "is_success": true,
+    "latency_s": 0.3631,
+    "audio_duration_s": 4.0
+  },
+  {
+    "sample_id": "common_voice_en_17275818-common_voice_en_17275817",
+    "target_text": "Ladies and gentlemen, this wagon is going to be detached.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17275818-common_voice_en_17275817.wav",
+    "is_success": true,
+    "latency_s": 0.2666,
+    "audio_duration_s": 3.04
+  },
+  {
+    "sample_id": "common_voice_en_17277080-common_voice_en_17277082",
+    "target_text": "Three weeks later, he was feeling a lot better.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17277080-common_voice_en_17277082.wav",
+    "is_success": true,
+    "latency_s": 0.3072,
+    "audio_duration_s": 3.04
+  },
+  {
+    "sample_id": "common_voice_en_17277080-common_voice_en_17277083",
+    "target_text": "Little thieves are hanged, but great ones escape.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17277080-common_voice_en_17277083.wav",
+    "is_success": true,
+    "latency_s": 0.3399,
+    "audio_duration_s": 3.76
+  },
+  {
+    "sample_id": "common_voice_en_17278904-common_voice_en_17278905",
+    "target_text": "With skin and hair completely, thoroughly out and out.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17278904-common_voice_en_17278905.wav",
+    "is_success": true,
+    "latency_s": 0.5328,
+    "audio_duration_s": 6.24
+  },
+  {
+    "sample_id": "common_voice_en_17278904-common_voice_en_17278909",
+    "target_text": "This part of the town was half residential, half industrial.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17278904-common_voice_en_17278909.wav",
+    "is_success": true,
+    "latency_s": 0.3453,
+    "audio_duration_s": 4.16
+  },
+  {
+    "sample_id": "common_voice_en_17281385-common_voice_en_17281386",
+    "target_text": "As he couldn't prove his innocence, he was brought to the detention zone, as if guilty.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17281385-common_voice_en_17281386.wav",
+    "is_success": true,
+    "latency_s": 0.4739,
+    "audio_duration_s": 6.0
+  },
+  {
+    "sample_id": "common_voice_en_17281385-common_voice_en_17281393",
+    "target_text": "Lifeguards were standing on a tower, staring at the water.",
+    "wav_path": "/data/runs/20260929T0400Z/parity/eager-b/seeded/audio/common_voice_en_17281385-common_voice_en_17281393.wav",
+    "is_success": true,
+    "latency_s": 0.3678,
+    "audio_duration_s": 4.56
+  }
+]
