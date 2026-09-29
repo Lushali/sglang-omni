@@ -1706,3 +1706,11 @@ cpuset 测试里的 `_samples` 改成 `samples`。
 这正是第三十八轮外审提过、我凭 runner 历史保留的那一项;余量只有 3%,我改判:两个臂的 p95 都只打印,只 gate 四个中位数,
 p95 字段、常量与工具里的 `ttfp_p95_s` 指标一并删除(工具 `86d562f`)。同时按他的第二条意见,延迟 artifact 改为只要没被取消就上传
 (触发 gate 的那次运行最需要留数据),输出目录按 run_id 与 attempt 分开,避免早期失败把上一次推送的 JSON 传上去;通过时缺文件才报错。
+
+**合并(2026-09-28 20:45 PT)**:JiaxinD 在 `2237388a` 上 approve。按 luojiaxuan 的要求等整轮 CI 跑完(run `36391473286`,
+36 项通过、5 项跳过,跳过的是 CPU/XPU CI 与收尾清理)再合。延迟阶段跑的是 `qwen3-tts-custom-voice`(runner `omni-runner-h100`,
+lane `32-47,96-111`):1 rps 中位数 21.9 ms(gate 27.3)、20 rps 中位数 34.3 ms(gate 44.4)、20 rps p95 49.6 ms(只打印),排队 0;
+新的上传步骤传上了 2 个 `speed_results.json`,artifact 保留到 10-28。这次 1 rps 中位数落回标定范围(21.2 到 21.8),
+而前两次在 lane `48-63,112-127` 上都偏高 7% 到 9%,更像是那条 lane 的差异。squash 合并为 `20329946`,
+带 `Co-authored-by: JiaxinD`,已复核。标定工具 #1 已由 zhaochenyang20 在 09-26 合并,但合的是 `a53be90`,
+少了删除 p95 指标的 `86d562f`;补在 zhaochenyang20/sglang-omni-calibration#2(对 main `20329946` 覆盖检查通过、49 项测试通过)。
