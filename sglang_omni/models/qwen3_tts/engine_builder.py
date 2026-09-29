@@ -271,6 +271,13 @@ class Qwen3TtsEngineBuilder(TtsEngineBuilder["Qwen3TTSSGLangRequestData"]):
             return
         else:
             pass
+        if model.speaker_encoder_graph_runner is not None:
+            model.speaker_encoder_graph_runner.capture(
+                self.reference_encoder_cuda_graph_bucket_frames,
+                speech_tokenizer.model.encode_downsample_rate,
+            )
+        else:
+            pass
         # note(ratish): the bucket warmups also build cuDNN's attention plans,
         # which otherwise land inside the first serving step of each batch size.
         subtalker = request_builders.resolve_subtalker_sampling(

@@ -20,6 +20,9 @@ from sglang_omni.models.qwen3_tts.compat import (
     apply_qwen_tts_transformers_compatibility_patches,
 )
 from sglang_omni.models.qwen3_tts.sglang_model import Qwen3TTSPromptBuilderMixin
+from sglang_omni.models.qwen3_tts.speaker_encoder_cuda_graph import (
+    Qwen3TTSSpeakerEncoderCudaGraphRunner,
+)
 
 if TYPE_CHECKING:
     from qwen_tts.core.models.configuration_qwen3_tts import (
@@ -114,8 +117,12 @@ class Qwen3TTSPromptFrontend(Qwen3TTSPromptBuilderMixin, nn.Module):
             self.speaker_encoder = Qwen3TTSSpeakerEncoder(
                 root_config.speaker_encoder_config
             )
+            self.speaker_encoder_graph_runner = Qwen3TTSSpeakerEncoderCudaGraphRunner(
+                self.speaker_encoder, sample_rate=self.speaker_encoder_sample_rate
+            )
         else:
             self.speaker_encoder = None
+            self.speaker_encoder_graph_runner = None
         self.speech_tokenizer = None
         self.to(device=device, dtype=dtype)
         self.requires_grad_(False)
