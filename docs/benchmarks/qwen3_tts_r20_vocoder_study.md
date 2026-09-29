@@ -1761,3 +1761,10 @@ p95:breakable 26.0 到 26.1 ms,full 23.4 到 23.5 ms。所有臂 56/56 完成、
 
 **收尾**:容器已删、map 已清;节点运行目录(含音频与 3 GB 的 venv)已删,正本是本仓库的数据目录;保留 CI 镜像(约 40 GB)与 HF 缓存;
 租约 21:36 PT 释放,`radix machines mine` 为空,额度 62 未变(一次申请、未续期)。
+
+**CI(2026-09-29)**:`d0452883` 的这一轮排队很久(runner 被多个 PR 共用,装环境等了 75 分钟),02:36 PT 跑到延迟阶段:
+`qwen3-tts-custom-voice`,lane `48-63,112-127`,日志里 prefill 抓取并登记的是 `backend=full`;从计划到达算起首帧 1 rps 中位数 21.3 ms
+(gate 27.3)、20 rps 中位数 32.6 ms(gate 44.4)、p95 45.8 ms(只打印),通过。对照 #2293 在 main(breakable 默认)上 CustomVoice 的三次:
+21.9 到 23.3 ms、34.3 ms、49.6 到 50.4 ms。单次 CI 读数,方向与 H200 上的一致性检查一致(20 rps 中位数约 -1.7 ms,p95 约 -4 ms)。
+同一轮 38 项通过、2 项失败,都与本 PR 无关:TTS stage 5(MPS,固定跑 MOSS)说话人相似度 63.28 对门槛 63.41;Qwen3-Omni stage 6
+(MMSU Talker)速度门槛差 2% 到 10%,当天别的 PR 上也时过时不过。15:15 PT 只重跑了这两个失败的 job。
