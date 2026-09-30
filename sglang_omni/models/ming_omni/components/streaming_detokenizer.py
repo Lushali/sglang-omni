@@ -26,9 +26,9 @@ import time
 from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import TypedDict
 
 from transformers import PreTrainedTokenizerBase
+from typing_extensions import NotRequired, TypedDict
 
 from sglang_omni.models.ming_omni.io import (
     MingOmniEvent,
@@ -282,7 +282,7 @@ class MingStreamingDetokenizeScheduler:
 
     def build_result(
         self, payload: StagePayload, *, is_streaming: bool = False
-    ) -> dict[str, object]:
+    ) -> MingDecodeResult:
         state = load_state(payload)
         thinker_out = state.thinker_out or state.engine_outputs.get(THINKER_STAGE)
         if not isinstance(thinker_out, dict):
@@ -306,7 +306,7 @@ class MingStreamingDetokenizeScheduler:
             )
         )
 
-        result: dict[str, object] = {"events": [event_to_dict(e) for e in events]}
+        result: MingDecodeResult = {"events": [event_to_dict(e) for e in events]}
         final_event = next(
             (
                 e
@@ -352,6 +352,18 @@ class MingOmniEventDict(TypedDict):
     is_final: bool
 
 
+MingDecodeResult = TypedDict(
+    "MingDecodeResult",
+    {
+        "events": list[MingOmniEventDict],
+        "text": NotRequired[str | list[str]],
+        "modality": NotRequired[str],
+        "usage": NotRequired[dict[str, int]],
+        "finish_reason": NotRequired[object],
+    },
+)
+
+
 def event_to_dict(event: MingOmniEvent) -> MingOmniEventDict:
     return {
         "type": event.type,
@@ -389,7 +401,7 @@ def text_output_requested(request: OmniRequest) -> bool:
 
 
 def attach_decode_final_metadata(
-    result: dict[str, object],
+    result: MingDecodeResult | dict[str, object],
     state: MingOmniPipelineState,
     thinker_out: Mapping[str, object],
 ) -> None:

@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
+
+from typing_extensions import NotRequired, TypedDict
 
 if TYPE_CHECKING:
     import torch
@@ -22,6 +24,18 @@ class LLaDA2UniEventDict(TypedDict):
     modality: str
     payload: dict[str, str | list[str]]
     is_final: bool
+
+
+LLaDA2UniDecodeResult = TypedDict(
+    "LLaDA2UniDecodeResult",
+    {
+        "events": list[LLaDA2UniEventDict],
+        "text": NotRequired[str | list[str]],
+        "modality": NotRequired[str],
+        "usage": NotRequired[dict[str, int]],
+        "finish_reason": NotRequired[object],
+    },
+)
 
 
 def event_to_dict(event) -> LLaDA2UniEventDict:
@@ -173,7 +187,7 @@ def create_decode_executor(model_path: str):
         )
         event_dicts = [event_to_dict(event) for event in events]
 
-        result: dict[str, object] = {"events": event_dicts}
+        result: LLaDA2UniDecodeResult = {"events": event_dicts}
         if events:
             result.update(events[0].payload)
             result.setdefault("modality", events[0].modality)
