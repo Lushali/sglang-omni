@@ -2,7 +2,7 @@
 // Protocol handling lives in session.js, audio I/O in worklet.js and camera capture
 // in camera.js (all shared byte-for-byte with tools/realtime_web_demo); orb.js draws
 // the orb from the live microphone and playback levels.
-import { DuplexSession, INPUT_RATE, PACKET_SAMPLES } from "./session.js";
+import { DuplexSession } from "./session.js";
 import { Camera } from "./camera.js";
 import { Orb } from "./orb.js";
 
@@ -15,11 +15,16 @@ const LEVEL_GAIN = 5;
 const MIC_TALK_LEVEL = 0.12;
 const MODEL_TALK_LEVEL = 0.04;
 const CAPTION_FADE_MS = 5000;
+// Output quieter than this counts as silence when deciding to end a local interrupt.
+const QUIET_RMS = 0.01;
+const UNMUTE_QUIET_MS = 400;
+// The stop button is offered while the model has been audible this recently.
+const INTERRUPT_WINDOW_MS = 1500;
 // Speech has gaps between syllables; a mood holds this long after the last loud frame.
 const MODEL_HOLD_MS = 700;
 const MIC_HOLD_MS = 400;
 
-const ids = ["statusPill", "statusText", "transcriptBtn", "themeBtn", "warning", "selfView", "cameraPreview", "frameCount", "orb", "orbCanvas", "statusLine", "caption", "note", "startBtn", "dock", "cameraBtn", "muteBtn", "micOn", "micOff", "interruptBtn", "endBtn", "hint", "sheet", "sheetClose", "transcript"];
+const ids = ["brandName", "statusPill", "statusText", "transcriptBtn", "themeBtn", "warning", "selfView", "cameraPreview", "frameCount", "orb", "orbCanvas", "statusLine", "caption", "note", "startBtn", "dock", "cameraBtn", "muteBtn", "micOn", "micOff", "interruptBtn", "endBtn", "hint", "sheet", "sheetClose", "transcript"];
 const ui = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
 
 function wsUrl() {
@@ -54,6 +59,10 @@ let serverUp = null;
 let sessionStart = null;
 let muted = false;
 let mutedResponse = false;
+// Quiet output heard since a local interrupt; enough of it ends the mute.
+let mutedQuietMs = 0;
+// A response is open but has not produced audio yet.
+let awaitingAudio = false;
 let lastSpokeAt = 0;
 let lastModelLoudAt = -Infinity;
 let lastMicLoudAt = -Infinity;
@@ -65,6 +74,13 @@ const camera = new Camera(ui.cameraPreview);
 let startingCamera = false;
 const orb = new Orb(ui.orbCanvas);
 const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+
+// Deployment-specific text comes from config.js, so one page serves any duplex model.
+if (window.DEMO_MODEL_NAME) {
+  ui.brandName.textContent = window.DEMO_MODEL_NAME;
+  document.title = `${window.DEMO_MODEL_NAME} Live`;
+}
+if (window.DEMO_NOTE) ui.note.textContent = window.DEMO_NOTE;
 
 function isOpen() {
   return Boolean(socket) && socket.readyState === WebSocket.OPEN;
@@ -98,7 +114,6 @@ function setButtons() {
   ui.caption.hidden = !call;
   ui.startBtn.disabled = remoteBusy || serverUp === false;
   ui.orb.setAttribute("aria-label", call ? "Show transcript" : "Start conversation");
-  ui.interruptBtn.disabled = !(session && session.responseOpen) || mutedResponse;
   ui.muteBtn.disabled = !captureStream;
   ui.muteBtn.setAttribute("aria-pressed", String(muted));
   ui.muteBtn.setAttribute("aria-label", muted ? "Unmute microphone" : "Mute microphone");
@@ -138,7 +153,7 @@ function mood(micLevel, modelLevel, now) {
   if (muted) return { mood: "idle", level: 0, line: "Microphone muted" };
   if (!captureStream) return { mood: "idle", level: 0, line: startingMic ? "Allow the microphone to start" : "Microphone off" };
   if (now - lastMicLoudAt < MIC_HOLD_MS) return { mood: "user", level: micLevel, line: "Listening" };
-  if (session.responseOpen) return { mood: "thinking", level: 0, line: "Thinking…" };
+  if (session.responseOpen && awaitingAudio) return { mood: "thinking", level: 0, line: "Thinking…" };
   return { mood: "listening", level: micLevel, line: "Listening" };
 }
 
@@ -156,6 +171,7 @@ function render(now) {
 }
 
 function tick() {
+  ui.interruptBtn.disabled = mutedResponse || !isOpen() || performance.now() - lastModelLoudAt > INTERRUPT_WINDOW_MS;
   let label;
   let pill;
   if (isOpen() && sessionStart !== null) {
@@ -202,6 +218,8 @@ async function pollStatus() {
 function renderTranscript() {
   const text = session ? session.transcript : "";
   const paragraphs = text.split("\n").filter((line) => line.trim());
+  // Audio-only models never send text; the transcript control appears with the first words.
+  ui.transcriptBtn.hidden = !paragraphs.length;
   if (!paragraphs.length) {
     ui.transcript.innerHTML = '<p class="empty">What the model says will appear here.</p>';
     ui.caption.textContent = "";
@@ -275,6 +293,25 @@ async function ensurePlayback(rate) {
   await playbackContext.resume();
 }
 
+function rmsOf(samples) {
+  let energy = 0;
+  for (let index = 0; index < samples.length; index += 1) energy += samples[index] * samples[index];
+  return samples.length ? Math.sqrt(energy / samples.length) : 0;
+}
+
+// Models that stream a frame every few tens of ms (PersonaPlex: 80 ms) are hurt by
+// every network hiccup, so they get a deeper, adaptive jitter buffer and gentler
+// catch-up; models that answer in 1 s units keep the fixed defaults.
+const STREAMING_UNIT_MS = 500;
+const STREAMING_PLAYBACK = { jitterMs: 400, maxJitterMs: 900, maxMs: 3500, keepMs: 2200, catchUp: { slow: 0.5, fast: 1.0, skip: 2.0, slowRate: 1.06, fastRate: 1.12 } };
+
+function configurePlayback(unitMs) {
+  if (!playbackNode || !(unitMs > 0) || unitMs >= STREAMING_UNIT_MS) return;
+  const samples = (ms) => Math.round((playbackContext.sampleRate * ms) / 1000);
+  const { jitterMs, maxJitterMs, maxMs, keepMs, catchUp } = STREAMING_PLAYBACK;
+  playbackNode.port.postMessage({ type: "config", initialSamples: samples(jitterMs), maxJitterSamples: samples(maxJitterMs), maxSamples: samples(maxMs), keepSamples: samples(keepMs), catchUp });
+}
+
 function pcm16ToFloat(bytes, sourceRate, targetRate) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const source = new Float32Array(bytes.byteLength >> 1);
@@ -302,20 +339,28 @@ function sessionListeners() {
     granted: async () => {
       sessionStart = performance.now();
       await ensurePlayback(session.outputRate);
+      configurePlayback(session.unitMs);
       setButtons();
       // One tap starts everything: the microphone follows the grant.
       startMic().catch((error) => warn(`Microphone: ${error.message}`, true));
     },
     audio: (bytes) => {
       if (!playbackNode) return;
-      // After a local interrupt, drop the rest of that answer; the next
-      // response.created lifts the mute.
-      if (mutedResponse) return;
+      awaitingAudio = false;
       const samples = pcm16ToFloat(bytes, session.outputRate, playbackContext.sampleRate);
+      // After a local interrupt, drop what the model is still saying. Models that
+      // answer in turns lift the mute at the next response.created; models that
+      // stream one response for the whole session lift it once they fall quiet.
+      if (mutedResponse) {
+        mutedQuietMs = rmsOf(samples) < QUIET_RMS ? mutedQuietMs + (samples.length * 1000) / playbackContext.sampleRate : 0;
+        if (mutedQuietMs < UNMUTE_QUIET_MS) return;
+        mutedResponse = false;
+      }
       playbackNode.port.postMessage({ type: "push", samples }, [samples.buffer]);
     },
     response: ({ open }) => {
       if (open) mutedResponse = false;
+      awaitingAudio = open;
       setButtons();
       if (playbackNode) playbackNode.port.postMessage({ type: open ? "open" : "flush" });
       // A new answer means whatever is still queued belongs to the previous one.
@@ -425,7 +470,7 @@ async function startMic() {
     if (stale()) throw new Error("the session changed while the microphone was starting");
     const source = pendingContext.createMediaStreamSource(pendingStream);
     const pendingNode = new AudioWorkletNode(pendingContext, "capture-processor", {
-      processorOptions: { sourceRate: pendingContext.sampleRate, targetRate: INPUT_RATE, frameSamples: PACKET_SAMPLES },
+      processorOptions: { sourceRate: pendingContext.sampleRate, targetRate: session.inputRate, frameSamples: session.packetSamples },
     });
     const silent = pendingContext.createGain();
     silent.gain.value = 0;
@@ -477,6 +522,7 @@ async function closeNow() {
 
 function interrupt() {
   mutedResponse = true;
+  mutedQuietMs = 0;
   if (playbackNode) playbackNode.port.postMessage({ type: "clear" });
   setButtons();
 }
@@ -484,7 +530,7 @@ function interrupt() {
 const start = () => connect().catch((error) => warn(error.message, true));
 ui.startBtn.addEventListener("click", start);
 ui.orb.addEventListener("click", () => {
-  if (inCall()) setSheet(ui.sheet.dataset.open !== "true");
+  if (inCall()) setSheet(!ui.transcriptBtn.hidden && ui.sheet.dataset.open !== "true");
   else if (!ui.startBtn.disabled) start();
 });
 ui.muteBtn.addEventListener("click", () => {
