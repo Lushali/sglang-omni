@@ -226,7 +226,7 @@ def build_generation_kwargs(
     else:
         pass
 
-    generation_kwargs: dict[str, int | float] = {
+    generation_kwargs: dict[str, object] = {
         "max_new_tokens": max_new_tokens,
         "text_temperature": 1.0,
         "audio_temperature": 1.7,

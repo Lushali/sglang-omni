@@ -375,7 +375,7 @@ def build_generation_kwargs(
     else:
         max_new_tokens = int(raw_max_new_tokens)
 
-    generation_kwargs: dict[str, int | float] = {
+    generation_kwargs: dict[str, object] = {
         "max_new_tokens": max_new_tokens,
         # note (chenyang): the checkpoint's own generate() defaults; greedy
         # (temperature=0) collapses the codec LM into copying the reference
