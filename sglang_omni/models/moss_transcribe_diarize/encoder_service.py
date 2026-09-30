@@ -12,7 +12,7 @@ import logging
 import queue
 import traceback
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeGuard
 
 import torch
 
@@ -133,7 +133,9 @@ class BatchedAudioEncoderService(
             pass
         return None if fingerprint is None else str(fingerprint)
 
-    def is_valid(self, embedding: object, expected_tokens: int) -> bool:
+    def is_valid(
+        self, embedding: object, expected_tokens: int
+    ) -> TypeGuard[torch.Tensor]:
         return (
             isinstance(embedding, torch.Tensor)
             and embedding.dim() == 2

@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from typing import Dict, Optional, Type
 
 import torch
@@ -92,7 +93,7 @@ class RelayOperation(ABC):
 
     @property
     @abstractmethod
-    def metadata(self) -> object:
+    def metadata(self) -> Mapping[str, object] | None:
         """Returns metadata required by the receiver (e.g., SHM name, memory pointer)."""
 
     @abstractmethod

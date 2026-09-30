@@ -14,7 +14,7 @@ import time
 import traceback
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeGuard
 
 import torch
 from sglang.srt.managers.schedule_batch import MultimodalDataItem, MultimodalInputFormat
@@ -301,7 +301,9 @@ class FunASRPreLMEncoderService(
             pass
         return f"{self.namespace}:{item_hash}"
 
-    def is_valid(self, embedding: object, expected_tokens: int) -> bool:
+    def is_valid(
+        self, embedding: object, expected_tokens: int
+    ) -> TypeGuard[torch.Tensor]:
         return (
             isinstance(embedding, torch.Tensor)
             and embedding.dim() == 2
