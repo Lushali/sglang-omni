@@ -8,16 +8,14 @@ import base64
 from collections.abc import Mapping
 from io import BytesIO
 from pathlib import Path
-from typing import TypeVar
 
+import torch
 from PIL import Image, UnidentifiedImageError
 
 from sglang_omni.preprocessing.resource_connector import MultiModalResourceConnector
 
 from .base import MediaIO, is_url
 from .cache_key import compute_media_cache_key
-
-ImageInputT = TypeVar("ImageInputT")
 
 
 def load_image_path(path: str | Path) -> Image.Image:
@@ -138,8 +136,8 @@ async def ensure_image_list_async(
 
 
 def build_image_mm_inputs(
-    hf_inputs: Mapping[str, ImageInputT],
-) -> dict[str, ImageInputT | None]:
+    hf_inputs: Mapping[str, torch.Tensor],
+) -> dict[str, torch.Tensor | None]:
     """Extract standard image tensors from HF processor outputs."""
     return {
         "pixel_values": hf_inputs.get("pixel_values"),

@@ -9,7 +9,7 @@ import re
 import time
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Callable, TypeVar
+from typing import Callable, overload
 
 import numpy as np
 import torch
@@ -33,8 +33,6 @@ from sglang_omni.scheduling.token_text_streaming import (
     make_token_text_stream_output_builder,
 )
 from sglang_omni.scheduling.types import RequestOutput
-
-SamplingResultT = TypeVar("SamplingResultT")
 
 logger = logging.getLogger(__name__)
 
@@ -181,13 +179,33 @@ def explicit_generation_fields(metadata: dict[str, object]) -> set[str]:
     return set()
 
 
+@overload
 def sampling_param(
     params: dict[str, object],
     explicit_fields: set[str],
     field: str,
-    default: SamplingResultT,
-    cast: Callable[[object], SamplingResultT],
-) -> SamplingResultT:
+    default: int,
+    cast: type[int],
+) -> int: ...
+
+
+@overload
+def sampling_param(
+    params: dict[str, object],
+    explicit_fields: set[str],
+    field: str,
+    default: float,
+    cast: type[float],
+) -> float: ...
+
+
+def sampling_param(
+    params: dict[str, object],
+    explicit_fields: set[str],
+    field: str,
+    default: int | float,
+    cast: type[int] | type[float],
+) -> int | float:
     if field not in explicit_fields:
         return default
     else:

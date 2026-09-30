@@ -430,23 +430,24 @@ class Qwen3OmniPreprocessor:
             request_id=payload.request_id,
         )
 
-        full_mm_inputs: dict[str, dict[str, torch.Tensor | None]] = {
-            "image": build_image_mm_inputs(flat_inputs),
-            "audio": build_audio_mm_inputs(flat_inputs),
-            "video": build_video_mm_inputs(flat_inputs),
+        image_mm_inputs = build_image_mm_inputs(flat_inputs)
+        audio_mm_inputs = build_audio_mm_inputs(flat_inputs)
+        video_mm_inputs = build_video_mm_inputs(flat_inputs)
+        full_mm_inputs: dict[str, Mapping[str, torch.Tensor | bool | None]] = {
+            "image": image_mm_inputs,
+            "audio": audio_mm_inputs,
+            "video": video_mm_inputs,
         }
-        image_encoder_inputs: dict[str, torch.Tensor | str | None] = {
+        image_encoder_inputs: dict[str, torch.Tensor | bool | str | None] = {
             name: value
             for name, value in {
-                **full_mm_inputs["image"],
-                **full_mm_inputs["video"],
+                **image_mm_inputs,
+                **video_mm_inputs,
             }.items()
             if value is not None
         }
         audio_encoder_inputs: dict[str, torch.Tensor | str | None] = {
-            name: value
-            for name, value in full_mm_inputs["audio"].items()
-            if value is not None
+            name: value for name, value in audio_mm_inputs.items() if value is not None
         }
         has_image_payload = (
             image_encoder_inputs.get("pixel_values") is not None
@@ -769,21 +770,24 @@ class Qwen3OmniPreprocessor:
             request_id=payload.request_id,
         )
 
-        full_mm_inputs: dict[str, dict[str, object]] = {
-            "image": build_image_mm_inputs(hf_inputs),
-            "audio": build_audio_mm_inputs(hf_inputs),
-            "video": build_video_mm_inputs(hf_inputs),
+        image_mm_inputs = build_image_mm_inputs(hf_inputs)
+        audio_mm_inputs = build_audio_mm_inputs(hf_inputs)
+        video_mm_inputs = build_video_mm_inputs(hf_inputs)
+        full_mm_inputs: dict[str, Mapping[str, torch.Tensor | bool | None]] = {
+            "image": image_mm_inputs,
+            "audio": audio_mm_inputs,
+            "video": video_mm_inputs,
         }
         if use_audio_in_video is not None:
-            full_mm_inputs["video"]["use_audio_in_video"] = bool(use_audio_in_video)
+            video_mm_inputs["use_audio_in_video"] = bool(use_audio_in_video)
         else:
             pass
 
         # Build encoder_inputs with cache_key for efficient caching.
         # Include preprocessing parameters that materially change encoder outputs.
-        image_encoder_inputs = {
-            **full_mm_inputs["image"],
-            **full_mm_inputs["video"],
+        image_encoder_inputs: dict[str, torch.Tensor | bool | str | None] = {
+            **image_mm_inputs,
+            **video_mm_inputs,
         }
         effective_video_fps: tuple[float, ...] | None = None
         if sampled_video_fps is not None:
@@ -810,7 +814,7 @@ class Qwen3OmniPreprocessor:
         else:
             pass
 
-        audio_encoder_inputs = {**full_mm_inputs["audio"]}
+        audio_encoder_inputs: dict[str, torch.Tensor | str | None] = {**audio_mm_inputs}
         contextualized_audio_cache_key = contextualize_cache_key(
             audio_cache_key,
             target_sr=audio_target_sr,

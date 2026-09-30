@@ -8,7 +8,6 @@ import base64
 import struct
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -17,8 +16,6 @@ import torch
 from sglang_omni.preprocessing.resource_connector import MultiModalResourceConnector
 
 from .base import MediaIO, is_url
-
-AudioInputT = TypeVar("AudioInputT")
 
 
 def decode_audio_bytes_av(data: bytes) -> tuple[npt.NDArray[np.float32], int]:
@@ -302,8 +299,8 @@ async def ensure_audio_list_async(
 
 
 def build_audio_mm_inputs(
-    hf_inputs: Mapping[str, AudioInputT],
-) -> dict[str, AudioInputT | torch.Tensor | None]:
+    hf_inputs: Mapping[str, torch.Tensor],
+) -> dict[str, torch.Tensor | None]:
     """Extract standard audio tensors from HF processor outputs."""
     feature_attention_mask = hf_inputs.get("feature_attention_mask")
     audio_feature_lengths = hf_inputs.get("audio_feature_lengths")

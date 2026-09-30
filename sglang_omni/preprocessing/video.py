@@ -9,7 +9,6 @@ import logging
 import tempfile
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TypeVar
 
 import av
 import librosa
@@ -27,8 +26,6 @@ from sglang_omni.preprocessing.resource_connector import (
 
 from .base import MediaIO, is_url
 from .cache_key import compute_media_cache_key
-
-VideoInputValueT = TypeVar("VideoInputValueT")
 
 logger = logging.getLogger(__name__)
 
@@ -444,8 +441,8 @@ def load_video_path(
 
 
 def build_video_mm_inputs(
-    hf_inputs: Mapping[str, VideoInputValueT],
-) -> dict[str, VideoInputValueT | None]:
+    hf_inputs: Mapping[str, torch.Tensor],
+) -> dict[str, torch.Tensor | bool | None]:
     return {
         "pixel_values_videos": hf_inputs.get("pixel_values_videos"),
         "video_grid_thw": hf_inputs.get("video_grid_thw"),
