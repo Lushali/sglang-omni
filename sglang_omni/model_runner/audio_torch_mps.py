@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, TypeVar
 import torch
 
 from sglang_omni.model_runner.base import ModelRunner
+from sglang_omni.scheduling.types import SchedulerRequest
 
 if TYPE_CHECKING:
     from sglang.srt.managers.schedule_batch import ScheduleBatch
@@ -18,7 +19,6 @@ if TYPE_CHECKING:
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
     )
-    from sglang_omni.scheduling.types import SchedulerRequest
 else:
     pass
 

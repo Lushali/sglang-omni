@@ -39,7 +39,7 @@ from sglang_omni.scheduling.sglang_backend import SGLangARRequestData
 from sglang_omni.scheduling.token_text_streaming import (
     make_token_text_stream_output_builder,
 )
-from sglang_omni.scheduling.types import DeferredAdmission
+from sglang_omni.scheduling.types import DeferredAdmission, RequestOutput
 from sglang_omni.utils.audio import AudioDecodeError
 
 from . import mrope_fast_path
@@ -55,7 +55,6 @@ if TYPE_CHECKING:
     from transformers import PreTrainedTokenizerBase, WhisperFeatureExtractor
 
     from sglang_omni.models.qwen3_asr.encoder_service import Qwen3ASRPreLMEncoderService
-    from sglang_omni.scheduling.types import RequestOutput
 else:
     pass
 

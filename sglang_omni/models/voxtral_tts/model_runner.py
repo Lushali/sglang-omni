@@ -9,7 +9,11 @@ import torch
 
 from sglang_omni.model_runner.base import ModelRunner
 from sglang_omni.models.voxtral_tts.acoustic_transformer import AudioSpecialTokens
-from sglang_omni.scheduling.types import RequestOutput
+from sglang_omni.scheduling.types import (
+    RequestOutput,
+    SchedulerOutput,
+    SchedulerRequest,
+)
 
 if TYPE_CHECKING:
     from sglang.srt.managers.schedule_batch import ScheduleBatch
@@ -22,7 +26,6 @@ if TYPE_CHECKING:
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
     )
-    from sglang_omni.scheduling.types import SchedulerOutput, SchedulerRequest
 else:
     pass
 

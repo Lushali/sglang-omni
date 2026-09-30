@@ -246,7 +246,7 @@ def decode_codes_batch(
     return decoded
 
 
-class MossTTSVocoder(BatchVocoderBase[MossTTSState, torch.Tensor, torch.Tensor]):
+class MossTTSVocoder(BatchVocoderBase[MossTTSState, torch.Tensor]):
     def __init__(
         self,
         processor: "MossProcessorConfigSource | None",

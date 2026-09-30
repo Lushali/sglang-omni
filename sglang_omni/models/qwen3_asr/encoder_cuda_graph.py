@@ -18,12 +18,10 @@ import torch
 from sglang.srt.layers.attention.vision import VisionAttentionMetadata
 
 from sglang_omni.platforms import current_platform
-from sglang_omni.platforms.device_graph import ReplayableGraph
+from sglang_omni.platforms.device_graph import DeviceGraphBackend, ReplayableGraph
 
 if TYPE_CHECKING:
     from sglang.srt.models.qwen3_omni_moe import Qwen3OmniMoeAudioEncoder
-
-    from sglang_omni.platforms.device_graph import DeviceGraphBackend
 else:
     pass
 

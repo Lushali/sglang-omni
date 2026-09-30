@@ -15,6 +15,11 @@ from sglang_omni.model_runner.prefill_inputs import (
 )
 from sglang_omni.models.qwen3_omni.pending_text_queue import PendingTextTensorQueue
 from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.types import (
+    ModelRunnerOutput,
+    SchedulerOutput,
+    SchedulerRequest,
+)
 
 if TYPE_CHECKING:
     from queue import Queue
@@ -29,11 +34,6 @@ if TYPE_CHECKING:
         SGLangOutputProcessor,
     )
     from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
-    from sglang_omni.scheduling.types import (
-        ModelRunnerOutput,
-        SchedulerOutput,
-        SchedulerRequest,
-    )
 else:
     pass
 

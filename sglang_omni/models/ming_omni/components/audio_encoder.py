@@ -11,12 +11,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from sglang_omni.models.ming_omni.components.common import load_ming_config
+from sglang_omni.models.ming_omni.hf_config import WhisperEncoderConfig
 from sglang_omni.models.weight_loader import load_module, resolve_dtype
 
 if TYPE_CHECKING:
     from whisper.model import AudioEncoder
-
-    from sglang_omni.models.ming_omni.hf_config import WhisperEncoderConfig
 else:
     pass
 
@@ -106,7 +105,7 @@ class MingAudioEncoder(nn.Module):
         self.eval()
 
     def build_whisper_encoder(
-        self, whisper_cfg: "WhisperEncoderConfig"
+        self, whisper_cfg: WhisperEncoderConfig
     ) -> "AudioEncoder":
         """Build a WhisperAudioEncoder from config."""
         try:

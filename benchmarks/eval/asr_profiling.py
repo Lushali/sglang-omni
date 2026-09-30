@@ -20,12 +20,11 @@ import threading
 import time
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, TextIO
+from typing import Any, TextIO
 
 import requests
 
-if TYPE_CHECKING:
-    from sglang_omni.profiler.views import ProfilerReport
+from sglang_omni.profiler.views import ProfilerReport, build_report
 
 _NO_PROXIES = {"http": None, "https": None}
 _PROFILE_TIMEOUT_S = 30
@@ -64,8 +63,6 @@ def build_stage_breakdown(
     ``event_dir`` is a server-side path. Timelines are dropped by default to
     keep result JSON small; breakdown rows carry count/total/avg/p50/p95/max.
     """
-    from sglang_omni.profiler.views import build_report
-
     report = build_report(event_dir)
     if not include_timelines:
         report.pop("timelines", None)

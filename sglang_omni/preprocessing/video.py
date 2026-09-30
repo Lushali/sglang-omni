@@ -9,7 +9,7 @@ import logging
 import tempfile
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TypeVar
 
 import av
 import librosa
@@ -20,14 +20,13 @@ from qwen_vl_utils import vision_process as qwen_vision
 from torchvision.transforms import InterpolationMode
 from torchvision.transforms import functional as tv_f
 
+from sglang_omni.preprocessing.resource_connector import (
+    MultiModalResourceConnector,
+    global_thread_pool,
+)
+
 from .base import MediaIO, is_url
 from .cache_key import compute_media_cache_key
-from .resource_connector import global_thread_pool
-
-if TYPE_CHECKING:
-    from .resource_connector import MultiModalResourceConnector
-else:
-    pass
 
 VideoInputValueT = TypeVar("VideoInputValueT")
 

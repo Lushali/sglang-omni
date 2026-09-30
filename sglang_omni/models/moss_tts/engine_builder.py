@@ -12,27 +12,27 @@ from sglang_omni.models.moss_tts.hf_loading import (
     MOSS_TTS_DEFAULT_CONTEXT_LENGTH,
     resolve_moss_tts_context_length,
 )
+from sglang_omni.models.moss_tts.request_builders import MossTTSSGLangRequestData
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
+from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.types import RequestOutput
 
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
 
     from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.moss_tts.model_runner import MossTTSModelRunner
-    from sglang_omni.models.moss_tts.request_builders import MossTTSSGLangRequestData
     from sglang_omni.models.moss_tts.sglang_model import MossTTSDelaySGLangModel
     from sglang_omni.proto import StagePayload
     from sglang_omni.scheduling.bootstrap import InfrastructureOptions
-    from sglang_omni.scheduling.message import OutgoingMessage
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
     )
-    from sglang_omni.scheduling.types import RequestOutput
 else:
     pass
 
 
-class MossTtsEngineBuilder(TtsEngineBuilder["MossTTSSGLangRequestData"]):
+class MossTtsEngineBuilder(TtsEngineBuilder[MossTTSSGLangRequestData]):
     model_name = "MOSS-TTS"
     context_length = MOSS_TTS_DEFAULT_CONTEXT_LENGTH
     model_arch_override = "MossTTSDelaySGLangModel"

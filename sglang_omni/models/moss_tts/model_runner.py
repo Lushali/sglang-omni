@@ -13,12 +13,19 @@ from sglang_omni.model_runner.prefill_inputs import (
     OmniPrefillInputs,
     attach_omni_prefill_inputs,
 )
-from sglang_omni.models.moss_tts.request_builders import _INF_DELAY
+from sglang_omni.models.moss_tts.request_builders import (
+    _INF_DELAY,
+    MossTTSSGLangRequestData,
+)
 from sglang_omni.models.moss_tts.sampler import DelayGraphBatch
 from sglang_omni.models.moss_tts.sampling_kernels import (
     multinomial_with_seed_and_token_ids,
 )
-from sglang_omni.scheduling.types import RequestOutput
+from sglang_omni.scheduling.types import (
+    RequestOutput,
+    SchedulerOutput,
+    SchedulerRequest,
+)
 
 if TYPE_CHECKING:
     from sglang.srt.managers.schedule_batch import ScheduleBatch
@@ -26,7 +33,6 @@ if TYPE_CHECKING:
     from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 
     from sglang_omni.model_runner.model_worker import ModelWorker
-    from sglang_omni.models.moss_tts.request_builders import MossTTSSGLangRequestData
     from sglang_omni.models.moss_tts.sglang_model import (
         ChannelLogitsList,
         MossTTSDelaySGLangModel,
@@ -34,7 +40,6 @@ if TYPE_CHECKING:
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
     )
-    from sglang_omni.scheduling.types import SchedulerOutput, SchedulerRequest
 else:
     pass
 

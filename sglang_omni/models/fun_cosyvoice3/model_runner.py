@@ -12,6 +12,14 @@ from sglang.srt.managers.scheduler import GenerationBatchResult
 from sglang_omni.model_runner.base import ModelRunner
 from sglang_omni.model_runner.mlx_model_worker import MlxSchedulerModelRunner
 from sglang_omni.model_runner.sglang_execution import attn_forward_context
+from sglang_omni.models.fun_cosyvoice3.request_builders import (
+    CosyVoice3SGLangRequestData,
+    accept_cosyvoice3_stream_token,
+)
+from sglang_omni.models.fun_cosyvoice3.sglang_model import (
+    VOCAB_SIZE,
+    FunCosyVoice3SGLangModel,
+)
 from sglang_omni.models.fun_cosyvoice3.streaming import (
     TOKEN_HOP_LEN,
     first_ar_flush_tokens,
@@ -20,9 +28,12 @@ from sglang_omni.models.fun_cosyvoice3.streaming import (
 from sglang_omni.platforms import current_platform
 from sglang_omni.sampling.seed import SAMPLING_SEED_MASK
 from sglang_omni.scheduling.message import OutgoingMessage
-
-from .request_builders import accept_cosyvoice3_stream_token
-from .sglang_model import VOCAB_SIZE
+from sglang_omni.scheduling.types import (
+    ARRequestData,
+    RequestOutput,
+    SchedulerOutput,
+    SchedulerRequest,
+)
 
 if TYPE_CHECKING:
     from contextlib import AbstractContextManager
@@ -38,15 +49,6 @@ if TYPE_CHECKING:
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
     )
-    from sglang_omni.scheduling.types import (
-        ARRequestData,
-        RequestOutput,
-        SchedulerOutput,
-        SchedulerRequest,
-    )
-
-    from .request_builders import CosyVoice3SGLangRequestData
-    from .sglang_model import FunCosyVoice3SGLangModel
 else:
     pass
 

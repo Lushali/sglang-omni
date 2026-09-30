@@ -21,6 +21,7 @@ from sglang_omni.models.zonos2.components.text_frontend import (
 )
 from sglang_omni.models.zonos2.payload_types import N_CODEBOOKS, Zonos2State
 from sglang_omni.models.zonos2.request_builders import (
+    Zonos2SGLangRequestData,
     build_zonos2_state,
     ref_audio_to_encoder_input,
 )
@@ -36,7 +37,6 @@ if TYPE_CHECKING:
     from sglang_omni.models.zonos2.components.streaming_vocoder import (
         Zonos2StreamingVocoderScheduler,
     )
-    from sglang_omni.models.zonos2.request_builders import Zonos2SGLangRequestData
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
 else:
     pass

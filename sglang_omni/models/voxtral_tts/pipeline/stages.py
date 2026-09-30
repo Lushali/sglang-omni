@@ -290,7 +290,7 @@ def load_audio_tokenizer(
     return tokenizer
 
 
-class VoxtralTTSVocoder(BatchVocoderBase[VoxtralTTSState, torch.Tensor, torch.Tensor]):
+class VoxtralTTSVocoder(BatchVocoderBase[VoxtralTTSState, torch.Tensor]):
     """Decode audio codes with repeated initial frames as warmup context."""
 
     N_WARMUP = 2

@@ -19,11 +19,13 @@ from sglang_omni.models.qwen3_tts import stages as qwen3_stages
 from sglang_omni.models.qwen3_tts.reference_encoder_cuda_graph import (
     DEFAULT_QWEN3_TTS_REFERENCE_ENCODER_BUCKET_FRAMES,
 )
+from sglang_omni.models.qwen3_tts.request_builders import Qwen3TTSSGLangRequestData
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
     build_default_prefill_cuda_graph_bs,
 )
+from sglang_omni.scheduling.message import OutgoingMessage
 
 if TYPE_CHECKING:
     from qwen_tts import Qwen3TTSModel
@@ -33,10 +35,8 @@ if TYPE_CHECKING:
     from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.qwen3_tts.model_runner import Qwen3TTSModelRunner
     from sglang_omni.models.qwen3_tts.prompt_frontend import Qwen3TTSPromptFrontend
-    from sglang_omni.models.qwen3_tts.request_builders import Qwen3TTSSGLangRequestData
     from sglang_omni.models.qwen3_tts.sglang_model import Qwen3TTSTalker
     from sglang_omni.proto import StagePayload
-    from sglang_omni.scheduling.message import OutgoingMessage
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
@@ -136,7 +136,7 @@ def derive_silence_codec_ids(
     return torch.unique(torch.cat([code[:, 0] for code in codes])).to(device)
 
 
-class Qwen3TtsEngineBuilder(TtsEngineBuilder["Qwen3TTSSGLangRequestData"]):
+class Qwen3TtsEngineBuilder(TtsEngineBuilder[Qwen3TTSSGLangRequestData]):
     model_name = "Qwen3-TTS"
     context_length = 8192
     model_arch_override = "Qwen3TTSTalker"

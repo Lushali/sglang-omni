@@ -12,32 +12,32 @@ from sglang_omni.models.moss_transcribe_diarize import CAPABILITIES, request_bui
 from sglang_omni.models.moss_transcribe_diarize.encoder_service import (
     BatchedAudioEncoderService,
 )
+from sglang_omni.models.moss_transcribe_diarize.request_builders import (
+    MossTranscribeDiarizeRequestData,
+)
 from sglang_omni.scheduling.engine_factory import AsrEngineBuilder, GenerationDefaults
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
     build_default_prefill_cuda_graph_bs,
 )
+from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.types import RequestOutput
 
 if TYPE_CHECKING:
     from sglang.srt.server_args import ServerArgs
     from transformers import PreTrainedTokenizerBase
 
-    from sglang_omni.models.moss_transcribe_diarize.request_builders import (
-        MossTranscribeDiarizeRequestData,
-    )
     from sglang_omni.models.moss_transcribe_diarize.sglang_model import (
         MossTranscribeDiarizeForConditionalGeneration,
     )
     from sglang_omni.proto import StagePayload
-    from sglang_omni.scheduling.message import OutgoingMessage
     from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
-    from sglang_omni.scheduling.types import RequestOutput
 else:
     pass
 
 
 class MossTranscribeDiarizeEngineBuilder(
-    AsrEngineBuilder["MossTranscribeDiarizeRequestData"]
+    AsrEngineBuilder[MossTranscribeDiarizeRequestData]
 ):
     model_name = "MOSS-Transcribe-Diarize"
     model_arch_override = "MossTranscribeDiarizeForConditionalGeneration"

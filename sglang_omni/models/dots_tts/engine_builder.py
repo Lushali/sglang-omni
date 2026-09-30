@@ -8,6 +8,7 @@ from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING
 
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
+from sglang_omni.scheduling.types import RequestOutput
 
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
@@ -23,7 +24,6 @@ if TYPE_CHECKING:
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
     )
-    from sglang_omni.scheduling.types import RequestOutput
 else:
     pass
 

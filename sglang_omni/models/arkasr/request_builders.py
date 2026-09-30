@@ -32,7 +32,7 @@ from sglang_omni.scheduling.sglang_backend import SGLangARRequestData
 from sglang_omni.scheduling.token_text_streaming import (
     make_token_text_stream_output_builder,
 )
-from sglang_omni.scheduling.types import DeferredAdmission
+from sglang_omni.scheduling.types import DeferredAdmission, RequestOutput
 
 from .audio_lengths import arkasr_num_audio_tokens
 
@@ -42,7 +42,6 @@ if TYPE_CHECKING:
     from transformers import PreTrainedTokenizerBase, WhisperFeatureExtractor
 
     from sglang_omni.models.arkasr.encoder_service import ArkasrPreLMEncoderService
-    from sglang_omni.scheduling.types import RequestOutput
 else:
     pass
 

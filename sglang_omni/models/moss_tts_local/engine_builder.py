@@ -13,6 +13,9 @@ from sglang_omni.models.moss_tts.hf_loading import (
 )
 from sglang_omni.models.moss_tts_local import request_builders
 from sglang_omni.models.moss_tts_local import stages as moss_local_stages
+from sglang_omni.models.moss_tts_local.request_builders import (
+    MossTTSLocalSGLangRequestData,
+)
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
 
 if TYPE_CHECKING:
@@ -21,9 +24,6 @@ if TYPE_CHECKING:
 
     from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.moss_tts_local.model_runner import MossTTSLocalModelRunner
-    from sglang_omni.models.moss_tts_local.request_builders import (
-        MossTTSLocalSGLangRequestData,
-    )
     from sglang_omni.models.moss_tts_local.sglang_model import MossTTSLocalSGLangModel
     from sglang_omni.proto import StagePayload
     from sglang_omni.scheduling.bootstrap import InfrastructureOptions
@@ -35,7 +35,7 @@ else:
     pass
 
 
-class MossTtsLocalEngineBuilder(TtsEngineBuilder["MossTTSLocalSGLangRequestData"]):
+class MossTtsLocalEngineBuilder(TtsEngineBuilder[MossTTSLocalSGLangRequestData]):
     model_name = "MOSS-TTS Local"
     context_length = MOSS_TTS_DEFAULT_CONTEXT_LENGTH
     model_arch_override = "MossTTSLocalSGLangModel"

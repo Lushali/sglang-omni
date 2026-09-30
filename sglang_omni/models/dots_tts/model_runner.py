@@ -11,7 +11,11 @@ from sglang.srt.managers.schedule_batch import FINISH_MATCHED_TOKEN
 
 from sglang_omni.model_runner.base import ModelRunner
 from sglang_omni.models.dots_tts.flow_head import DotsFlowStep
-from sglang_omni.models.dots_tts.request_builders import DotsFlowResume
+from sglang_omni.models.dots_tts.request_builders import (
+    DotsFlowResume,
+    DotsTTSSGLangRequestData,
+)
+from sglang_omni.scheduling.types import SchedulerRequest
 
 if TYPE_CHECKING:
     from sglang.srt.managers.schedule_batch import ScheduleBatch
@@ -22,12 +26,10 @@ if TYPE_CHECKING:
     )
 
     from sglang_omni.model_runner.model_worker import ModelWorker
-    from sglang_omni.models.dots_tts.request_builders import DotsTTSSGLangRequestData
     from sglang_omni.models.dots_tts.sglang_model import DotsTTSSGLangModel
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
     )
-    from sglang_omni.scheduling.types import SchedulerRequest
 else:
     pass
 
@@ -41,7 +43,7 @@ class DotsFlowLaunchBuf:
     batched: bool
 
 
-class DotsTTSModelRunner(ModelRunner["DotsTTSSGLangRequestData"]):
+class DotsTTSModelRunner(ModelRunner[DotsTTSSGLangRequestData]):
     """Use the shared SGLang forward path and own only latent recurrence."""
 
     model: DotsTTSSGLangModel
@@ -386,7 +388,7 @@ class DotsTTSModelRunner(ModelRunner["DotsTTSSGLangRequestData"]):
         return hidden
 
     def on_request_finished(
-        self, request_id: str, req_data: "DotsTTSSGLangRequestData"
+        self, request_id: str, req_data: DotsTTSSGLangRequestData
     ) -> None:
         self.request_data.pop(request_id, None)
         self.clear_request_data(req_data)

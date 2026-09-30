@@ -20,6 +20,7 @@ from sglang_omni.models.qwen3_tts.reference_encoder_cuda_graph import (
     move_conv_padding_to_host,
 )
 from sglang_omni.models.qwen3_tts.request_builders import (
+    Qwen3TTSSGLangRequestData,
     cleanup_prepared_qwen3_tts_request,
     preprocess_qwen3_tts_payload,
 )
@@ -38,7 +39,6 @@ from sglang_omni.utils.json import JsonValue
 if TYPE_CHECKING:
     from qwen_tts import Qwen3TTSTokenizer
 
-    from sglang_omni.models.qwen3_tts.request_builders import Qwen3TTSSGLangRequestData
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
 else:
     pass

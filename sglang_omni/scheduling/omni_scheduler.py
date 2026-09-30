@@ -47,8 +47,9 @@ from sglang.srt.session.session_controller import SessionController
 from sglang.srt.utils import broadcast_pyobj
 
 from sglang_omni.admission import QueueFullError
-from sglang_omni.model_runner.base import PendingStep
+from sglang_omni.model_runner.base import ModelRunner, PendingStep
 from sglang_omni.model_runner.mlx_model_worker import MlxSchedulerPendingStep
+from sglang_omni.pipeline.stage.stream_queue import StreamItem
 from sglang_omni.profiler.event_recorder import emit as _emit_event
 from sglang_omni.profiler.event_recorder import (
     emit_model_path_end as _emit_model_path_end,
@@ -96,10 +97,8 @@ if TYPE_CHECKING:
     from sglang.srt.mem_cache.memory_pool import ReqToTokenPool
     from sglang.srt.server_args import ServerArgs
 
-    from sglang_omni.model_runner.base import ModelRunner
     from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.model_runner.weight_checker import WeightCheckResult
-    from sglang_omni.pipeline.stage.stream_queue import StreamItem
 else:
     pass
 
@@ -271,7 +270,7 @@ class OmniScheduler(Generic[RequestDataT]):
         server_args: ServerArgs,
         model_config: ModelConfig,
         *,
-        model_runner: "ModelRunner[RequestDataT] | None" = None,
+        model_runner: ModelRunner[RequestDataT] | None = None,
         request_builder: (
             Callable[[StagePayload], RequestDataT | DeferredAdmission[RequestDataT]]
             | None
@@ -308,7 +307,7 @@ class OmniScheduler(Generic[RequestDataT]):
             pass
         self.request_builder = request_builder
         self.result_adapter = result_adapter
-        self.model_runner: "ModelRunner[RequestDataT] | None" = None
+        self.model_runner: ModelRunner[RequestDataT] | None = None
         self.stream_output_builder = stream_output_builder
         self.stream_chunk_handler = stream_chunk_handler
         self.stream_done_handler = stream_done_handler
@@ -638,7 +637,7 @@ class OmniScheduler(Generic[RequestDataT]):
 
         return DisaggregationMode.NULL
 
-    def bind_model_runner(self, model_runner: "ModelRunner[RequestDataT]") -> None:
+    def bind_model_runner(self, model_runner: ModelRunner[RequestDataT]) -> None:
         """Attach a custom runner and its SGLang execution-contract bridge.
 
         Some pipelines need the scheduler-owned outbox before they can build
@@ -2275,7 +2274,7 @@ class OmniScheduler(Generic[RequestDataT]):
                 )
             )
 
-    def on_stream_chunk(self, request_id: str, chunk: "StreamItem") -> None:
+    def on_stream_chunk(self, request_id: str, chunk: StreamItem) -> None:
         if request_id in self.completed_request_ids:
             return
         else:
@@ -3616,7 +3615,7 @@ class OmniScheduler(Generic[RequestDataT]):
     @staticmethod
     def append_stream_chunk_default(
         req_data: RequestDataT | SGLangARRequestData,
-        chunk: "StreamItem",
+        chunk: StreamItem,
     ) -> None:
         stream_chunks = getattr(req_data, "stream_chunks", None)
         if stream_chunks is None:
@@ -3627,7 +3626,7 @@ class OmniScheduler(Generic[RequestDataT]):
         stream_chunks.append(chunk)
 
     def append_stream_chunk(
-        self, req_data: RequestDataT | SGLangARRequestData, chunk: "StreamItem"
+        self, req_data: RequestDataT | SGLangARRequestData, chunk: StreamItem
     ) -> None:
         if self.stream_chunk_handler is None:
             self.append_stream_chunk_default(req_data, chunk)

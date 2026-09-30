@@ -16,26 +16,26 @@ from sglang_omni.models.arkasr.encoder_service import (
     ArkasrPreLMEncoderService,
     build_cache_namespace,
 )
+from sglang_omni.models.arkasr.request_builders import ArkASRRequestData
 from sglang_omni.scheduling.engine_factory import AsrEngineBuilder, GenerationDefaults
 from sglang_omni.scheduling.generation_batch_policy import CudaGraphBackend
+from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.types import DeferredAdmission, RequestOutput
 from sglang_omni.utils.gpu_compat import get_visible_gpu_sm_version
 
 if TYPE_CHECKING:
     from transformers import PreTrainedTokenizerBase
 
-    from sglang_omni.models.arkasr.request_builders import ArkASRRequestData
     from sglang_omni.models.arkasr.sglang_model import ArkasrForConditionalGeneration
     from sglang_omni.proto import StagePayload
-    from sglang_omni.scheduling.message import OutgoingMessage
     from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
-    from sglang_omni.scheduling.types import DeferredAdmission, RequestOutput
 else:
     pass
 
 logger = logging.getLogger(__name__)
 
 
-class ArkasrEngineBuilder(AsrEngineBuilder["ArkASRRequestData"]):
+class ArkasrEngineBuilder(AsrEngineBuilder[ArkASRRequestData]):
     model_name = "ARK-ASR"
     model_arch_override = "ArkasrForConditionalGeneration"
     supports_breakable_prefill_cuda_graph = True

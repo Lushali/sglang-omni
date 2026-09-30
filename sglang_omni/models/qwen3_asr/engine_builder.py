@@ -20,12 +20,15 @@ from sglang_omni.models.qwen3_asr.encoder_service import (
     Qwen3ASRPreLMEncoderService,
     build_cache_namespace,
 )
+from sglang_omni.models.qwen3_asr.request_builders import Qwen3ASRRequestData
 from sglang_omni.platforms import current_platform
 from sglang_omni.scheduling.engine_factory import AsrEngineBuilder, GenerationDefaults
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
     get_decode_cuda_graph_bs,
 )
+from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.types import DeferredAdmission, RequestOutput
 from sglang_omni.utils.gpu_compat import get_visible_gpu_sm_version
 from sglang_omni.utils.gpu_memory import format_bytes_gib, get_process_gpu_memory_bytes
 
@@ -37,7 +40,6 @@ if TYPE_CHECKING:
 
     from sglang_omni.model_runner.base import ModelRunner
     from sglang_omni.model_runner.model_worker import ModelWorker
-    from sglang_omni.models.qwen3_asr.request_builders import Qwen3ASRRequestData
     from sglang_omni.models.qwen3_asr.sglang_model import (
         Qwen3ASRForConditionalGeneration,
     )
@@ -45,19 +47,17 @@ if TYPE_CHECKING:
         Qwen3ASRTorchMpsModelRunner,
     )
     from sglang_omni.proto import StagePayload
-    from sglang_omni.scheduling.message import OutgoingMessage
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
     )
-    from sglang_omni.scheduling.types import DeferredAdmission, RequestOutput
 else:
     pass
 
 logger = logging.getLogger(__name__)
 
 
-class Qwen3ASREngineBuilder(AsrEngineBuilder["Qwen3ASRRequestData"]):
+class Qwen3ASREngineBuilder(AsrEngineBuilder[Qwen3ASRRequestData]):
     model_name = "Qwen3-ASR"
     model_arch_override = "Qwen3ASRForConditionalGeneration"
     supports_breakable_prefill_cuda_graph = True

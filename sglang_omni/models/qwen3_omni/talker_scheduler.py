@@ -13,13 +13,12 @@ from sglang_omni.models.qwen3_omni.config import (
     TALKER_START_MIN_CHUNKS,
 )
 from sglang_omni.scheduling.omni_scheduler import OmniScheduler
+from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
 from sglang_omni.vendor.sglang.server_args import override_server_args
 
 if TYPE_CHECKING:
     from sglang.srt.managers.schedule_batch import ScheduleBatch
     from sglang.srt.server_args import ServerArgs
-
-    from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
 else:
     pass
 
@@ -60,7 +59,7 @@ def configure_talker_server_args(
     return want_cuda_graph
 
 
-class QwenTalkerScheduler(OmniScheduler["SGLangARRequestData"]):
+class QwenTalkerScheduler(OmniScheduler[SGLangARRequestData]):
     """Talker scheduler with Qwen-specific request and decode readiness."""
 
     talker_start_topology: bool = ENABLE_TALKER_START_TOPOLOGY
@@ -217,7 +216,7 @@ class QwenTalkerScheduler(OmniScheduler["SGLangARRequestData"]):
 
     @staticmethod
     def append_stream_chunk_default(
-        req_data: "SGLangARRequestData", chunk: object
+        req_data: SGLangARRequestData, chunk: object
     ) -> None:
         pending_text_queue = getattr(req_data, "pending_text_queue", None)
         if pending_text_queue is None:
@@ -227,7 +226,7 @@ class QwenTalkerScheduler(OmniScheduler["SGLangARRequestData"]):
             pass
         pending_text_queue.append(getattr(chunk, "data", chunk))
 
-    def mark_stream_done(self, req_data: "SGLangARRequestData") -> None:
+    def mark_stream_done(self, req_data: SGLangARRequestData) -> None:
         if self.stream_done_handler is None:
             req_data.thinker_chunks_done = True
             return

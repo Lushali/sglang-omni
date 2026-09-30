@@ -25,12 +25,15 @@ from sglang_omni.models.moss_tts.audio_tokenizer import (
 )
 from sglang_omni.models.moss_tts.engine_builder import MossTtsEngineBuilder
 from sglang_omni.models.moss_tts.hf_loading import (
+    MossDelayReferences,
+    MossLoadedProcessor,
     MossProcessorConfigSource,
     load_moss_processor_class,
     moss_transformers_processor_compat,
 )
 from sglang_omni.models.moss_tts.payload_types import moss_tts_special_token_defaults
 from sglang_omni.models.moss_tts.request_builders import (
+    MossTTSSGLangRequestData,
     cleanup_prepared_moss_tts_request,
     preprocess_moss_tts_payload,
     set_moss_tts_preprocessing_context,
@@ -46,11 +49,6 @@ from sglang_omni.scheduling.simple_scheduler import SimpleScheduler
 from sglang_omni.utils.audio import audio_fingerprint, load_audio
 
 if TYPE_CHECKING:
-    from sglang_omni.models.moss_tts.hf_loading import (
-        MossDelayReferences,
-        MossLoadedProcessor,
-    )
-    from sglang_omni.models.moss_tts.request_builders import MossTTSSGLangRequestData
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
 else:
     pass
@@ -121,7 +119,7 @@ def audio_tokenizer_model_path_from_processor_dict(
 
 def load_moss_processor(
     model_path: str,
-) -> "MossLoadedProcessor[MossDelayReferences]":
+) -> MossLoadedProcessor[MossDelayReferences]:
     logger.info(f"Loading MOSS-TTS processor from {model_path} without codec")
     try:
         with moss_transformers_processor_compat():

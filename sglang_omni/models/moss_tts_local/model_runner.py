@@ -11,10 +11,16 @@ from sglang_omni.models.moss_tts.model_runner import MossTTSModelRunner
 from sglang_omni.models.moss_tts_local.radix_hash import build_rows_and_radix_token_ids
 from sglang_omni.models.moss_tts_local.request_builders import (
     MOSS_STREAM_TRANSPORT_BATCH_FRAMES,
+    MossTTSLocalSGLangRequestData,
 )
 from sglang_omni.models.moss_tts_local.state_pool import MossTTSLocalDecodeJournal
 from sglang_omni.scheduling.message import OutgoingMessage
-from sglang_omni.scheduling.types import RequestOutput
+from sglang_omni.scheduling.types import (
+    ARRequestData,
+    RequestOutput,
+    SchedulerOutput,
+    SchedulerRequest,
+)
 
 if TYPE_CHECKING:
     from queue import Queue
@@ -24,17 +30,9 @@ if TYPE_CHECKING:
     from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 
     from sglang_omni.model_runner.model_worker import ModelWorker
-    from sglang_omni.models.moss_tts_local.request_builders import (
-        MossTTSLocalSGLangRequestData,
-    )
     from sglang_omni.models.moss_tts_local.sglang_model import MossTTSLocalSGLangModel
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
-    )
-    from sglang_omni.scheduling.types import (
-        ARRequestData,
-        SchedulerOutput,
-        SchedulerRequest,
     )
 else:
     pass

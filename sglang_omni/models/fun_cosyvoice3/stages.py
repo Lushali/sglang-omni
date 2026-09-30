@@ -25,9 +25,6 @@ if TYPE_CHECKING:
     from cosyvoice.hifigan.generator import CausalHiFTGenerator
 
     from sglang_omni.models.fun_cosyvoice3.mlx.vocoder import FunCosyVoice3MlxVocoder
-    from sglang_omni.models.fun_cosyvoice3.request_builders import (
-        CosyVoice3SGLangRequestData,
-    )
     from sglang_omni.models.fun_cosyvoice3.streaming_vocoder import (
         FunCosyVoice3StreamingVocoderScheduler,
     )
@@ -49,6 +46,7 @@ from sglang_omni.models.fun_cosyvoice3.packed_dit import (
 )
 from sglang_omni.models.fun_cosyvoice3.payload_types import FunCosyVoice3State
 from sglang_omni.models.fun_cosyvoice3.request_builders import (
+    CosyVoice3SGLangRequestData,
     cleanup_prepared_cosyvoice3_request,
     preprocess_cosyvoice3_payload,
 )
@@ -1456,9 +1454,7 @@ def adaptive_flow_requests_grouping(
     raise AssertionError("valid Flow requests must have a feasible partition")
 
 
-class CosyVoice3Vocoder(
-    BatchVocoderBase[FunCosyVoice3State, torch.Tensor, torch.Tensor]
-):
+class CosyVoice3Vocoder(BatchVocoderBase[FunCosyVoice3State, torch.Tensor]):
     def __init__(
         self,
         flow: FunCosyVoice3Flow | CausalMaskedDiffWithDiT,
@@ -1859,7 +1855,7 @@ class CosyVoice3Vocoder(
 
 
 class CosyVoice3MlxVocoderAdapter(
-    BatchVocoderBase[FunCosyVoice3State, torch.Tensor, NDArray[np.float32]]
+    BatchVocoderBase[FunCosyVoice3State, NDArray[np.float32]]
 ):
     """Bridge pipeline state into the native batch-one MLX Flow/HiFT API."""
 

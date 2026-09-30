@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from sglang_omni.models.voxtral_tts import request_builders
 from sglang_omni.models.voxtral_tts.pipeline import stages as voxtral_stages
+from sglang_omni.models.voxtral_tts.request_builders import VoxtralSGLangRequestData
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
 
 if TYPE_CHECKING:
@@ -18,7 +19,6 @@ if TYPE_CHECKING:
 
     from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.voxtral_tts.model_runner import VoxtralTTSModelRunner
-    from sglang_omni.models.voxtral_tts.request_builders import VoxtralSGLangRequestData
     from sglang_omni.models.voxtral_tts.sglang_model import VoxtralSGLangTTSModel
     from sglang_omni.proto import StagePayload
     from sglang_omni.scheduling.sglang_backend.output_processor import (
@@ -28,7 +28,7 @@ else:
     pass
 
 
-class VoxtralTtsEngineBuilder(TtsEngineBuilder["VoxtralSGLangRequestData"]):
+class VoxtralTtsEngineBuilder(TtsEngineBuilder[VoxtralSGLangRequestData]):
     model_name = "Voxtral TTS"
     context_length = 8192
 

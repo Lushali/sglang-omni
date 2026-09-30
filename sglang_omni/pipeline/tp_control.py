@@ -15,22 +15,21 @@ import logging
 import queue as queue_mod
 from dataclasses import dataclass
 from multiprocessing.queues import Queue
-from typing import Generic, TypeVar
+from typing import TypeVar
 
-from sglang_omni.proto import (
+from sglang_omni.proto.messages import (
     AbortMessage,
     AdminMessage,
     AdminResultMessage,
     ProfilerStartMessage,
     ProfilerStopMessage,
     ShutdownMessage,
-    StagePayload,
 )
+from sglang_omni.proto.request import StagePayload
 
 logger = logging.getLogger(__name__)
 
 _WORK_POLL_SECONDS = 0.1
-WorkPayloadT = TypeVar("WorkPayloadT")
 QueueMessageT = TypeVar("QueueMessageT")
 
 TPControlMessage = (
@@ -39,14 +38,14 @@ TPControlMessage = (
 
 
 @dataclass
-class TPWorkMessage(Generic[WorkPayloadT]):
+class TPWorkMessage:
     """Payload replicated from the TP leader to follower schedulers."""
 
     request_id: str
-    data: WorkPayloadT
+    data: StagePayload
 
 
-TPWorkQueueMessage = TPControlMessage | TPWorkMessage[StagePayload]
+TPWorkQueueMessage = TPControlMessage | TPWorkMessage
 
 
 class TPLeaderFanout:
@@ -155,7 +154,7 @@ class TPFollowerControlPlane:
         | ShutdownMessage
         | ProfilerStartMessage
         | ProfilerStopMessage
-        | TPWorkMessage[StagePayload]
+        | TPWorkMessage
     ):
         msg = await self.recv_from_queue(self.work_queue)
         if isinstance(

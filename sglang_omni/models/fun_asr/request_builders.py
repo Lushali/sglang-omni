@@ -19,6 +19,10 @@ from sglang.srt.managers.schedule_batch import (
 )
 from sglang.srt.sampling.sampling_params import SamplingParams
 
+from sglang_omni.models.fun_asr.configuration_fun_asr import (
+    AUDIO_PLACEHOLDER_TOKEN as _AUDIO_PAD,
+)
+from sglang_omni.models.fun_asr.configuration_fun_asr import FunAsrNanoFeatureExtractor
 from sglang_omni.preprocessing.transcription import prepare_audio
 from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.message import OutgoingMessage
@@ -28,15 +32,11 @@ from sglang_omni.scheduling.token_text_streaming import (
 )
 from sglang_omni.scheduling.types import RequestOutput
 
-from .configuration_fun_asr import AUDIO_PLACEHOLDER_TOKEN as _AUDIO_PAD
 from .tool_funcs.audio_lengths import fun_asr_low_frame_rate_length
 
 if TYPE_CHECKING:
     from transformers import PreTrainedTokenizerBase
 
-    from sglang_omni.models.fun_asr.configuration_fun_asr import (
-        FunAsrNanoFeatureExtractor,
-    )
     from sglang_omni.models.fun_asr.encoder_service import FunASRPreLMEncoderService
 else:
     pass
@@ -202,7 +202,7 @@ def make_fun_asr_scheduler_adapters(
     *,
     tokenizer: "PreTrainedTokenizerBase",
     max_new_tokens: int,
-    feature_extractor: "FunAsrNanoFeatureExtractor | None" = None,
+    feature_extractor: FunAsrNanoFeatureExtractor | None = None,
     context_length: int | None = None,
     audio_encoder_service: "FunASRPreLMEncoderService | None" = None,
 ) -> tuple[

@@ -22,6 +22,7 @@ from sglang_omni.models.qwen3_omni.components.audio_encoder import Qwen3OmniAudi
 from sglang_omni.models.qwen3_omni.components.image_encoder import Qwen3OmniImageEncoder
 from sglang_omni.models.qwen3_omni.components.preprocessor import Qwen3OmniPreprocessor
 from sglang_omni.models.qwen3_omni.components.streaming_detokenizer import (
+    StreamingDetokenizeScheduler,
     create_streaming_detokenize_scheduler,
 )
 from sglang_omni.models.qwen3_omni.payload_types import Qwen3OmniPipelineState
@@ -50,9 +51,6 @@ from sglang_omni.utils.misc import avail_gpu_mem
 if TYPE_CHECKING:
     from sglang.srt.server_args import ServerArgs
 
-    from sglang_omni.models.qwen3_omni.components.streaming_detokenizer import (
-        StreamingDetokenizeScheduler,
-    )
     from sglang_omni.models.qwen3_omni.talker_scheduler import QwenTalkerScheduler
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
     from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData

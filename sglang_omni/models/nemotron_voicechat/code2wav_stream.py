@@ -53,7 +53,7 @@ class StreamState:
         self.audio_parts: list[torch.Tensor] = []
 
 
-class NemotronCode2WavScheduler(StreamingSimpleScheduler[StagePayload]):
+class NemotronCode2WavScheduler(StreamingSimpleScheduler):
     def __init__(
         self,
         decoder,

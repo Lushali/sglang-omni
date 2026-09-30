@@ -361,7 +361,7 @@ class AcousticStreamState:
     next_start_frame: int = 0
 
 
-class MiniMaxMusic3AcousticScheduler(StreamingSimpleScheduler[StagePayload]):
+class MiniMaxMusic3AcousticScheduler(StreamingSimpleScheduler):
     """Consumes internal hidden chunks while HTTP remains non-streaming."""
 
     def __init__(

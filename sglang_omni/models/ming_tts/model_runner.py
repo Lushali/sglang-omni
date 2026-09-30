@@ -12,8 +12,15 @@ from sglang.srt.runtime_context import get_parallel
 
 from sglang_omni.model_runner.base import ModelRunner
 from sglang_omni.model_runner.sglang_execution import attn_forward_context
-from sglang_omni.models.ming_tts.engine_io import MingTTSLatentPatch
-from sglang_omni.models.ming_tts.sglang_model import MingTTSTailInputs
+from sglang_omni.models.ming_tts.engine_io import (
+    MingTTSLatentPatch,
+    MingTTSSGLangRequestData,
+)
+from sglang_omni.models.ming_tts.sglang_model import (
+    MingTTSSGLangModel,
+    MingTTSTailInputs,
+)
+from sglang_omni.scheduling.types import SchedulerOutput, SchedulerRequest
 
 if TYPE_CHECKING:
     from sglang.srt.distributed.parallel_state import GroupCoordinator
@@ -21,12 +28,9 @@ if TYPE_CHECKING:
     from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 
     from sglang_omni.model_runner.model_worker import ModelWorker
-    from sglang_omni.models.ming_tts.engine_io import MingTTSSGLangRequestData
-    from sglang_omni.models.ming_tts.sglang_model import MingTTSSGLangModel
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
     )
-    from sglang_omni.scheduling.types import SchedulerOutput, SchedulerRequest
 else:
     pass
 

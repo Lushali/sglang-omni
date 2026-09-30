@@ -21,8 +21,6 @@ import time
 from collections.abc import Coroutine, Sequence
 from typing import Callable
 
-from typing_extensions import Generic, TypeVar
-
 from sglang_omni.pipeline.stage.stream_queue import StreamItem
 from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.message import IncomingMessage, OutgoingMessage
@@ -34,10 +32,8 @@ ABORTED_REQUEST_ID_RETAINED = 5000
 COMPLETED_NON_STREAMING_REQUEST_ID_LIMIT = 10000
 COMPLETED_NON_STREAMING_REQUEST_ID_RETAINED = 5000
 
-StreamingInputT = TypeVar("StreamingInputT", default=StagePayload)
 
-
-class StreamingSimpleScheduler(Generic[StreamingInputT]):
+class StreamingSimpleScheduler:
     """Scheduler base for simple stages with streaming input.
 
     Subclasses implement the streaming hooks. Non-streaming requests use
@@ -51,18 +47,18 @@ class StreamingSimpleScheduler(Generic[StreamingInputT]):
 
     def __init__(
         self,
-        compute_fn: Callable[[StreamingInputT], object] | None,
+        compute_fn: Callable[[StagePayload], object] | None,
         *,
         batch_compute_fn: (
             Callable[
-                [list[StreamingInputT]],
+                [list[StagePayload]],
                 Sequence[object] | Coroutine[object, None, Sequence[object]],
             ]
             | None
         ) = None,
         max_batch_size: int = 1,
         max_batch_wait_ms: int = 0,
-        request_cost_fn: Callable[[StreamingInputT], int] | None = None,
+        request_cost_fn: Callable[[StagePayload], int] | None = None,
         max_batch_cost: int | None = None,
         abort_callback: Callable[[str], None] | None = None,
     ) -> None:
@@ -83,7 +79,7 @@ class StreamingSimpleScheduler(Generic[StreamingInputT]):
         self.running = False
         self.pending_messages: collections.deque[IncomingMessage] = collections.deque()
         self.pending_done: set[str] = set()
-        self.stream_payloads: dict[str, StreamingInputT] = {}
+        self.stream_payloads: dict[str, StagePayload] = {}
         self.aborted_request_ids: set[str] = set()
         self.completed_non_streaming_request_ids: set[str] = set()
         self.state_lock = threading.RLock()
@@ -91,17 +87,17 @@ class StreamingSimpleScheduler(Generic[StreamingInputT]):
 
     def is_streaming_payload(
         self,
-        payload: StreamingInputT,
+        payload: StagePayload,
     ) -> bool:
         return False
 
-    def validate_non_streaming_payload(self, payload: StreamingInputT) -> None:
+    def validate_non_streaming_payload(self, payload: StagePayload) -> None:
         del payload
 
     def on_streaming_new_request(
         self,
         request_id: str,
-        payload: StreamingInputT,
+        payload: StagePayload,
     ) -> None:
         del request_id, payload
 
@@ -564,7 +560,7 @@ class StreamingSimpleScheduler(Generic[StreamingInputT]):
 
     def run_compute(
         self,
-        payload: StreamingInputT,
+        payload: StagePayload,
         loop: asyncio.AbstractEventLoop,
     ) -> object:
         if self.compute_fn is None:
@@ -593,7 +589,7 @@ class StreamingSimpleScheduler(Generic[StreamingInputT]):
     def handle_streaming_new_request(
         self,
         request_id: str,
-        payload: StreamingInputT,
+        payload: StagePayload,
     ) -> None:
         with self.abort_lock:
             self.aborted_request_ids.discard(request_id)

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 from sglang_omni.models.higgs_tts import request_builders
 from sglang_omni.models.higgs_tts import utils as higgs_utils
+from sglang_omni.models.higgs_tts.request_builders import HiggsSGLangRequestData
 from sglang_omni.models.higgs_tts.vocoder_scheduler import (
     DEFAULT_HIGGS_INITIAL_CHUNK_FRAMES,
     DEFAULT_HIGGS_STREAM_FOLLOWUP_STRIDE,
@@ -29,7 +30,6 @@ if TYPE_CHECKING:
     from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.higgs_tts.model import HiggsTTSModel
     from sglang_omni.models.higgs_tts.model_runner import HiggsTTSModelRunner
-    from sglang_omni.models.higgs_tts.request_builders import HiggsSGLangRequestData
     from sglang_omni.proto import StagePayload
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
     from sglang_omni.scheduling.sglang_backend.output_processor import (
@@ -41,7 +41,7 @@ else:
 logger = logging.getLogger(__name__)
 
 
-class HiggsTtsEngineBuilder(TtsEngineBuilder["HiggsSGLangRequestData"]):
+class HiggsTtsEngineBuilder(TtsEngineBuilder[HiggsSGLangRequestData]):
     model_name = "Higgs TTS"
     context_length = 4096
     supports_breakable_prefill_cuda_graph = True

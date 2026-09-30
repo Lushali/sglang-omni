@@ -24,6 +24,8 @@ from sglang_omni.models.moss_tts.audio_tokenizer import (
     resolve_moss_audio_dtype,
 )
 from sglang_omni.models.moss_tts.hf_loading import (
+    MossLoadedProcessor,
+    MossLocalReferences,
     MossProcessorConfigSource,
     load_moss_processor_class,
     moss_transformers_processor_compat,
@@ -34,6 +36,7 @@ from sglang_omni.models.moss_tts_local.payload_types import (
     moss_tts_local_special_token_defaults,
 )
 from sglang_omni.models.moss_tts_local.request_builders import (
+    MossTTSLocalSGLangRequestData,
     cleanup_prepared_moss_tts_local_request,
     preprocess_moss_tts_local_payload,
     set_moss_tts_local_preprocessing_context,
@@ -54,13 +57,6 @@ from sglang_omni.scheduling.simple_scheduler import SimpleScheduler
 from sglang_omni.utils.cpu import bounded_intraop_threads
 
 if TYPE_CHECKING:
-    from sglang_omni.models.moss_tts.hf_loading import (
-        MossLoadedProcessor,
-        MossLocalReferences,
-    )
-    from sglang_omni.models.moss_tts_local.request_builders import (
-        MossTTSLocalSGLangRequestData,
-    )
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
 else:
     pass
@@ -240,7 +236,7 @@ def normalize_processor_config(processor: object) -> None:
 
 def load_moss_tts_local_processor(
     model_path: str,
-) -> "MossLoadedProcessor[MossLocalReferences]":
+) -> MossLoadedProcessor[MossLocalReferences]:
     logger.info(f"Loading MOSS-TTS Local processor from {model_path} without codec")
     try:
         from transformers import AutoConfig, AutoTokenizer

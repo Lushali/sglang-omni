@@ -14,6 +14,7 @@ import torch
 
 from sglang_omni.model_runner.base import ModelRunner
 from sglang_omni.sampling.seed import derive_sampling_seed
+from sglang_omni.scheduling.types import SchedulerRequest
 
 from .chunking import ChunkWindow, chunk_windows
 from .constants import AR_CHUNK_FRAMES, AR_CHUNK_HOP_FRAMES
@@ -36,7 +37,6 @@ if TYPE_CHECKING:
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
     )
-    from sglang_omni.scheduling.types import SchedulerRequest
 else:
     pass
 

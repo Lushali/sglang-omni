@@ -4,23 +4,24 @@ from __future__ import annotations
 
 from typing import Generic, TypeVar
 
-from sglang_omni.proto import StagePayload
+import torch
+
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.pipeline_state import PipelineStateBase
 from sglang_omni.scheduling.simple_scheduler import SimpleScheduler
 
 __all__ = ["BatchVocoderBase"]
 
 StateT = TypeVar("StateT", bound=PipelineStateBase)
-CodesT = TypeVar("CodesT")
 WaveformT = TypeVar("WaveformT")
 
 
-class BatchVocoderBase(Generic[StateT, CodesT, WaveformT]):
-    def prepare_item(self, payload: StagePayload) -> tuple[StateT, CodesT]:
+class BatchVocoderBase(Generic[StateT, WaveformT]):
+    def prepare_item(self, payload: StagePayload) -> tuple[StateT, torch.Tensor]:
         raise NotImplementedError
 
     async def decode_batch(
-        self, items: list[tuple[StateT, CodesT]]
+        self, items: list[tuple[StateT, torch.Tensor]]
     ) -> list[tuple[WaveformT, int]]:
         raise NotImplementedError
 

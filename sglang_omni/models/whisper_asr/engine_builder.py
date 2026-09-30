@@ -11,7 +11,10 @@ from sglang_omni.models.whisper_asr.encoder_service import (
     WhisperPreLMEncoderService,
     build_cache_namespace,
 )
-from sglang_omni.models.whisper_asr.request_builders import MAX_PREV_CONTEXT_TOKENS
+from sglang_omni.models.whisper_asr.request_builders import (
+    MAX_PREV_CONTEXT_TOKENS,
+    WhisperASRRequestData,
+)
 from sglang_omni.scheduling.engine_factory import AsrEngineBuilder, GenerationDefaults
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
@@ -21,7 +24,6 @@ from sglang_omni.scheduling.generation_batch_policy import (
 if TYPE_CHECKING:
     from transformers import GenerationConfig, WhisperProcessor, WhisperTokenizer
 
-    from sglang_omni.models.whisper_asr.request_builders import WhisperASRRequestData
     from sglang_omni.models.whisper_asr.sglang_model import (
         WhisperForConditionalGeneration,
     )
@@ -166,7 +168,7 @@ def resolve_encoder_graph_buckets(
     return tuple(sorted(resolved))
 
 
-class WhisperASREngineBuilder(AsrEngineBuilder["WhisperASRRequestData"]):
+class WhisperASREngineBuilder(AsrEngineBuilder[WhisperASRRequestData]):
     model_name = "Whisper ASR"
     model_arch_override = "WhisperForConditionalGeneration"
     supports_breakable_prefill_cuda_graph = True

@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
 from sglang_omni.scheduling.generation_batch_policy import build_default_cuda_graph_bs
+from sglang_omni.scheduling.types import RequestOutput
 
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
@@ -27,7 +28,6 @@ if TYPE_CHECKING:
     from sglang_omni.proto import StagePayload
     from sglang_omni.scheduling.message import OutgoingMessage
     from sglang_omni.scheduling.sglang_backend import SGLangOutputProcessor
-    from sglang_omni.scheduling.types import RequestOutput
 else:
     pass
 

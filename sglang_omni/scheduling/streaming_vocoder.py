@@ -101,7 +101,7 @@ def vocoder_decode_stream_priority(device_module: ModuleType) -> int:
 
 
 class StreamingVocoderBase(
-    StreamingSimpleScheduler[StagePayload], ABC, Generic[StreamStateT, StepPlanT]
+    StreamingSimpleScheduler, ABC, Generic[StreamStateT, StepPlanT]
 ):
     """Template-method base for streaming vocoder schedulers.
 

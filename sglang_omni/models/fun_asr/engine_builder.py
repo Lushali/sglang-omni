@@ -12,6 +12,7 @@ from sglang.srt.managers.mm_utils import init_mm_embedding_cache
 from transformers import AutoFeatureExtractor, AutoTokenizer
 
 from sglang_omni.models.fun_asr import request_builders
+from sglang_omni.models.fun_asr.configuration_fun_asr import FunAsrNanoFeatureExtractor
 from sglang_omni.models.fun_asr.encoder_service import (
     FunASRPreLMEncoderService,
     build_cache_namespace,
@@ -25,22 +26,19 @@ from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
     build_default_prefill_cuda_graph_bs,
 )
+from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.types import RequestOutput
 from sglang_omni.utils.gpu_compat import get_visible_gpu_sm_version
 
 if TYPE_CHECKING:
     from sglang.srt.server_args import ServerArgs
     from transformers import PreTrainedTokenizerBase
 
-    from sglang_omni.models.fun_asr.configuration_fun_asr import (
-        FunAsrNanoFeatureExtractor,
-    )
     from sglang_omni.models.fun_asr.sglang_model import (
         FunAsrNanoForConditionalGeneration,
     )
     from sglang_omni.proto import StagePayload
-    from sglang_omni.scheduling.message import OutgoingMessage
     from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
-    from sglang_omni.scheduling.types import RequestOutput
 else:
     pass
 
@@ -107,7 +105,7 @@ class FunASREngineBuilder(AsrEngineBuilder[request_builders.FunASRRequestData]):
         self.request_build_max_pending = request_build_max_pending
         self.stream_emit_interval_s = stream_emit_interval_s
         self.tokenizer: "PreTrainedTokenizerBase | None" = None
-        self.feature_extractor: "FunAsrNanoFeatureExtractor | None" = None
+        self.feature_extractor: FunAsrNanoFeatureExtractor | None = None
         self.audio_encoder_service: FunASRPreLMEncoderService | None = None
         self.context_length = 0
 

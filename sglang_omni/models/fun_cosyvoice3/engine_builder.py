@@ -12,6 +12,9 @@ from typing import TYPE_CHECKING
 import torch
 
 from sglang_omni.models.fun_cosyvoice3 import request_builders
+from sglang_omni.models.fun_cosyvoice3.request_builders import (
+    CosyVoice3SGLangRequestData,
+)
 from sglang_omni.models.fun_cosyvoice3.streaming import TOKEN_HOP_LEN
 from sglang_omni.models.fun_cosyvoice3.utils import (
     CosyVoice3Tokenizer,
@@ -31,9 +34,6 @@ if TYPE_CHECKING:
         FunCosyVoice3MlxSchedulerModelRunner,
         FunCosyVoice3ModelRunner,
     )
-    from sglang_omni.models.fun_cosyvoice3.request_builders import (
-        CosyVoice3SGLangRequestData,
-    )
     from sglang_omni.proto import StagePayload
     from sglang_omni.scheduling.bootstrap import InfrastructureOptions
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
@@ -46,7 +46,7 @@ else:
 logger = logging.getLogger(__name__)
 
 
-class FunCosyVoice3EngineBuilder(TtsEngineBuilder["CosyVoice3SGLangRequestData"]):
+class FunCosyVoice3EngineBuilder(TtsEngineBuilder[CosyVoice3SGLangRequestData]):
     model_name = "Fun-CosyVoice3"
     context_length = 4096
     model_arch_override = "FunCosyVoice3SGLangModel"
