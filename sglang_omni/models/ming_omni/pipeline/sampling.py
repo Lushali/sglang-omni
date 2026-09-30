@@ -3,12 +3,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar
+from typing import TypeVar
 
-if TYPE_CHECKING:
-    from transformers import PreTrainedTokenizerBase
-else:
-    pass
+from transformers import PreTrainedTokenizerBase
 
 ValueT = TypeVar("ValueT")
 
@@ -32,7 +29,7 @@ def build_ming_sampling_kwargs(
 def build_ming_sampling_params(
     params: dict[str, ValueT],
     *,
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     vocab_size: int,
 ):
     from sglang.srt.sampling.sampling_params import SamplingParams

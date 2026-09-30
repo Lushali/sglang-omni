@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING
 
 import torch
 from sglang.srt.layers.logits_processor import LogitsProcessorOutput
@@ -14,11 +13,7 @@ from sglang.srt.model_executor.forward_batch_info import ForwardBatch, PPProxyTe
 from sglang.srt.model_loader.weight_utils import default_weight_loader
 from sglang.srt.models.qwen2 import Qwen2ForCausalLM
 from torch import nn
-
-if TYPE_CHECKING:
-    from transformers import Qwen2Config
-else:
-    pass
+from transformers import Qwen2Config
 
 VOCAB_SIZE = 6561
 TOTAL_VOCAB_SIZE = VOCAB_SIZE + 200
@@ -35,7 +30,7 @@ class FunCosyVoice3SGLangModel(Qwen2ForCausalLM):
 
     def __init__(
         self,
-        config: "Qwen2Config",
+        config: Qwen2Config,
         quant_config: QuantizationConfig | None = None,
         prefix: str = "",
     ) -> None:

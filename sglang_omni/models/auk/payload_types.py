@@ -4,16 +4,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+
+import numpy as np
+import torch
 
 from sglang_omni.models.auk import constants as C
 from sglang_omni.scheduling.pipeline_state import DeclarativeStateBase, wire
-
-if TYPE_CHECKING:
-    import numpy as np
-    import torch
-else:
-    pass
 
 
 @dataclass

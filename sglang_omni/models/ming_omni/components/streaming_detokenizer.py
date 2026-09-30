@@ -25,22 +25,18 @@ import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, TypeVar
+from typing import TypeVar
+
+from transformers import PreTrainedTokenizerBase
 
 from sglang_omni.models.ming_omni.io import MingOmniEvent, MingOmniPipelineState
 from sglang_omni.models.ming_omni.pipeline.merge import decode_events
 from sglang_omni.models.ming_omni.pipeline.next_stage import THINKER_STAGE
 from sglang_omni.models.ming_omni.pipeline.state_io import load_state
 from sglang_omni.models.ming_omni.pipeline.usage import build_text_usage
+from sglang_omni.pipeline.stage.stream_queue import StreamItem
 from sglang_omni.proto import OmniRequest, StagePayload
 from sglang_omni.scheduling.message import IncomingMessage, OutgoingMessage
-
-if TYPE_CHECKING:
-    from transformers import PreTrainedTokenizerBase
-
-    from sglang_omni.pipeline.stage.stream_queue import StreamItem
-else:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +74,7 @@ class MingStreamingDetokenizeScheduler:
 
     def __init__(
         self,
-        tokenizer: "PreTrainedTokenizerBase",
+        tokenizer: PreTrainedTokenizerBase,
         eos_token_id: int | None,
         *,
         stage_name: str = "decode",
@@ -166,7 +162,7 @@ class MingStreamingDetokenizeScheduler:
         else:
             pass
 
-    def on_stream_chunk(self, request_id: str, item: "StreamItem") -> None:
+    def on_stream_chunk(self, request_id: str, item: StreamItem) -> None:
         # item is the StreamItem the runtime wraps around the thinker's
         # torch.tensor([token_id], dtype=torch.long)
         data = item.data

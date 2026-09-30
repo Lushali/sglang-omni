@@ -5,9 +5,10 @@ from __future__ import annotations
 
 from array import array
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
 
 import torch
+from sglang.srt.dllm.config import DllmConfig
+from transformers import PreTrainedTokenizerBase
 
 from sglang_omni.models.llada2_uni.components.preprocessor import (
     DUMMY_IMAGE_TOKEN_ID,
@@ -24,12 +25,6 @@ from sglang_omni.models.llada2_uni.payload_types import (
 )
 from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.sglang_backend import SGLangDLLMRequestData
-
-if TYPE_CHECKING:
-    from sglang.srt.dllm.config import DllmConfig
-    from transformers import PreTrainedTokenizerBase
-else:
-    pass
 
 
 def build_encoder_request(
@@ -129,9 +124,9 @@ def build_dllm_thinker_request(
     state: LLaDA2UniPipelineState,
     *,
     params: Mapping[str, object],
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     vocab_size: int,
-    dllm_config: "DllmConfig",
+    dllm_config: DllmConfig,
     request_id: str | None = None,
 ) -> SGLangDLLMRequestData:
     """Build SGLangDLLMRequestData for the LLaDA2-Uni thinker."""
@@ -215,9 +210,9 @@ def apply_dllm_thinker_result(
 
 def make_dllm_thinker_scheduler_adapters(
     *,
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     vocab_size: int,
-    dllm_config: "DllmConfig",
+    dllm_config: DllmConfig,
     stage_name: str = THINKER_STAGE,
 ):
     """Build StagePayload <-> scheduler adapters for the dLLM thinker."""

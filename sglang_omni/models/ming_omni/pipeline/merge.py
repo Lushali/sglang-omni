@@ -3,14 +3,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable, Mapping, TypeGuard
-
-if TYPE_CHECKING:
-    from transformers import PreTrainedTokenizerBase
-else:
-    pass
+from typing import Iterable, Mapping, TypeGuard
 
 import torch
+from transformers import PreTrainedTokenizerBase
 
 from sglang_omni.models.ming_omni.io import (
     MingOmniEvent,
@@ -185,7 +181,7 @@ def decode_events(
     *,
     thinker_out: ThinkerOutput,
     state: MingOmniPipelineState,
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     eos_token_id: int | None,
     step: int,
 ) -> Iterable[MingOmniEvent]:

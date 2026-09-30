@@ -3,23 +3,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import torch
 import torch.nn as nn
 from accelerate import init_empty_weights
 from transformers.models.qwen3_omni_moe import modeling_qwen3_omni_moe as hf_modeling
+from transformers.models.qwen3_omni_moe.configuration_qwen3_omni_moe import (
+    Qwen3OmniMoeThinkerConfig,
+)
 
 from sglang_omni.models.qwen3_omni.components.common import load_thinker_config
 from sglang_omni.models.weight_loader import load_module, resolve_dtype
 from sglang_omni.utils import instantiate_module
-
-if TYPE_CHECKING:
-    from transformers.models.qwen3_omni_moe.configuration_qwen3_omni_moe import (
-        Qwen3OmniMoeThinkerConfig,
-    )
-else:
-    pass
 
 TEXT_MODEL_PREFIX = ("thinker.model.", "model.")
 LM_HEAD_PREFIX = ("thinker.lm_head.", "lm_head.")
@@ -47,13 +41,13 @@ def concat_features(value: object) -> torch.Tensor | None:
     return None
 
 
-def should_tie_embeddings(config: "Qwen3OmniMoeThinkerConfig") -> bool:
+def should_tie_embeddings(config: Qwen3OmniMoeThinkerConfig) -> bool:
     return bool(config.text_config.tie_word_embeddings)
 
 
 def maybe_tie_weights(
     *,
-    config: "Qwen3OmniMoeThinkerConfig",
+    config: Qwen3OmniMoeThinkerConfig,
     text_model: nn.Module,
     lm_head: nn.Module,
 ) -> None:
@@ -67,7 +61,7 @@ def maybe_tie_weights(
 def build_text_model(
     model_path: str,
     *,
-    thinker_cfg: "Qwen3OmniMoeThinkerConfig",
+    thinker_cfg: Qwen3OmniMoeThinkerConfig,
     torch_dtype: torch.dtype | None,
 ) -> nn.Module:
     text_cfg = thinker_cfg.text_config
@@ -85,7 +79,7 @@ def build_text_model(
 def build_lm_head(
     model_path: str,
     *,
-    thinker_cfg: "Qwen3OmniMoeThinkerConfig",
+    thinker_cfg: Qwen3OmniMoeThinkerConfig,
     torch_dtype: torch.dtype | None,
 ) -> nn.Module:
     lm_head = nn.Linear(
@@ -108,7 +102,7 @@ def build_lm_head(
 
 
 def build_thinker_shell(
-    thinker_cfg: "Qwen3OmniMoeThinkerConfig",
+    thinker_cfg: Qwen3OmniMoeThinkerConfig,
 ) -> hf_modeling.Qwen3OmniMoeThinkerForConditionalGeneration:
     with init_empty_weights():
         thinker = hf_modeling.Qwen3OmniMoeThinkerForConditionalGeneration(thinker_cfg)

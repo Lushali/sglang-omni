@@ -5,26 +5,22 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
-from typing import TYPE_CHECKING, Protocol, TypeVar
+from typing import Protocol
+
+from sglang.srt.managers.schedule_batch import ScheduleBatch
+from sglang.srt.server_args import ServerArgs
 
 from sglang_omni.models.qwen3_omni.config import (
     ENABLE_TALKER_START_TOPOLOGY,
     MIN_PARTIAL_START_CHUNKS,
     TALKER_START_MIN_CHUNKS,
 )
+from sglang_omni.pipeline.stage.stream_queue import StreamItem
 from sglang_omni.scheduling.omni_scheduler import OmniScheduler
 from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
 from sglang_omni.vendor.sglang.server_args import override_server_args
 
-if TYPE_CHECKING:
-    from sglang.srt.managers.schedule_batch import ScheduleBatch
-    from sglang.srt.server_args import ServerArgs
-else:
-    pass
-
 logger = logging.getLogger(__name__)
-
-ChunkT = TypeVar("ChunkT")
 
 _CHUNK_WAIT_LOG_INTERVAL_S = 10.0
 
@@ -39,7 +35,7 @@ class DecodeBatch(Protocol):
 
 
 def configure_talker_server_args(
-    server_args: "ServerArgs", *, feedback_enabled: bool = True
+    server_args: ServerArgs, *, feedback_enabled: bool = True
 ) -> bool:
     """Apply talker-specific scheduler/runtime defaults.
 
@@ -101,7 +97,7 @@ class QwenTalkerScheduler(OmniScheduler[SGLangARRequestData]):
         else:
             pass
 
-    def count_usable_prefetched_chunks(self, prefetched: list[ChunkT]) -> int:
+    def count_usable_prefetched_chunks(self, prefetched: list[StreamItem]) -> int:
         im_end = self.im_end_token_id
         if im_end is None or not prefetched:
             return len(prefetched)
@@ -184,7 +180,7 @@ class QwenTalkerScheduler(OmniScheduler[SGLangARRequestData]):
             pass
         return batch
 
-    def rollback_decode_prep_after_skip(self, batch: "ScheduleBatch") -> None:
+    def rollback_decode_prep_after_skip(self, batch: ScheduleBatch) -> None:
         if not batch.forward_mode.is_decode():
             return
         else:

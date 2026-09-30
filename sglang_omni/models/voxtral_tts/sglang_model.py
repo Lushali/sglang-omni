@@ -5,14 +5,15 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import asdict
-from typing import TYPE_CHECKING
 
 import torch
 from sglang.srt.layers.logits_processor import LogitsProcessorOutput
+from sglang.srt.layers.quantization.base_config import QuantizationConfig
 from sglang.srt.model_loader.weight_utils import default_weight_loader
 from sglang.srt.runtime_context import get_model, get_schedule
 from sglang.srt.utils import add_prefix
 from torch import nn
+from transformers import PretrainedConfig
 
 from sglang_omni.models.voxtral_tts.acoustic_transformer import (
     FlowMatchingAudioTransformer,
@@ -35,12 +36,6 @@ from sglang_omni.vendor.sglang.layers import (
     VocabParallelEmbedding,
     get_rope,
 )
-
-if TYPE_CHECKING:
-    from sglang.srt.layers.quantization.base_config import QuantizationConfig
-    from transformers import PretrainedConfig
-else:
-    pass
 
 
 class VoxtralSGLangAttention(nn.Module):
@@ -184,8 +179,8 @@ class VoxtralSGLangTTSModel(nn.Module):
 
     def __init__(
         self,
-        config: "PretrainedConfig",
-        quant_config: "QuantizationConfig | None" = None,
+        config: PretrainedConfig,
+        quant_config: QuantizationConfig | None = None,
         prefix: str = "",
     ) -> None:
         # note (SunskyXH): SGLang requires these arguments; Voxtral uses params.json.

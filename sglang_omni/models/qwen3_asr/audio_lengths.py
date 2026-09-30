@@ -3,14 +3,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import torch
-
-if TYPE_CHECKING:
-    from numpy.typing import ArrayLike
-else:
-    pass
+from numpy.typing import ArrayLike
 
 
 def qwen3_asr_audio_token_lengths(

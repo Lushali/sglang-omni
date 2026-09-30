@@ -17,12 +17,13 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple
+from typing import Iterable, Optional, Tuple
 
 import torch
 from sglang.srt.layers.communicator import enable_moe_dense_fully_dp
 from sglang.srt.runtime_context import get_parallel
 from torch import nn
+from transformers import PretrainedConfig
 
 from sglang_omni.models.ming_omni.configuration import (
     BailingMM2Config,
@@ -53,11 +54,6 @@ from sglang_omni.vendor.sglang.layers import (
 )
 from sglang_omni.vendor.sglang.models import apply_qk_norm
 from sglang_omni.vendor.sglang.utils import add_prefix, make_layers
-
-if TYPE_CHECKING:
-    from transformers import PretrainedConfig
-else:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -840,7 +836,7 @@ class BailingMoeV2ForCausalLM(nn.Module):
 
     def __init__(
         self,
-        config: "PretrainedConfig",
+        config: PretrainedConfig,
         quant_config: Optional[QuantizationConfig] = None,
     ) -> None:
         super().__init__()
@@ -896,7 +892,7 @@ class BailingMoeV2ForCausalLM(nn.Module):
 
     @staticmethod
     def patch_token_ids(
-        config: "PretrainedConfig", llm_cfg: "PretrainedConfig | None"
+        config: PretrainedConfig, llm_cfg: PretrainedConfig | None
     ) -> None:
         """Set image/video/audio token IDs on the HF config."""
         if not hasattr(config, "image_token_id"):

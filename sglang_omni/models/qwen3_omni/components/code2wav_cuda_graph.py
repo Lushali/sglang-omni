@@ -14,16 +14,12 @@ from contextlib import AbstractContextManager
 from copy import deepcopy
 from dataclasses import dataclass
 from types import ModuleType
-from typing import TYPE_CHECKING, Literal, Protocol, TypeAlias, TypedDict
+from typing import Literal, Protocol, TypeAlias, TypedDict
 
 import torch
 
 from sglang_omni.platforms import current_platform
-
-if TYPE_CHECKING:
-    from sglang_omni.platforms.device_graph import DeviceGraphBackend
-else:
-    pass
+from sglang_omni.platforms.device_graph import DeviceGraphBackend
 
 logger = logging.getLogger(__name__)
 _MASK_SWAP_LOCK = threading.Lock()

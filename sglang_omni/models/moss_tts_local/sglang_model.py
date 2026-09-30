@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING, Callable, Iterable, Optional, Tuple, TypeVar
+from typing import Callable, Iterable, Optional, Tuple, TypeVar
 
 import torch
 import torch.nn.functional as F
@@ -29,7 +29,7 @@ from sglang.srt.model_loader.weight_utils import default_weight_loader
 from sglang.srt.models.qwen3 import Qwen3Model
 from sglang.srt.runtime_context import get_schedule
 from sglang.srt.utils import add_prefix
-from transformers import PretrainedConfig
+from transformers import GPT2Config, PretrainedConfig, Qwen3Config
 
 from sglang_omni.models.moss_tts.sampling_kernels import (
     MAX_FUSED_SAMPLE_VOCAB,
@@ -41,11 +41,6 @@ from sglang_omni.models.moss_tts_local.payload_types import (
     moss_tts_local_special_token_defaults,
 )
 from sglang_omni.models.moss_tts_local.state_pool import MossTTSLocalDecodeStatePool
-
-if TYPE_CHECKING:
-    from transformers import GPT2Config, Qwen3Config
-else:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +145,7 @@ class MossTTSLocalSGLangModel(torch.nn.Module):
         return self.state_pool.row_for(rid)
 
     @staticmethod
-    def cfg_get(config: "GPT2Config", name: str, default: int | float) -> object:
+    def cfg_get(config: GPT2Config, name: str, default: int | float) -> object:
         if isinstance(config, dict):
             value = config.get(name, default)
         else:

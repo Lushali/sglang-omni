@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os
 from copy import copy
-from typing import TYPE_CHECKING, Iterable, Optional, Sequence, Tuple, TypeVar
+from typing import Iterable, Optional, Sequence, Tuple, TypeVar
 
 import torch
 from sglang.srt.distributed import get_pp_group, get_tensor_model_parallel_world_size
@@ -30,6 +30,7 @@ from sglang.srt.model_loader.weight_utils import default_weight_loader
 from sglang.srt.models.qwen3 import Qwen3Model
 from sglang.srt.runtime_context import get_schedule
 from sglang.srt.utils import add_prefix
+from transformers import PretrainedConfig, Qwen3Config
 
 from sglang_omni.models.moss_tts.payload_types import moss_tts_special_token_defaults
 from sglang_omni.models.moss_tts.sampler import (
@@ -42,11 +43,6 @@ from sglang_omni.models.moss_tts.sampling_cuda_graph import (
     MossTTSDelaySamplingCudaGraphRunner,
 )
 from sglang_omni.platforms import current_platform
-
-if TYPE_CHECKING:
-    from transformers import PretrainedConfig, Qwen3Config
-else:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +95,7 @@ class MossTTSDelaySGLangModel(torch.nn.Module):
 
     def __init__(
         self,
-        config: "PretrainedConfig",
+        config: PretrainedConfig,
         quant_config: Optional[QuantizationConfig] = None,
         prefix: str = "",
     ) -> None:
@@ -182,7 +178,7 @@ class MossTTSDelaySGLangModel(torch.nn.Module):
         self.decode_input_embedding.weight.requires_grad_(False)
 
     @staticmethod
-    def normalize_config(config: "PretrainedConfig") -> "PretrainedConfig":
+    def normalize_config(config: PretrainedConfig) -> PretrainedConfig:
         language_config = as_qwen3_config(getattr(config, "language_config", None))
         config.language_config = language_config
         config.hidden_size = int(
@@ -360,7 +356,7 @@ class MossTTSDelaySGLangModel(torch.nn.Module):
 
     @staticmethod
     def make_logits_processor(
-        config: "PretrainedConfig", channel: int
+        config: PretrainedConfig, channel: int
     ) -> LogitsProcessor:
         """Per-channel LogitsProcessor sized to that channel's own vocab.
 

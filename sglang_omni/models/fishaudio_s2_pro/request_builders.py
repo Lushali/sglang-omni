@@ -6,19 +6,14 @@ from __future__ import annotations
 import hashlib
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 import torch
+from transformers import PreTrainedTokenizerFast
 
 from sglang_omni.models.fishaudio_s2_pro.payload_types import S2ProState
 from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.message import OutgoingMessage
 from sglang_omni.scheduling.sglang_backend import SGLangARRequestData
-
-if TYPE_CHECKING:
-    from transformers import PreTrainedTokenizerFast
-else:
-    pass
 
 _S2PRO_GRAPH_TOP_K = 30
 
@@ -84,7 +79,7 @@ def ref_vq_fingerprint(vq_parts: list[torch.Tensor] | None) -> str | None:
 
 def build_sglang_tts_request(
     state: S2ProState,
-    tokenizer: "PreTrainedTokenizerFast",
+    tokenizer: PreTrainedTokenizerFast,
     request_id: str = "",
     *,
     im_end_token_id: int | None = None,
@@ -208,7 +203,7 @@ def apply_tts_result(state: S2ProState, result: S2ProSGLangRequestData) -> None:
 
 def make_tts_scheduler_adapters(
     *,
-    tokenizer: "PreTrainedTokenizerFast",
+    tokenizer: PreTrainedTokenizerFast,
     max_new_tokens_cap: int | None = None,
     context_length: int | None = None,
     im_end_token_id: int | None = None,

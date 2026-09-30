@@ -3,11 +3,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NamedTuple
+from typing import NamedTuple
 
 import torch
 from sglang.srt.layers.sampler import multinomial_with_seed
 from torch import nn
+from transformers import PretrainedConfig
 
 from sglang_omni.models.moss_tts.payload_types import (
     AUDIO_REPETITION_PENALTY,
@@ -19,11 +20,6 @@ from sglang_omni.models.moss_tts.sampling_kernels import (
     multinomial_with_seed_and_token_ids,
     seeded_gumbel_argmax,
 )
-
-if TYPE_CHECKING:
-    from transformers import PretrainedConfig
-else:
-    pass
 
 _NEG_INF = float("-inf")
 _INT64_MAX = torch.iinfo(torch.int64).max
@@ -116,7 +112,7 @@ class MossTTSDelayAudioGraphSampler(nn.Module):
     :mod:`model_runner`.
     """
 
-    def __init__(self, config: "PretrainedConfig") -> None:
+    def __init__(self, config: PretrainedConfig) -> None:
         super().__init__()
         self.n_vq = int(config.n_vq)
         self.num_channels = self.n_vq + 1

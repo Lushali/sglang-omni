@@ -8,18 +8,15 @@ import base64
 import struct
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TypeVar
 
 import numpy as np
 import numpy.typing as npt
 import torch
 
-from .base import MediaIO, is_url
+from sglang_omni.preprocessing.resource_connector import MultiModalResourceConnector
 
-if TYPE_CHECKING:
-    from .resource_connector import MultiModalResourceConnector
-else:
-    pass
+from .base import MediaIO, is_url
 
 AudioInputT = TypeVar("AudioInputT")
 

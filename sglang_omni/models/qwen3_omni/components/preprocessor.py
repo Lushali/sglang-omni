@@ -9,10 +9,11 @@ import json
 import logging
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict, TypeGuard
+from typing import TypedDict, TypeGuard
 
 import torch
 import xxhash
+from transformers import BatchFeature, PreTrainedTokenizerBase
 from transformers.models.qwen3_omni_moe.processing_qwen3_omni_moe import (
     Qwen3OmniMoeProcessor,
 )
@@ -39,11 +40,6 @@ from sglang_omni.preprocessing.resource_connector import (
 )
 from sglang_omni.profiler.event_recorder import emit as _emit_event
 from sglang_omni.proto import StagePayload
-
-if TYPE_CHECKING:
-    from transformers import BatchFeature, PreTrainedTokenizerBase
-else:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -289,7 +285,7 @@ class Qwen3OmniPreprocessor:
                 local_files_only=False,
             )
             self.model_dir = str(resolve_model_path(model_path, local_files_only=False))
-        self.tokenizer: "PreTrainedTokenizerBase" = self.processor.tokenizer
+        self.tokenizer: PreTrainedTokenizerBase = self.processor.tokenizer
         ensure_chat_template(
             self.tokenizer,
             model_path=self.model_dir,
@@ -747,7 +743,7 @@ class Qwen3OmniPreprocessor:
         else:
             pass
 
-        hf_inputs: "BatchFeature" = self.processor(
+        hf_inputs: BatchFeature = self.processor(
             text=prompt_text,
             images=images or None,
             videos=videos or None,

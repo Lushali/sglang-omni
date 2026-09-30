@@ -8,17 +8,14 @@ import base64
 from collections.abc import Mapping
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TypeVar
 
 from PIL import Image, UnidentifiedImageError
 
+from sglang_omni.preprocessing.resource_connector import MultiModalResourceConnector
+
 from .base import MediaIO, is_url
 from .cache_key import compute_media_cache_key
-
-if TYPE_CHECKING:
-    from .resource_connector import MultiModalResourceConnector
-else:
-    pass
 
 ImageInputT = TypeVar("ImageInputT")
 
