@@ -32,17 +32,22 @@ class ThinkerOutput(TypedDict, total=False):
     output_token_logprobs: list[list[float | int]]
 
 
+class EngineOutputs(TypedDict, total=False):
+    thinker: ThinkerOutput
+    talker: dict[str, torch.Tensor]
+
+
 @dataclass(kw_only=True)
 class MiniCPMOPipelineState:
     """Per-request state serialized as plain dictionaries across processes."""
 
     prompt: PromptInputs | None = None
     mm_inputs: dict[str, object] = field(default_factory=dict)
-    encoder_inputs: dict[str, object] = field(default_factory=dict)
+    encoder_inputs: dict[str, dict[str, object]] = field(default_factory=dict)
     encoder_outs: dict[str, object] = field(default_factory=dict)
     thinker_inputs: dict[str, object] = field(default_factory=dict)
     thinker_out: ThinkerOutput | None = None
-    engine_outputs: dict[str, object] = field(default_factory=dict)
+    engine_outputs: EngineOutputs = field(default_factory=dict)
     stream_state: dict[str, object] = field(default_factory=dict)
 
     @classmethod

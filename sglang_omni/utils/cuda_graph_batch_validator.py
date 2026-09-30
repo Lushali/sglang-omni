@@ -8,6 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+import torch
 from sglang.srt.runtime_context import get_exec, get_schedule
 
 from sglang_omni.scheduling.generation_batch_policy import get_decode_cuda_graph_max_bs
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 class BufferProbe:
     """Per-model ``(label, fn)`` extractors reading the allocated buffer first dim."""
 
-    extractors: tuple[tuple[str, Callable[[object], int]], ...]
+    extractors: tuple[tuple[str, Callable[[torch.nn.Module], int]], ...]
     note: str = ""
 
 

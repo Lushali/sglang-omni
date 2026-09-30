@@ -6,8 +6,10 @@ import threading
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Generic
 
 import torch
+from typing_extensions import TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +89,10 @@ def value_size_bytes(value: object) -> int:
     return 0
 
 
-class StageOutputCache:
+CacheInput = TypeVar("CacheInput", default=object)
+
+
+class StageOutputCache(Generic[CacheInput]):
     """Small in-memory LRU cache for non-AR stage outputs."""
 
     def __init__(
@@ -95,7 +100,7 @@ class StageOutputCache:
         max_size: int | None = None,
         max_bytes: int | None = None,
         cache_device: torch.device | str | None = None,
-        size_fn: Callable[[object], int] | None = None,
+        size_fn: Callable[[CacheInput], int] | None = None,
         pin_memory: bool = False,
     ) -> None:
         if max_size is not None and max_size < 0:
@@ -141,7 +146,7 @@ class StageOutputCache:
             self.cache.move_to_end(key)
             return entry.data
 
-    def put(self, key: str | None, data: object) -> None:
+    def put(self, key: str | None, data: CacheInput) -> None:
         if key is None:
             return
         else:
