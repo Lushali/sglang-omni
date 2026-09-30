@@ -94,6 +94,7 @@ from sglang_omni.scheduling.types import (
     ModelRunnerOutput,
     RequestDataT,
     SchedulerOutput,
+    StreamOutputBuilder,
 )
 
 if TYPE_CHECKING:
@@ -275,7 +276,7 @@ class OmniScheduler(Generic[RequestDataT]):
         ) = None,
         session_adapter: ARSessionAdapter | None = None,
         result_adapter: Callable | None = None,
-        stream_output_builder: Callable | None = None,
+        stream_output_builder: StreamOutputBuilder[RequestDataT] | None = None,
         stream_chunk_handler: Callable | None = None,
         stream_done_handler: Callable | None = None,
         abort_callback: Callable[[str], None] | None = None,

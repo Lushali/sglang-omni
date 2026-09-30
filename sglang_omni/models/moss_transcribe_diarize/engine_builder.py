@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, Callable
 
 from sglang.srt.managers.mm_utils import init_mm_embedding_cache
@@ -18,14 +17,15 @@ from sglang_omni.models.moss_transcribe_diarize.request_builders import (
     MossTranscribeDiarizeRequestData,
 )
 from sglang_omni.proto.request import StagePayload
-from sglang_omni.scheduling.engine_factory import AsrEngineBuilder, GenerationDefaults
+from sglang_omni.scheduling.engine_factory import (
+    AsrEngineBuilder,
+    GenerationDefaults,
+    SchedulerExtras,
+)
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
     build_default_prefill_cuda_graph_bs,
 )
-from sglang_omni.scheduling.message import OutgoingMessage
-from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
-from sglang_omni.scheduling.types import RequestOutput
 
 if TYPE_CHECKING:
 
@@ -205,16 +205,7 @@ class MossTranscribeDiarizeEngineBuilder(
 
     def extra_scheduler_kwargs(
         self,
-    ) -> dict[
-        str,
-        Callable[
-            [str, SGLangARRequestData, RequestOutput | SimpleNamespace],
-            list[OutgoingMessage],
-        ]
-        | int
-        | float
-        | None,
-    ]:
+    ) -> SchedulerExtras[MossTranscribeDiarizeRequestData]:
         return {
             "stream_output_builder": (
                 request_builders.make_moss_transcribe_diarize_stream_output_builder(

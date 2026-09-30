@@ -20,7 +20,11 @@ from sglang_omni.models.higgs_tts.vocoder_scheduler import (
     DEFAULT_HIGGS_STREAM_STRIDE,
 )
 from sglang_omni.proto.request import StagePayload
-from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
+from sglang_omni.scheduling.engine_factory import (
+    GenerationDefaults,
+    SchedulerExtras,
+    TtsEngineBuilder,
+)
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
     build_default_prefill_cuda_graph_bs,
@@ -182,7 +186,7 @@ class HiggsTtsEngineBuilder(TtsEngineBuilder[HiggsSGLangRequestData]):
         assert self.model is not None
         return self.model.reset_request
 
-    def extra_scheduler_kwargs(self) -> dict[str, int | float]:
+    def extra_scheduler_kwargs(self) -> SchedulerExtras[HiggsSGLangRequestData]:
         return {
             "enable_async_decode": self.enable_async_decode,
             "async_decode_min_batch_size": self.async_decode_min_batch_size,

@@ -18,7 +18,11 @@ from sglang_omni.models.whisper_asr.request_builders import (
     WhisperASRRequestData,
 )
 from sglang_omni.proto.request import StagePayload
-from sglang_omni.scheduling.engine_factory import AsrEngineBuilder, GenerationDefaults
+from sglang_omni.scheduling.engine_factory import (
+    AsrEngineBuilder,
+    GenerationDefaults,
+    SchedulerExtras,
+)
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
     build_default_prefill_cuda_graph_bs,
@@ -411,7 +415,7 @@ class WhisperASREngineBuilder(AsrEngineBuilder[WhisperASRRequestData]):
             audio_encoder_service=self.audio_encoder_service,
         )
 
-    def extra_scheduler_kwargs(self) -> dict[str, int | float | None]:
+    def extra_scheduler_kwargs(self) -> SchedulerExtras[WhisperASRRequestData]:
         return {
             "enable_async_decode": self.enable_async_decode,
             "async_decode_min_batch_size": self.async_decode_min_batch_size,

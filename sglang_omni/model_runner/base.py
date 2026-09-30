@@ -13,7 +13,6 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Generic, Protocol, TypeAlias
 
 import torch
-from typing_extensions import TypeVar
 
 from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.model_runner.prefill_inputs import clear_omni_prefill_inputs
@@ -25,8 +24,8 @@ from sglang_omni.sampling.seed import (
     resolve_row_seed,
 )
 from sglang_omni.scheduling.types import (
-    ARRequestData,
     ModelRunnerOutput,
+    RequestDataInput,
     RequestOutput,
     SchedulerOutput,
     SchedulerRequest,
@@ -141,15 +140,7 @@ class PendingStep:
     )
 
 
-FinishedRequestDataT = TypeVar(
-    "FinishedRequestDataT",
-    bound=ARRequestData,
-    default=ARRequestData,
-    contravariant=True,
-)
-
-
-class ModelRunner(Generic[FinishedRequestDataT]):
+class ModelRunner(Generic[RequestDataInput]):
     """Base AR model runner.
 
     Subclasses provide phase-specific behavior:
@@ -907,9 +898,7 @@ class ModelRunner(Generic[FinishedRequestDataT]):
     ) -> None:
         """Called after output tokens are materialized into RequestOutput."""
 
-    def on_request_finished(
-        self, request_id: str, req_data: FinishedRequestDataT
-    ) -> None:
+    def on_request_finished(self, request_id: str, req_data: RequestDataInput) -> None:
         """Drain per-request state on any non-abort finish.
 
         Called from ``OmniScheduler.stream_output`` before the terminal payload

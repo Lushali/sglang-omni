@@ -26,7 +26,11 @@ from sglang_omni.models.fun_cosyvoice3.utils import (
 from sglang_omni.platforms import current_platform
 from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.bootstrap import InfrastructureOptions
-from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
+from sglang_omni.scheduling.engine_factory import (
+    GenerationDefaults,
+    SchedulerExtras,
+    TtsEngineBuilder,
+)
 from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputProcessor
 from sglang_omni.utils.checkpoint import resolve_checkpoint as _resolve_checkpoint
 
@@ -296,7 +300,7 @@ class FunCosyVoice3EngineBuilder(TtsEngineBuilder[CosyVoice3SGLangRequestData]):
     ]:
         return request_builders.make_cosyvoice3_scheduler_adapters(model=model)
 
-    def extra_scheduler_kwargs(self) -> dict[str, int]:
+    def extra_scheduler_kwargs(self) -> SchedulerExtras[CosyVoice3SGLangRequestData]:
         from sglang.srt.hardware_backend.mlx.runtime import use_mlx
 
         if not use_mlx():

@@ -3,11 +3,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Generic, Protocol, SupportsIndex, SupportsInt
 
 from typing_extensions import TypeVar
+
+from sglang_omni.scheduling.message import OutgoingMessage
 
 if TYPE_CHECKING:
     import torch
@@ -107,6 +110,22 @@ class ARRequestData:
 
 
 RequestDataT = TypeVar("RequestDataT", bound=ARRequestData, default=ARRequestData)
+RequestDataInput = TypeVar(
+    "RequestDataInput",
+    bound=ARRequestData,
+    default=ARRequestData,
+    contravariant=True,
+)
+
+
+class StreamOutputBuilder(Protocol[RequestDataInput]):
+    def __call__(
+        self,
+        request_id: str,
+        request_data: RequestDataInput,
+        request_output: RequestOutput,
+        /,
+    ) -> Iterable[OutgoingMessage]: ...
 
 
 def sampled_logprobs_to_list(

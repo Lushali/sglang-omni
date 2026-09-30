@@ -21,7 +21,11 @@ from sglang_omni.models.zonos2.streaming_contract import (
     DEFAULT_ZONOS2_PRODUCER_FIRST_FLUSH_ROWS,
 )
 from sglang_omni.proto.request import StagePayload
-from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
+from sglang_omni.scheduling.engine_factory import (
+    GenerationDefaults,
+    SchedulerExtras,
+    TtsEngineBuilder,
+)
 from sglang_omni.utils.checkpoint import resolve_checkpoint
 from sglang_omni.vendor.sglang.server_args import override_server_args
 
@@ -272,7 +276,7 @@ class Zonos2EngineBuilder(TtsEngineBuilder["Zonos2SGLangRequestData"]):
         assert self.model is not None
         return self.model.reset_request
 
-    def extra_scheduler_kwargs(self) -> dict[str, bool]:
+    def extra_scheduler_kwargs(self) -> SchedulerExtras[Zonos2SGLangRequestData]:
         return {"enable_async_decode": self.async_decode}
 
     def post_scheduler_setup(

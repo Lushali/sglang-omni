@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 from sglang.srt.managers.mm_utils import init_mm_embedding_cache
@@ -24,11 +23,13 @@ from sglang_omni.models.arkasr.encoder_service import (
 )
 from sglang_omni.models.arkasr.request_builders import ArkASRRequestData
 from sglang_omni.proto.request import StagePayload
-from sglang_omni.scheduling.engine_factory import AsrEngineBuilder, GenerationDefaults
+from sglang_omni.scheduling.engine_factory import (
+    AsrEngineBuilder,
+    GenerationDefaults,
+    SchedulerExtras,
+)
 from sglang_omni.scheduling.generation_batch_policy import CudaGraphBackend
-from sglang_omni.scheduling.message import OutgoingMessage
-from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
-from sglang_omni.scheduling.types import DeferredAdmission, RequestOutput
+from sglang_omni.scheduling.types import DeferredAdmission
 from sglang_omni.utils.gpu_compat import get_visible_gpu_sm_version
 
 if TYPE_CHECKING:
@@ -238,18 +239,7 @@ class ArkasrEngineBuilder(AsrEngineBuilder[ArkASRRequestData]):
         else:
             pass
 
-    def extra_scheduler_kwargs(
-        self,
-    ) -> dict[
-        str,
-        Callable[
-            [str, SGLangARRequestData, RequestOutput | SimpleNamespace],
-            list[OutgoingMessage],
-        ]
-        | int
-        | float
-        | None,
-    ]:
+    def extra_scheduler_kwargs(self) -> SchedulerExtras[ArkASRRequestData]:
         return {
             "stream_output_builder": request_builders.make_arkasr_stream_output_builder(
                 tokenizer=self.tokenizer,

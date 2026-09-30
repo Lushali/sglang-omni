@@ -292,8 +292,8 @@ def apply_encoder_result(
 
 
 def build_lightweight_mm_inputs(
-    mm_inputs: Mapping[str, Mapping[str, ValueT]],
-) -> dict[str, dict[str, ValueT]]:
+    mm_inputs: Mapping[str, Mapping[str, torch.Tensor | bool | None]],
+) -> dict[str, dict[str, torch.Tensor | bool | None]]:
     mm_image = mm_inputs.get("image", {})
     mm_audio = mm_inputs.get("audio", {})
     mm_video = mm_inputs.get("video", {})
@@ -420,10 +420,6 @@ def payload_with_state(
 
 @overload
 def copy_mutable_containers(value: StreamState) -> StreamState: ...
-
-
-@overload
-def copy_mutable_containers(value: dict[str, ValueT]) -> dict[str, object]: ...
 
 
 @overload
@@ -556,10 +552,10 @@ def has_encoder_model_input(stage_name: str, stage_inputs: object) -> bool:
 
 
 def select_present_fields(
-    source: Mapping[str, ValueT],
+    source: Mapping[str, torch.Tensor | bool | None],
     keys: tuple[str, ...],
-) -> dict[str, ValueT]:
-    selected: dict[str, ValueT] = {}
+) -> dict[str, torch.Tensor | bool | None]:
+    selected: dict[str, torch.Tensor | bool | None] = {}
     for key in keys:
         value = source.get(key)
         if value is not None:

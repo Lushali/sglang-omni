@@ -14,9 +14,12 @@ from sglang_omni.models.ming_omni.tp_utils import validate_attention_tp_config
 from sglang_omni.models.ming_tts.tokenizer import MingTTSTokenizerBundle
 from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.bootstrap import InfrastructureOptions
-from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
+from sglang_omni.scheduling.engine_factory import (
+    GenerationDefaults,
+    SchedulerExtras,
+    TtsEngineBuilder,
+)
 from sglang_omni.scheduling.generation_batch_policy import get_decode_cuda_graph_bs
-from sglang_omni.scheduling.message import OutgoingMessage
 
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
@@ -278,12 +281,7 @@ class MingTtsEngineBuilder(TtsEngineBuilder["MingTTSSGLangRequestData"]):
             owns_acoustic_result=self.tp_rank == 0,
         )
 
-    def extra_scheduler_kwargs(
-        self,
-    ) -> dict[
-        str,
-        Callable[[str, MingTTSSGLangRequestData, object], list[OutgoingMessage]],
-    ]:
+    def extra_scheduler_kwargs(self) -> SchedulerExtras[MingTTSSGLangRequestData]:
         if self.tp_rank != 0:
             return {}
         else:

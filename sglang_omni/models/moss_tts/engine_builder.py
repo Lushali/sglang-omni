@@ -16,9 +16,11 @@ from sglang_omni.models.moss_tts.hf_loading import (
 from sglang_omni.models.moss_tts.request_builders import MossTTSSGLangRequestData
 from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.bootstrap import InfrastructureOptions
-from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
-from sglang_omni.scheduling.message import OutgoingMessage
-from sglang_omni.scheduling.types import RequestOutput
+from sglang_omni.scheduling.engine_factory import (
+    GenerationDefaults,
+    SchedulerExtras,
+    TtsEngineBuilder,
+)
 
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
@@ -123,15 +125,7 @@ class MossTtsEngineBuilder(TtsEngineBuilder[MossTTSSGLangRequestData]):
         )
         return request_builders.make_moss_tts_scheduler_adapters(model=model)
 
-    def extra_scheduler_kwargs(
-        self,
-    ) -> dict[
-        str,
-        Callable[
-            [str, MossTTSSGLangRequestData, RequestOutput | None],
-            list[OutgoingMessage],
-        ],
-    ]:
+    def extra_scheduler_kwargs(self) -> SchedulerExtras[MossTTSSGLangRequestData]:
         return {"stream_output_builder": self.stream_output_builder}
 
     def make_abort_callback(self) -> Callable[[str], None]:

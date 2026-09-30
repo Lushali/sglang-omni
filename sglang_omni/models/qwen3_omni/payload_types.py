@@ -48,7 +48,9 @@ class Qwen3OmniPipelineState:
 
     raw_inputs: object | None = None
     prompt: PromptInputs | None = None
-    mm_inputs: dict[str, dict[str, object]] = field(default_factory=dict)
+    mm_inputs: dict[str, dict[str, torch.Tensor | bool | None]] = field(
+        default_factory=dict
+    )
     encoder_inputs: dict[str, dict[str, object]] = field(default_factory=dict)
     encoder_outs: dict[str, object] = field(default_factory=dict)
     thinker_inputs: dict[str, object] = field(default_factory=dict)

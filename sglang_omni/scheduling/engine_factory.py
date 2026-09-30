@@ -24,7 +24,11 @@ from sglang_omni.scheduling.generation_batch_policy import (
     operator_selected_prefill_backend,
     validate_generation_batch_policy,
 )
-from sglang_omni.scheduling.types import DeferredAdmission, RequestDataT
+from sglang_omni.scheduling.types import (
+    DeferredAdmission,
+    RequestDataT,
+    StreamOutputBuilder,
+)
 from sglang_omni.utils.checkpoint import resolve_checkpoint as _resolve_checkpoint
 
 if TYPE_CHECKING:
@@ -96,6 +100,19 @@ GenerationDefaults = TypedDict(
         "cuda_graph_backend_decode": NotRequired[str],
     },
 )
+
+
+class SchedulerExtras(TypedDict, Generic[RequestDataT], total=False):
+    stream_output_builder: StreamOutputBuilder[RequestDataT] | None
+    enable_async_decode: bool
+    async_decode_min_batch_size: int
+    prefill_coalesce_requests: int
+    prefill_coalesce_wait_ms: float
+    prefill_coalesce_when_idle: bool
+    prefill_coalesce_requires_pending_builds: bool
+    prefill_coalesce_after_builds_during_decode: bool
+    request_build_max_workers: int
+    request_build_max_pending: int | None
 
 
 class SGLangGenerationEngineBuilder(ABC, Generic[RequestDataT]):
@@ -471,7 +488,7 @@ class SGLangGenerationEngineBuilder(ABC, Generic[RequestDataT]):
     def cleanup_build_failure(self) -> None:
         pass
 
-    def extra_scheduler_kwargs(self) -> Mapping[str, object]:
+    def extra_scheduler_kwargs(self) -> SchedulerExtras[RequestDataT]:
         return {}
 
     def make_scheduler(
@@ -489,7 +506,7 @@ class SGLangGenerationEngineBuilder(ABC, Generic[RequestDataT]):
             | None
         ),
         result_adapter: Callable[[RequestDataT], StagePayload] | None,
-        extra_scheduler_kwargs: Mapping[str, object],
+        extra_scheduler_kwargs: SchedulerExtras[RequestDataT],
     ) -> "OmniScheduler[RequestDataT]":
         from sglang_omni.scheduling import omni_scheduler
 

@@ -17,8 +17,11 @@ from sglang_omni.models.fishaudio_s2_pro import stages as fish_stages
 from sglang_omni.models.fishaudio_s2_pro.tokenizer import S2ProTokenizerAdapter
 from sglang_omni.platforms import current_platform
 from sglang_omni.proto.request import StagePayload
-from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
-from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.engine_factory import (
+    GenerationDefaults,
+    SchedulerExtras,
+    TtsEngineBuilder,
+)
 from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputProcessor
 from sglang_omni.utils.gpu_compat import get_visible_gpu_sm_version
 from sglang_omni.vendor.sglang.server_args import override_server_args
@@ -242,11 +245,5 @@ class FishS2ProEngineBuilder(TtsEngineBuilder[request_builders.S2ProSGLangReques
 
     def extra_scheduler_kwargs(
         self,
-    ) -> dict[
-        str,
-        Callable[
-            [str, request_builders.S2ProSGLangRequestData, object],
-            list[OutgoingMessage],
-        ],
-    ]:
+    ) -> SchedulerExtras[request_builders.S2ProSGLangRequestData]:
         return {"stream_output_builder": self.stream_output_builder}

@@ -24,7 +24,11 @@ from sglang_omni.models.qwen3_tts.reference_encoder_cuda_graph import (
 )
 from sglang_omni.models.qwen3_tts.request_builders import Qwen3TTSSGLangRequestData
 from sglang_omni.proto.request import StagePayload
-from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
+from sglang_omni.scheduling.engine_factory import (
+    GenerationDefaults,
+    SchedulerExtras,
+    TtsEngineBuilder,
+)
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
     build_default_prefill_cuda_graph_bs,
@@ -354,15 +358,7 @@ class Qwen3TtsEngineBuilder(TtsEngineBuilder[Qwen3TTSSGLangRequestData]):
         )
         return request_builder, result_adapter
 
-    def extra_scheduler_kwargs(
-        self,
-    ) -> dict[
-        str,
-        Callable[[str, Qwen3TTSSGLangRequestData, object], list[OutgoingMessage]]
-        | int
-        | float
-        | None,
-    ]:
+    def extra_scheduler_kwargs(self) -> SchedulerExtras[Qwen3TTSSGLangRequestData]:
         return {
             "stream_output_builder": self.stream_output_builder,
             "request_build_max_workers": 4,

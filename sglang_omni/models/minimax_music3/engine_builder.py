@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
@@ -15,10 +15,13 @@ from typing_extensions import Unpack
 from sglang_omni.model_runner.base import ModelRunner
 from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.proto.request import StagePayload
-from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
+from sglang_omni.scheduling.engine_factory import (
+    GenerationDefaults,
+    SchedulerExtras,
+    TtsEngineBuilder,
+)
 from sglang_omni.scheduling.generation_batch_policy import build_default_cuda_graph_bs
-from sglang_omni.scheduling.message import OutgoingMessage
-from sglang_omni.scheduling.types import DeferredAdmission, RequestOutput
+from sglang_omni.scheduling.types import DeferredAdmission
 
 if TYPE_CHECKING:
     from sglang.srt.configs.model_config import ModelConfig
@@ -41,14 +44,6 @@ else:
 logger = logging.getLogger(__name__)
 
 _AUDIO_WEIGHT_PREFIXES = ("model.audio_decoder.", "model.audio_extra_embedding.")
-
-
-class MiniMaxMusic3SchedulerExtras(TypedDict):
-    stream_output_builder: Callable[
-        [str, MiniMaxMusic3SGLangRequestData, RequestOutput],
-        Iterator[OutgoingMessage],
-    ]
-    enable_async_decode: bool
 
 
 class MiniMaxMusic3SchedulerArguments(TypedDict):
@@ -241,7 +236,7 @@ class MiniMaxMusic3EngineBuilder(TtsEngineBuilder["MiniMaxMusic3SGLangRequestDat
         assert self.model_runner is not None
         return self.model_runner.reset_request
 
-    def extra_scheduler_kwargs(self) -> MiniMaxMusic3SchedulerExtras:
+    def extra_scheduler_kwargs(self) -> SchedulerExtras[MiniMaxMusic3SGLangRequestData]:
         from .sglang_request_builder import build_stream_output
 
         return {

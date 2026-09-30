@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 from sglang.srt.managers.mm_utils import init_mm_embedding_cache
@@ -23,14 +22,15 @@ from sglang_omni.models.fun_asr.tool_funcs.audio_lengths import (
 )
 from sglang_omni.platforms import current_platform
 from sglang_omni.proto.request import StagePayload
-from sglang_omni.scheduling.engine_factory import AsrEngineBuilder, GenerationDefaults
+from sglang_omni.scheduling.engine_factory import (
+    AsrEngineBuilder,
+    GenerationDefaults,
+    SchedulerExtras,
+)
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
     build_default_prefill_cuda_graph_bs,
 )
-from sglang_omni.scheduling.message import OutgoingMessage
-from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
-from sglang_omni.scheduling.types import RequestOutput
 from sglang_omni.utils.gpu_compat import get_visible_gpu_sm_version
 
 if TYPE_CHECKING:
@@ -257,16 +257,7 @@ class FunASREngineBuilder(AsrEngineBuilder[request_builders.FunASRRequestData]):
 
     def extra_scheduler_kwargs(
         self,
-    ) -> dict[
-        str,
-        Callable[
-            [str, SGLangARRequestData, RequestOutput | SimpleNamespace],
-            list[OutgoingMessage],
-        ]
-        | int
-        | float
-        | None,
-    ]:
+    ) -> SchedulerExtras[request_builders.FunASRRequestData]:
         return {
             "stream_output_builder": request_builders.make_fun_asr_stream_output_builder(
                 tokenizer=self.tokenizer,

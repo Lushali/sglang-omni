@@ -36,7 +36,11 @@ from sglang_omni.models.nemotron_voicechat.talker_scheduler import (
     NemotronTalkerScheduler,
 )
 from sglang_omni.models.weight_loader import resolve_model_path
-from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
+from sglang_omni.scheduling.engine_factory import (
+    GenerationDefaults,
+    SchedulerExtras,
+    TtsEngineBuilder,
+)
 from sglang_omni.scheduling.omni_scheduler import OmniScheduler
 from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
 
@@ -205,7 +209,7 @@ class NemotronVoiceChatEngineBuilder(VoiceChatEngineBuilder):
 
         return build, apply_thinker_result
 
-    def extra_scheduler_kwargs(self):
+    def extra_scheduler_kwargs(self) -> SchedulerExtras[SGLangARRequestData]:
         return {"stream_output_builder": thinker_stream_output_builder}
 
 
@@ -244,5 +248,5 @@ class NemotronVoiceChatTalkerEngineBuilder(VoiceChatEngineBuilder):
 
         return build, apply_talker_result
 
-    def extra_scheduler_kwargs(self):
+    def extra_scheduler_kwargs(self) -> SchedulerExtras[SGLangARRequestData]:
         return {"stream_output_builder": talker_stream_output_builder}
