@@ -50,6 +50,11 @@ class AudioEncoderInputs(TypedDict):
     cache_key: str | None
 
 
+class StreamState(TypedDict):
+    token_ids: list[int]
+    text: str
+
+
 class EngineOutputs(TypedDict, total=False):
     thinker: ThinkerOutput
     talker: dict[str, torch.Tensor]
@@ -66,7 +71,7 @@ class MiniCPMOPipelineState:
     thinker_inputs: dict[str, object] = field(default_factory=dict)
     thinker_out: ThinkerOutput | None = None
     engine_outputs: EngineOutputs = field(default_factory=dict)
-    stream_state: dict[str, object] = field(default_factory=dict)
+    stream_state: Mapping[str, object] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: object) -> "MiniCPMOPipelineState":

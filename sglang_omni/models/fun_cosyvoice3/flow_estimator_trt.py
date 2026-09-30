@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Protocol, SupportsIndex, SupportsInt
 import torch
 
 if TYPE_CHECKING:
+    from tensorrt import BuilderFlag as TensorRTBuilderFlag
     from tensorrt import IBuilderConfig, ICudaEngine, IExecutionContext
 else:
     pass
@@ -36,7 +37,7 @@ _DEFAULT_ONNX_CANDIDATES = (
 
 class BuilderFlagNamespace(Protocol):
     @property
-    def BuilderFlag(self) -> object: ...
+    def BuilderFlag(self) -> type[TensorRTBuilderFlag]: ...
 
 
 class ExecutableFlowEstimator(Protocol):

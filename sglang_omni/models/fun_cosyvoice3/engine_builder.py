@@ -35,6 +35,9 @@ from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputP
 from sglang_omni.utils.checkpoint import resolve_checkpoint as _resolve_checkpoint
 
 if TYPE_CHECKING:
+    from sglang.srt.hardware_backend.mlx.model_runner_stub import (
+        _DummyModel as MlxStubModel,
+    )
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
 
     from sglang_omni.models.fun_cosyvoice3.model_runner import (
@@ -294,7 +297,7 @@ class FunCosyVoice3EngineBuilder(TtsEngineBuilder[CosyVoice3SGLangRequestData]):
         else:
             pass
 
-    def make_adapters(self, model: object) -> tuple[
+    def make_adapters(self, model: torch.nn.Module | MlxStubModel) -> tuple[
         Callable[[StagePayload], CosyVoice3SGLangRequestData],
         Callable[[CosyVoice3SGLangRequestData], StagePayload],
     ]:

@@ -8,7 +8,7 @@ Ming's config remains usable in lightweight environments.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import overload
+from typing import Literal, TypedDict, overload
 
 import torch
 
@@ -108,16 +108,21 @@ def payload_with_state(
     )
 
 
+class EncoderInputMetadata(TypedDict, total=False):
+    cache_key: object
+    _skip: Literal[True]
+
+
 def project_encoder_input_metadata(
     encoder_inputs: Mapping[str, object],
-) -> dict[str, dict[str, object]]:
-    projected: dict[str, dict[str, object]] = {}
+) -> dict[str, EncoderInputMetadata]:
+    projected: dict[str, EncoderInputMetadata] = {}
     for stage_name, stage_inputs in encoder_inputs.items():
         if not isinstance(stage_inputs, dict):
             continue
         else:
             pass
-        metadata: dict[str, object] = {}
+        metadata: EncoderInputMetadata = {}
         cache_key = stage_inputs.get("cache_key")
         if cache_key is not None:
             metadata["cache_key"] = cache_key

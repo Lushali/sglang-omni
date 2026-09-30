@@ -26,10 +26,15 @@ import time
 from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import TypedDict
 
 from transformers import PreTrainedTokenizerBase
 
-from sglang_omni.models.ming_omni.io import MingOmniEvent, MingOmniPipelineState
+from sglang_omni.models.ming_omni.io import (
+    MingOmniEvent,
+    MingOmniEventType,
+    MingOmniPipelineState,
+)
 from sglang_omni.models.ming_omni.pipeline.merge import decode_events
 from sglang_omni.models.ming_omni.pipeline.next_stage import THINKER_STAGE
 from sglang_omni.models.ming_omni.pipeline.state_io import load_state
@@ -340,7 +345,14 @@ class MingStreamingDetokenizeScheduler:
         return result
 
 
-def event_to_dict(event: MingOmniEvent) -> dict[str, object]:
+class MingOmniEventDict(TypedDict):
+    type: MingOmniEventType
+    modality: str
+    payload: dict[str, str | list[str]]
+    is_final: bool
+
+
+def event_to_dict(event: MingOmniEvent) -> MingOmniEventDict:
     return {
         "type": event.type,
         "modality": event.modality,

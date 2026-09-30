@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     import torch
@@ -17,7 +17,14 @@ from sglang_omni.models.llada2_uni.config import IMAGE_STAGE, THINKER_STAGE
 logger = logging.getLogger(__name__)
 
 
-def event_to_dict(event) -> dict[str, object]:
+class LLaDA2UniEventDict(TypedDict):
+    type: str
+    modality: str
+    payload: dict[str, str | list[str]]
+    is_final: bool
+
+
+def event_to_dict(event) -> LLaDA2UniEventDict:
     return {
         "type": event.type,
         "modality": event.modality,

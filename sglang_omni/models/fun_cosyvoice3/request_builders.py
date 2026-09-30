@@ -10,7 +10,7 @@ import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, TypedDict
+from typing import TYPE_CHECKING, Literal, TypedDict
 from urllib.parse import unquote, urlparse
 
 import numpy as np
@@ -51,6 +51,13 @@ from .utils import (
     build_llm_prompt_embeddings,
     extract_prompt_speech_feat,
 )
+
+if TYPE_CHECKING:
+    from sglang.srt.hardware_backend.mlx.model_runner_stub import (
+        _DummyModel as MlxStubModel,
+    )
+else:
+    pass
 
 _SAMPLE_RATE = 24000
 _PROMPT_AUDIO_SR = 16000
@@ -900,7 +907,7 @@ def preprocess_cosyvoice3_payload(payload: StagePayload) -> StagePayload:
 def build_sglang_cosyvoice3_request(
     payload: StagePayload,
     *,
-    model: object,
+    model: torch.nn.Module | MlxStubModel | None,
 ) -> CosyVoice3SGLangRequestData:
     prepared = pop_prepared_cosyvoice3_request(payload)
     if prepared is None:
@@ -1051,7 +1058,9 @@ def accept_cosyvoice3_stream_token(
     return True
 
 
-def make_cosyvoice3_scheduler_adapters(*, model: object) -> tuple[
+def make_cosyvoice3_scheduler_adapters(
+    *, model: torch.nn.Module | MlxStubModel
+) -> tuple[
     Callable[[StagePayload], CosyVoice3SGLangRequestData],
     Callable[[CosyVoice3SGLangRequestData], StagePayload],
 ]:

@@ -17,6 +17,7 @@ from sglang_omni.models.minicpm_o.payload_types import (
     ImageEncoderInputs,
     MiniCPMOPipelineState,
     ModalityInputs,
+    StreamState,
 )
 from sglang_omni.models.minicpm_o.routing import should_generate_audio_output
 from sglang_omni.models.weight_loader import resolve_model_path
@@ -196,13 +197,14 @@ class MiniCPMOPreprocessor:
             input_ids = encoded["input_ids"][0].to(dtype=torch.long)
         attention_mask = torch.ones_like(input_ids)
 
+        stream_state: StreamState = {"token_ids": [], "text": ""}
         state = MiniCPMOPipelineState(
             prompt={
                 "prompt_text": prompt_text,
                 "input_ids": input_ids,
                 "attention_mask": attention_mask,
             },
-            stream_state={"token_ids": [], "text": ""},
+            stream_state=stream_state,
         )
         payload.data = state.to_dict()
         payload.request.inputs = None
@@ -374,6 +376,7 @@ class MiniCPMOPreprocessor:
         else:
             pass
 
+        stream_state: StreamState = {"token_ids": [], "text": ""}
         state = MiniCPMOPipelineState(
             prompt={
                 "prompt_text": prompt_text,
@@ -382,7 +385,7 @@ class MiniCPMOPreprocessor:
             },
             mm_inputs=mm_inputs,
             encoder_inputs=encoder_inputs,
-            stream_state={"token_ids": [], "text": ""},
+            stream_state=stream_state,
         )
         payload.data = state.to_dict()
         payload.request.inputs = None
