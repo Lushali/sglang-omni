@@ -153,7 +153,7 @@ def build_speech_to_text_generate_request(
     segment_timestamps: bool = False,
 ) -> GenerateRequest:
     """Keep endpoint policy out of model-neutral request construction."""
-    params: dict[str, object] = {"task": task}
+    params: dict[str, str | bool] = {"task": task}
     if detect_language:
         params["detect_language"] = True
     else:

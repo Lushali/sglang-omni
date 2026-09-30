@@ -1115,7 +1115,7 @@ def build_chat_generate_request(req: ChatCompletionRequest) -> GenerateRequest:
         explicit_generation_params(req),
     )
 
-    extra_params: dict[str, object] = {}
+    extra_params: dict[str, int | float] = {}
     for field_name, value in (
         ("talker_temperature", req.talker_temperature),
         ("talker_top_p", req.talker_top_p),
@@ -1243,7 +1243,7 @@ def build_rollout_generate_request(req: RolloutGenerateRequest) -> GenerateReque
     else:
         pass
 
-    extra_params: dict[str, object] = {
+    extra_params: dict[str, bool] = {
         "return_logprob": req.return_logprob,
         "return_omni_rollout": req.return_omni_rollout,
         "return_routed_experts": req.return_routed_experts,
