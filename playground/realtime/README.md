@@ -74,6 +74,7 @@ Keep the SSH terminal open, then visit:
 
 - Voice: <http://localhost:8080/audio_duplex>
 - Video: <http://localhost:8080/omni>
+- Voice with an audio-reactive orb: <http://localhost:8080/orb>
 
 Allow microphone/camera access, choose Chinese or English, and click **Start**.
 Click **Stop** to end the conversation. If the server is your own computer,

@@ -228,6 +228,9 @@ def create_app(api_base: str) -> web.Application:
     async def video_page(request: web.Request) -> web.FileResponse:
         return web.FileResponse(FRONTEND / "video" / "omni.html")
 
+    async def orb_page(request: web.Request) -> web.FileResponse:
+        return web.FileResponse(FRONTEND / "orb" / "index.html")
+
     async def frontend_defaults(request: web.Request) -> web.Response:
         return web.json_response({"playback_delay_ms": 200})
 
@@ -241,6 +244,7 @@ def create_app(api_base: str) -> web.Application:
                         "route": "/audio_duplex",
                     },
                     {"app_id": "omni", "name": "Omni Full-Duplex", "route": "/omni"},
+                    {"app_id": "orb", "name": "Orb Voice", "route": "/orb"},
                 ]
             }
         )
@@ -289,6 +293,7 @@ def create_app(api_base: str) -> web.Application:
 
     app.router.add_get("/audio_duplex", index)
     app.router.add_get("/omni", video_page)
+    app.router.add_get("/orb", orb_page)
     app.router.add_get("/api/frontend_defaults", frontend_defaults)
     app.router.add_get("/api/apps", apps)
     app.router.add_get("/api/default_ref_audio", default_reference)
