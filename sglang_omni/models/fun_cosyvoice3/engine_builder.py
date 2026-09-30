@@ -160,7 +160,7 @@ class FunCosyVoice3EngineBuilder(TtsEngineBuilder[CosyVoice3SGLangRequestData]):
         checkpoint_dir: str,
         device: str,
         gpu_id: int,
-        server_args: object,
+        server_args: ServerArgs,
     ) -> None:
         from sglang.srt.hardware_backend.mlx.runtime import use_mlx
 
@@ -212,11 +212,11 @@ class FunCosyVoice3EngineBuilder(TtsEngineBuilder[CosyVoice3SGLangRequestData]):
     def setup_model(
         self,
         *,
-        model_worker: object,
+        model_worker: ModelWorker | MlxTpModelWorker,
         checkpoint_dir: str,
         device: str,
         gpu_id: int,
-        server_args: object,
+        server_args: ServerArgs,
     ) -> None:
         del model_worker, checkpoint_dir, device, gpu_id, server_args
 

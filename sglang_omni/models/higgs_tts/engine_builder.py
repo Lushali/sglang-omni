@@ -142,7 +142,7 @@ class HiggsTtsEngineBuilder(TtsEngineBuilder[HiggsSGLangRequestData]):
         checkpoint_dir: str,
         device: str,
         gpu_id: int,
-        server_args: object,
+        server_args: ServerArgs,
     ) -> None:
         del checkpoint_dir, device, gpu_id, server_args
         self.model = model_worker.model_runner.model

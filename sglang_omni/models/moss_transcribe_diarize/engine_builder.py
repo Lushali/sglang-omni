@@ -163,7 +163,7 @@ class MossTranscribeDiarizeEngineBuilder(
     def setup_model_resources(
         self,
         model: MossTranscribeDiarizeForConditionalGeneration,
-        server_args: object,
+        server_args: ServerArgs,
         *,
         generation_cuda_graph_enabled: bool,
     ) -> None:
@@ -179,7 +179,9 @@ class MossTranscribeDiarizeEngineBuilder(
         model.init_encoder_cache(self.encoder_cache_size_bytes)
 
     def setup_runtime_resources(
-        self, model: MossTranscribeDiarizeForConditionalGeneration, server_args: object
+        self,
+        model: MossTranscribeDiarizeForConditionalGeneration,
+        server_args: ServerArgs,
     ) -> None:
         del server_args
         self.audio_encoder_service = BatchedAudioEncoderService(

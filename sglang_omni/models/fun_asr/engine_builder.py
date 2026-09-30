@@ -153,7 +153,7 @@ class FunASREngineBuilder(AsrEngineBuilder[request_builders.FunASRRequestData]):
     def setup_model_resources(
         self,
         model: FunAsrNanoForConditionalGeneration | None,
-        server_args: object,
+        server_args: ServerArgs,
         *,
         generation_cuda_graph_enabled: bool,
     ) -> None:

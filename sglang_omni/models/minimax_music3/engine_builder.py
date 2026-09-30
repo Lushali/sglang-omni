@@ -178,7 +178,7 @@ class MiniMaxMusic3EngineBuilder(TtsEngineBuilder["MiniMaxMusic3SGLangRequestDat
     def setup_model_resources(
         self,
         model: Qwen3ForCausalLM,
-        server_args: object,
+        server_args: ServerArgs,
         *,
         generation_cuda_graph_enabled: bool,
     ) -> None:

@@ -240,7 +240,7 @@ class MingTtsEngineBuilder(TtsEngineBuilder["MingTTSSGLangRequestData"]):
         return int(model.decode_input_embedding.num_embeddings)
 
     def post_cuda_graph_setup(
-        self, model: MingTTSSGLangModel | None, server_args: object
+        self, model: MingTTSSGLangModel | None, server_args: ServerArgs
     ) -> None:
         del server_args
         # Note (yzxiao): Only the acoustic owner captures tail graphs because

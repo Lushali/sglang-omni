@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 
-def mapping_get(value: object, key: str, default: object = None) -> object:
+def mapping_get(value: object, key: str, default: None = None) -> object:
     if isinstance(value, Mapping):
         return value.get(key, default)
     else:

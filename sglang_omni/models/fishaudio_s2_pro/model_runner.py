@@ -108,7 +108,7 @@ class FishS2ProModelRunner(ModelRunner):
         self.semantic_end_id = int(self.model.semantic_end_id)
         self.im_end_token_id = int(self.model.im_end_token_id)
 
-    def lookahead_eligible(self, batch: object) -> bool:
+    def lookahead_eligible(self, batch: ScheduleBatch) -> bool:
         # note (Junnan Li): not supported yet; semantic_history_tokens is
         # appended at resolve, one step late under lookahead.
         del batch

@@ -163,7 +163,7 @@ class FishS2ProEngineBuilder(TtsEngineBuilder[request_builders.S2ProSGLangReques
         checkpoint_dir: str,
         device: str,
         gpu_id: int,
-        server_args: object,
+        server_args: ServerArgs,
     ) -> None:
         del gpu_id
         from sglang.srt.runtime_context import get_schedule
