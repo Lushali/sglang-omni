@@ -18,7 +18,10 @@ from transformers.models.qwen3_omni_moe.processing_qwen3_omni_moe import (
     Qwen3OmniMoeProcessor,
 )
 
-from sglang_omni.models.qwen3_omni.payload_types import Qwen3OmniPipelineState
+from sglang_omni.models.qwen3_omni.payload_types import (
+    EncoderInputs,
+    Qwen3OmniPipelineState,
+)
 from sglang_omni.models.qwen3_omni.request_builders import build_lightweight_mm_inputs
 from sglang_omni.models.weight_loader import resolve_model_path
 from sglang_omni.preprocessing import (
@@ -358,7 +361,7 @@ class Qwen3OmniPreprocessor:
         attention_mask: "torch.Tensor",
         prompt_text: str,
         full_mm_inputs: Mapping[str, Mapping[str, torch.Tensor | bool | None]],
-        encoder_inputs: dict[str, dict[str, object]],
+        encoder_inputs: dict[str, EncoderInputs],
     ) -> StagePayload:
         """Assemble the thinker-ready pipeline state (single source of shape)."""
         state = Qwen3OmniPipelineState(
@@ -835,7 +838,7 @@ class Qwen3OmniPreprocessor:
         else:
             pass
 
-        encoder_inputs: dict[str, dict[str, object]] = {}
+        encoder_inputs: dict[str, EncoderInputs] = {}
         image_encoder_inputs = {
             k: v for k, v in image_encoder_inputs.items() if v is not None
         }

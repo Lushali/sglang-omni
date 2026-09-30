@@ -15,6 +15,7 @@ from transformers import PreTrainedTokenizerBase
 
 from sglang_omni.models.qwen3_omni.components.talker_prefill import TalkerPrefillBuilder
 from sglang_omni.models.qwen3_omni.payload_types import (
+    EncoderInputs,
     Qwen3OmniPipelineState,
     StreamState,
     ThinkerOutput,
@@ -34,6 +35,9 @@ if TYPE_CHECKING:
         Qwen3OmniMoeThinkerConfig,
     )
 
+    from sglang_omni.models.qwen3_omni.components.image_encoder import (
+        ImageEncoderOutput,
+    )
     from sglang_omni.models.qwen3_omni.components.talker import Qwen3OmniTalker
 else:
     pass
@@ -245,9 +249,9 @@ def project_talker_to_code2wav(payload: StagePayload) -> StagePayload:
 class EncoderRequestData:
     """Typed encoder request data for pre-thinker stages."""
 
-    model_inputs: dict[str, object]
+    model_inputs: dict[str, torch.Tensor | bool | None]
     cache_key: str | None = None
-    skip_result: dict[str, object] | None = None
+    skip_result: ImageEncoderOutput | dict[str, torch.Tensor] | None = None
 
 
 def build_encoder_request(
@@ -455,10 +459,10 @@ def copy_mutable_containers(value: object) -> object:
 
 
 def select_encoder_inputs(
-    encoder_inputs: dict[str, dict[str, ValueT]],
+    encoder_inputs: dict[str, EncoderInputs],
     *,
     stage_name: str,
-) -> dict[str, dict[str, ValueT]]:
+) -> dict[str, EncoderInputs]:
     stage_inputs = encoder_inputs.get(stage_name)
     if not isinstance(stage_inputs, dict):
         return {}
@@ -468,15 +472,15 @@ def select_encoder_inputs(
 
 
 def project_encoder_input_metadata(
-    encoder_inputs: Mapping[str, object],
-) -> dict[str, dict[str, object]]:
-    projected: dict[str, dict[str, object]] = {}
+    encoder_inputs: Mapping[str, EncoderInputs],
+) -> dict[str, EncoderInputs]:
+    projected: dict[str, EncoderInputs] = {}
     for stage_name, stage_inputs in encoder_inputs.items():
         if not isinstance(stage_inputs, dict):
             continue
         else:
             pass
-        stage_metadata: dict[str, object] = {}
+        stage_metadata: EncoderInputs = {}
         cache_key = stage_inputs.get("cache_key")
         if cache_key is not None:
             stage_metadata["cache_key"] = cache_key
@@ -496,7 +500,7 @@ def project_encoder_input_metadata(
 
 
 def encoder_stages_with_model_inputs(
-    encoder_inputs: Mapping[str, object],
+    encoder_inputs: Mapping[str, EncoderInputs],
 ) -> list[str]:
     return [
         stage_name
@@ -506,7 +510,7 @@ def encoder_stages_with_model_inputs(
 
 
 def active_encoder_stages(
-    encoder_inputs: Mapping[str, object],
+    encoder_inputs: Mapping[str, EncoderInputs],
 ) -> list[str]:
     return [
         stage_name

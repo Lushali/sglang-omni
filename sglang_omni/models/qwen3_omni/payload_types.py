@@ -8,6 +8,10 @@ from typing import TYPE_CHECKING, Literal, TypedDict
 
 if TYPE_CHECKING:
     import torch
+
+    from sglang_omni.models.qwen3_omni.components.image_encoder import (
+        ImageEncoderOutput,
+    )
 else:
     pass
 
@@ -38,6 +42,22 @@ class StreamState(TypedDict, total=False):
     emitted_text: str
 
 
+class EncoderInputs(TypedDict, total=False):
+    pixel_values: torch.Tensor | None
+    image_grid_thw: torch.Tensor | None
+    pixel_values_videos: torch.Tensor | None
+    video_grid_thw: torch.Tensor | None
+    video_second_per_grid: torch.Tensor | None
+    use_audio_in_video: bool
+    input_features: torch.Tensor | None
+    feature_attention_mask: torch.Tensor | None
+    audio_feature_lengths: torch.Tensor | None
+    cache_key: str
+    _active: bool
+    _skip: bool
+    _result: ImageEncoderOutput | dict[str, torch.Tensor]
+
+
 @dataclass
 class Qwen3OmniPipelineState:
     """Typed view of the per-request pipeline state.
@@ -51,7 +71,7 @@ class Qwen3OmniPipelineState:
     mm_inputs: dict[str, dict[str, torch.Tensor | bool | None]] = field(
         default_factory=dict
     )
-    encoder_inputs: dict[str, dict[str, object]] = field(default_factory=dict)
+    encoder_inputs: dict[str, EncoderInputs] = field(default_factory=dict)
     encoder_outs: dict[str, object] = field(default_factory=dict)
     thinker_inputs: dict[str, object] = field(default_factory=dict)
     thinker_out: ThinkerOutput | None = None
