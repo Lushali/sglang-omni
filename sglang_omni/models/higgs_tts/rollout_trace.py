@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Literal, TypedDict
 
 import torch
+from typing_extensions import Never
 
 from sglang_omni.models.higgs_tts.utils import delay_pattern_action_mask
 
@@ -38,7 +39,7 @@ class HiggsRolloutTrace(TypedDict):
     stages: list[str]
     total_action_count: int
     action_streams: list[HiggsActionStream]
-    non_action_outputs: list[object]
+    non_action_outputs: list[Never]
 
 
 def build_omni_rollout_trace(

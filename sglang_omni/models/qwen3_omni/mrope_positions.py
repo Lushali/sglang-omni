@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 import numpy as np
 import torch
+from typing_extensions import NotRequired, Unpack
 
 if TYPE_CHECKING:
     from transformers import PretrainedConfig
@@ -130,6 +131,14 @@ def merge_audio_in_video(video_pos: np.ndarray, audio_pos: np.ndarray) -> np.nda
     return np.concatenate([video_pos, audio_pos], axis=1)[:, order]
 
 
+class RopeIndexKwargs(TypedDict):
+    audio_token_id: int
+    audio_start_token_id: int
+    position_id_per_seconds: int
+    use_audio_in_video: NotRequired[bool]
+    audio_seqlens: NotRequired[torch.Tensor | None]
+
+
 def get_rope_index_qwen3_omni_vectorized(
     spatial_merge_size: int,
     image_token_id: int,
@@ -140,7 +149,7 @@ def get_rope_index_qwen3_omni_vectorized(
     image_grid_thw: torch.LongTensor | None = None,
     video_grid_thw: torch.LongTensor | None = None,
     second_per_grid_ts: torch.Tensor | None = None,
-    **kwargs: object,
+    **kwargs: Unpack[RopeIndexKwargs],
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Drop-in for get_rope_index_qwen3_omni with vectorized blocks."""
     del tokens_per_second

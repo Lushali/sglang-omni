@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Literal, TypedDict
 
@@ -52,7 +53,9 @@ class MingOmniPipelineState:
     mm_inputs: dict[str, object] = field(default_factory=dict)
     encoder_inputs: dict[str, dict[str, object]] = field(default_factory=dict)
     encoder_outs: dict[str, object] = field(default_factory=dict)
-    thinker_inputs: dict[str, object] = field(default_factory=dict)
+    thinker_inputs: dict[str, Mapping[str, torch.Tensor | str]] = field(
+        default_factory=dict
+    )
     thinker_out: ThinkerOutput | None = None
     engine_outputs: dict[str, object] = field(default_factory=dict)
     stream_state: StreamState = field(default_factory=dict)
