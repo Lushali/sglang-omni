@@ -219,41 +219,11 @@ def create_app(api_base: str) -> web.Application:
         return browser
 
     async def index(request: web.Request) -> web.FileResponse:
-        return web.FileResponse(FRONTEND / "audio" / "audio_duplex.html")
+        return web.FileResponse(FRONTEND / "orb" / "index.html")
 
     app.router.add_get("/v1/realtime/capabilities", capabilities)
     app.router.add_get("/v1/realtime", realtime)
     app.router.add_get("/", index)
-
-    async def video_page(request: web.Request) -> web.FileResponse:
-        return web.FileResponse(FRONTEND / "video" / "omni.html")
-
-    async def orb_page(request: web.Request) -> web.FileResponse:
-        return web.FileResponse(FRONTEND / "orb" / "index.html")
-
-    async def frontend_defaults(request: web.Request) -> web.Response:
-        return web.json_response({"playback_delay_ms": 200})
-
-    async def apps(request: web.Request) -> web.Response:
-        return web.json_response(
-            {
-                "apps": [
-                    {
-                        "app_id": "audio_duplex",
-                        "name": "Audio Full-Duplex",
-                        "route": "/audio_duplex",
-                    },
-                    {"app_id": "omni", "name": "Omni Full-Duplex", "route": "/omni"},
-                    {"app_id": "orb", "name": "Orb Voice", "route": "/orb"},
-                ]
-            }
-        )
-
-    async def default_reference(request: web.Request) -> web.Response:
-        reference = await asyncio.to_thread(
-            load_reference, "assets/minicpmo/ref_audio/ref_minicpm_signature.wav"
-        )
-        return web.json_response({**reference, "base64": reference["data"]})
 
     presets = {}
     for mode in ("audio_duplex", "omni"):
@@ -291,12 +261,7 @@ def create_app(api_base: str) -> web.Application:
         reference = await asyncio.to_thread(load_reference, preset["ref_audio"]["path"])
         return web.json_response({"ref_audio": reference})
 
-    app.router.add_get("/audio_duplex", index)
-    app.router.add_get("/omni", video_page)
-    app.router.add_get("/orb", orb_page)
-    app.router.add_get("/api/frontend_defaults", frontend_defaults)
-    app.router.add_get("/api/apps", apps)
-    app.router.add_get("/api/default_ref_audio", default_reference)
+    app.router.add_get("/orb", index)
     app.router.add_get("/api/presets", list_presets)
     app.router.add_get("/api/presets/{mode}/{preset_id}/audio", preset_audio)
     app.router.add_static("/static/", FRONTEND)

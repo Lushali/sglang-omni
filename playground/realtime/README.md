@@ -1,8 +1,6 @@
 # Voice and video playground
 
-Talk to MiniCPM-o through your microphone, or turn on the camera for video chat.
-
-Frontend adapted from [MiniCPM-o-Demo](https://github.com/OpenBMB/MiniCPM-o-Demo).
+Talk to MiniCPM-o through your microphone, or turn on the camera for video chat. An orb follows your voice and the model's, and the model's words appear as captions.
 
 You need a Linux NVIDIA GPU server and Docker with NVIDIA GPU support.
 This setup has been tested on one H200. Use a browser on
@@ -70,15 +68,11 @@ On **your own computer**, replace `USER` and `SERVER` with your server login:
 ssh -N -L 8080:127.0.0.1:8080 USER@SERVER
 ```
 
-Keep the SSH terminal open, then visit:
+Keep the SSH terminal open, then visit <http://localhost:8080>.
 
-- Voice: <http://localhost:8080/audio_duplex>
-- Video: <http://localhost:8080/omni>
-- Voice with an audio-reactive orb: <http://localhost:8080/orb>
+Click **Start talking** and allow microphone access; the camera button appears once the call starts. The red button ends the conversation. If the server is your own computer, skip the SSH command.
 
-Allow microphone/camera access, choose Chinese or English, and click **Start**.
-Click **Stop** to end the conversation. If the server is your own computer,
-skip the SSH command.
+The settings button in the top bar opens the preset (English or Chinese call, with or without video), the system prompt, the voice (the preset's, the model's default or a recording you upload), text-only replies, the microphone and, under **Advanced**, the sampling parameters and camera detail. Changes apply to the next conversation and are remembered by the browser; empty sampling fields keep the server's defaults.
 
 ## Stop or restart
 
@@ -90,4 +84,4 @@ Your downloaded model stays in the repository's `models/` directory.
 
 - **No microphone/camera prompt:** open the `localhost` URL above, not the server's IP address, and check browser permissions.
 - **Model service unavailable:** check the model terminal and repeat the `curl` check before starting a conversation.
-- **Port 8080 is busy on your computer:** use `ssh -N -L 8081:127.0.0.1:8080 USER@SERVER` and open `http://localhost:8081/audio_duplex`.
+- **Port 8080 is busy on your computer:** use `ssh -N -L 8081:127.0.0.1:8080 USER@SERVER` and open `http://localhost:8081`.
