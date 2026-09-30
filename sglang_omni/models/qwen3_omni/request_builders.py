@@ -284,7 +284,7 @@ def apply_encoder_result(
     state: Qwen3OmniPipelineState,
     *,
     stage_name: str,
-    result: object,
+    result: ImageEncoderOutput | dict[str, torch.Tensor] | EncoderRequestData,
 ) -> None:
     if isinstance(result, EncoderRequestData):
         encoder_out = result.skip_result if result.skip_result is not None else {}

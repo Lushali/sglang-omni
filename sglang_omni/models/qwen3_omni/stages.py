@@ -436,7 +436,7 @@ def lookup_cached_encoder_output(
     request_id: str,
     stage_name: str,
     cache: StageOutputCache | None,
-) -> object | None:
+) -> ImageEncoderOutput | dict[str, torch.Tensor] | None:
     if cache is None or request.cache_key is None:
         return None
     else:
