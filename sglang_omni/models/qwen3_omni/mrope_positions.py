@@ -135,8 +135,8 @@ class RopeIndexKwargs(TypedDict):
     audio_token_id: int
     audio_start_token_id: int
     position_id_per_seconds: int
-    use_audio_in_video: NotRequired[bool]
-    audio_seqlens: NotRequired[torch.Tensor | None]
+    use_audio_in_video: NotRequired[object]
+    audio_seqlens: NotRequired[object]
 
 
 def get_rope_index_qwen3_omni_vectorized(

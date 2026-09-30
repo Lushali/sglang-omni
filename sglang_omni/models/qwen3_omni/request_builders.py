@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypedDict, TypeVar, overload
+from typing import TYPE_CHECKING, TypedDict, overload
 
 import torch
 import xxhash
@@ -54,8 +54,6 @@ MM_AGGREGATE_STAGE = "mm_aggregate"
 
 # Note(Chenchen Hong): PyTorch sampling_seed must fit a positive int32.
 MAX_INT32_POSITIVE = 0x7FFFFFFF
-
-ValueT = TypeVar("ValueT")
 
 
 class OptionalTalkerSamplingConfig(TypedDict, total=False):
@@ -887,7 +885,7 @@ def build_sglang_talker_request(
     tts_pad_embed: torch.Tensor | None = None,
     thinker_chunks_done: bool = True,
     thinker_config: Qwen3OmniMoeThinkerConfig | None = None,
-    talker_model_inputs: dict[str, ValueT] | None = None,
+    talker_model_inputs: Mapping[str, object] | None = None,
     seed: int | None = None,
 ) -> "SGLangARRequestData":
     """Build SGLang AR request for the Talker from thinker hidden states.
