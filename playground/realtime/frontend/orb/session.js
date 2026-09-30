@@ -46,11 +46,13 @@ export function base64ToBytes(encoded) {
 
 export class DuplexSession {
   // transport(event) sends one JSON-serialisable client event; now() returns ms.
-  constructor({ transport, now, outputModalities = ["audio"], instructions = "", listeners = {} }) {
+  // extension is sent as session.sglang (sampling, reference_audio, max_slice_nums, ...).
+  constructor({ transport, now, outputModalities = ["audio"], instructions = "", extension = null, listeners = {} }) {
     this.transport = transport;
     this.now = now;
     this.outputModalities = outputModalities;
     this.instructions = instructions;
+    this.extension = extension;
     this.listeners = listeners;
     this.state = "connecting";
     this.sessionId = null;
@@ -290,11 +292,15 @@ export class DuplexSession {
         this.state = "negotiating";
         const session = { output_modalities: this.outputModalities };
         if (this.instructions) session.instructions = this.instructions;
+        if (this.extension && Object.keys(this.extension).length) session.sglang = this.extension;
         this.send("session.update", { session });
         break;
       }
       case "session.updated": {
         this.granted = event.session.sglang.granted;
+        for (const rejection of this.granted.rejections || []) {
+          this.emit("warning", `setting ${rejection.field} not applied: ${rejection.reason}`);
+        }
         const inputRate = this.granted.input_audio_format && this.granted.input_audio_format.rate;
         if (!(inputRate > 0)) {
           this.fail(`server granted no usable input rate (${inputRate})`);
