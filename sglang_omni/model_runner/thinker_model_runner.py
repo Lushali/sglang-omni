@@ -84,7 +84,7 @@ class ThinkerModelRunner(ModelRunner):
     # note (ratish): the thinker reads no SGLang hidden states, and a request asking
     # for them would raise the batch capture mode above the graph's and run eager
     def requested_capture_hidden_mode_prefill(
-        self, schedule_batch: object, requests: list[SchedulerRequest]
+        self, schedule_batch: ScheduleBatch, requests: list[SchedulerRequest]
     ) -> CaptureHiddenMode:
         del schedule_batch, requests
         from sglang.srt.model_executor.forward_batch_info import CaptureHiddenMode
@@ -92,7 +92,7 @@ class ThinkerModelRunner(ModelRunner):
         return CaptureHiddenMode.NULL
 
     def requested_capture_hidden_mode_decode(
-        self, schedule_batch: object, requests: list[SchedulerRequest]
+        self, schedule_batch: ScheduleBatch, requests: list[SchedulerRequest]
     ) -> CaptureHiddenMode:
         del schedule_batch, requests
         from sglang.srt.model_executor.forward_batch_info import CaptureHiddenMode
@@ -593,8 +593,8 @@ class ThinkerModelRunner(ModelRunner):
         self,
         launch_buf: torch.Tensor | None,
         result: GenerationBatchResult | None,
-        forward_batch: object,
-        schedule_batch: object,
+        forward_batch: ForwardBatch | None,
+        schedule_batch: ScheduleBatch,
         requests: list[SchedulerRequest],
     ) -> None:
         del forward_batch, schedule_batch

@@ -325,7 +325,7 @@ def prompt_token_parts(
 
 
 def audio_feature_lengths_from_waveform(
-    processor: object,
+    processor: ProcessorMixin,
     num_samples: int,
 ) -> torch.Tensor:
     """Derive the processor's per-chunk token lengths without extracting mel."""
@@ -350,7 +350,7 @@ def audio_feature_lengths_from_waveform(
 
 
 def extract_audio_features(
-    processor: object,
+    processor: ProcessorMixin,
     audio: np.ndarray,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int]:
     feature_extractor = processor.feature_extractor
@@ -384,7 +384,7 @@ def extract_audio_features(
 
 
 def make_moss_transcribe_diarize_scheduler_adapters(
-    processor: object,
+    processor: ProcessorMixin,
     tokenizer: PreTrainedTokenizerBase,
     max_new_tokens: int,
     context_length: int,

@@ -10,6 +10,7 @@ from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from numbers import Integral, Real
 from os import PathLike
+from types import ModuleType
 from typing import Literal, Protocol, TypeAlias, TypeVar
 
 import torch
@@ -19,7 +20,7 @@ from sglang.srt.utils.hf_transformers import (
     get_context_length,
     get_hf_text_config,
 )
-from transformers import BatchFeature
+from transformers import BatchFeature, PretrainedConfig
 
 MOSS_TTS_DEFAULT_CONTEXT_LENGTH = 8192
 
@@ -74,7 +75,7 @@ class MossLoadedProcessor(
     """Request processor with audio configuration."""
 
 
-def validate_context_length_metadata(text_config: object) -> bool:
+def validate_context_length_metadata(text_config: PretrainedConfig) -> bool:
     context_value = None
     for key in CONTEXT_LENGTH_KEYS:
         value = getattr(text_config, key, None)
@@ -220,7 +221,7 @@ def moss_transformers_processor_compat() -> Generator[None, None, None]:
         | tuple[Literal["item"], dict[str, object], str, object]
     ] = []
 
-    def patch_attr(obj: object, name: str, value: object) -> None:
+    def patch_attr(obj: ModuleType, name: str, value: object) -> None:
         undo.append(("attr", obj, name, getattr(obj, name, missing)))
         setattr(obj, name, value)
 

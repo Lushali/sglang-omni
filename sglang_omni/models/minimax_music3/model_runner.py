@@ -185,7 +185,7 @@ class MiniMaxMusic3ModelRunner(ModelRunner["MiniMaxMusic3SGLangRequestData"]):
         self,
         result: GenerationBatchResult | None,
         forward_batch: ForwardBatch | None,
-        schedule_batch: object,
+        schedule_batch: ScheduleBatch,
         requests: list[SchedulerRequest],
     ) -> None:
         del forward_batch

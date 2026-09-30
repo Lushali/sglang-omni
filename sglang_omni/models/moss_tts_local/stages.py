@@ -220,7 +220,7 @@ def validate_loaded_process_memory_budget(
     )
 
 
-def normalize_processor_config(processor: object) -> None:
+def normalize_processor_config(processor: MossProcessorConfigSource) -> None:
     model_config = getattr(processor, "model_config", None)
     if model_config is None:
         return

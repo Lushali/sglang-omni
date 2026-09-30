@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os
 from copy import copy
-from typing import Iterable, Optional, Sequence, Tuple, TypeVar
+from typing import TYPE_CHECKING, Iterable, Optional, Sequence, Tuple, TypeVar
 
 import torch
 from sglang.srt.distributed import get_pp_group, get_tensor_model_parallel_world_size
@@ -43,6 +43,11 @@ from sglang_omni.models.moss_tts.sampling_cuda_graph import (
     MossTTSDelaySamplingCudaGraphRunner,
 )
 from sglang_omni.platforms import current_platform
+
+if TYPE_CHECKING:
+    from sglang_omni.models.moss_tts.request_builders import MossTTSSGLangRequestData
+else:
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -653,7 +658,7 @@ class MossTTSDelaySGLangModel(torch.nn.Module):
         )  # noqa: leading-underscore  # upstream spelling, or the public name is already taken
 
     @staticmethod
-    def is_sampling_cuda_graph_compatible(data: object) -> bool:
+    def is_sampling_cuda_graph_compatible(data: MossTTSSGLangRequestData) -> bool:
         """Return whether one request uses the captured sampling profile."""
 
         return matches_graph_profile(data)

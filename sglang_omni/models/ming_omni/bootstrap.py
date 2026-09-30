@@ -518,12 +518,12 @@ def torch_long() -> torch.dtype:
     return torch.long
 
 
-def collect_eos_token_ids(tokenizer: object) -> set[int] | None:
+def collect_eos_token_ids(tokenizer: PreTrainedTokenizerBase) -> set[int] | None:
     """Match Ming V0: let the SGLang request stop only on tokenizer EOS."""
     eid = getattr(tokenizer, "eos_token_id", None)
     return {int(eid)} if isinstance(eid, int) and eid >= 0 else None
 
 
-def stop_hits(output_ids: list[int], tokenizer: object) -> list[int]:
+def stop_hits(output_ids: list[int], tokenizer: PreTrainedTokenizerBase) -> list[int]:
     stop_ids = collect_eos_token_ids(tokenizer) or set()
     return [int(token_id) for token_id in output_ids[-8:] if int(token_id) in stop_ids]

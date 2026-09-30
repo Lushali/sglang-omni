@@ -182,7 +182,7 @@ class UpstreamAbortSender(Generic[RequestDataT]):
     def __init__(self, scheduler: "OmniScheduler[RequestDataT]") -> None:
         self.scheduler = scheduler
 
-    def send_output(self, msg: object, req: object = None) -> None:
+    def send_output(self, msg: object, req: Req | None = None) -> None:
         del req
         if not isinstance(msg, AbortReq):
             raise RuntimeError(
@@ -227,7 +227,7 @@ class NoOpGrammarManager:
     def get_ready_grammar_requests(self) -> list:
         return []
 
-    def abort_requests(self, recv_req: object) -> None:
+    def abort_requests(self, recv_req: AbortReq) -> None:
         pass
 
     def clear(self) -> None:
@@ -1731,7 +1731,7 @@ class OmniScheduler(Generic[RequestDataT]):
         return deferred
 
     def should_recheck_deferred_request_on_stream_chunk(
-        self, request_id: str, chunk: object
+        self, request_id: str, chunk: StreamItem
     ) -> bool:
         del request_id, chunk
         return True

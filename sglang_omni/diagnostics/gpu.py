@@ -10,7 +10,7 @@ import subprocess
 import sys
 from collections.abc import Mapping
 from types import ModuleType
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 from sglang_omni.utils.gpu_memory import (
     decode_nvml_string,
@@ -19,6 +19,11 @@ from sglang_omni.utils.gpu_memory import (
     shutdown_nvml,
     try_import_pynvml,
 )
+
+if TYPE_CHECKING:
+    from torch._C import _CudaDeviceProperties
+else:
+    pass
 
 
 class BackendInfo(TypedDict):
@@ -312,7 +317,7 @@ def nvml_inventory(
 
 def physical_device(
     logical_index: int,
-    properties: object,
+    properties: _CudaDeviceProperties | None,
     visible_devices: list[int | str],
     by_index: dict[int, NvmlDeviceInfo],
     by_uuid: dict[str, NvmlDeviceInfo],

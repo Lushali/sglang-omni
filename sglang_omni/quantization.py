@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     import torch
+    from sglang.srt.configs.model_config import ModelConfig
+    from transformers import PretrainedConfig
 else:
     pass
 
@@ -76,7 +78,7 @@ def read_metadata(node: object, key: str) -> object:
     return getattr(node, key, None)
 
 
-def resolve_quant_config(config: object) -> dict[str, object] | None:
+def resolve_quant_config(config: PretrainedConfig | None) -> dict[str, object] | None:
     """Extract a `quantization_config` dict from a root or sub-model config."""
     visited: set[int] = set()
 
@@ -171,7 +173,7 @@ def identity_preprocessor(
 
 
 def get_weight_preprocessor(
-    config: object = None,
+    config: PretrainedConfig | None = None,
     *,
     fp8_scale_inverted: bool = False,
 ) -> WeightPreprocessor:
@@ -274,7 +276,7 @@ def normalize_block_name_to_quantize(
 
 
 def load_writable_quant_config(
-    hf_config: object,
+    hf_config: PretrainedConfig,
 ) -> tuple[object, str, dict[str, object], bool] | None:
     """Return `(owner, metadata_key, quant_config, needs_writeback)` for the
     quant metadata discovered on `hf_config` or a nested stage sub-config,
@@ -312,7 +314,7 @@ def load_writable_quant_config(
     return _search(hf_config)
 
 
-def resolve_stage_prefix(hf_config: object) -> str | None:
+def resolve_stage_prefix(hf_config: PretrainedConfig) -> str | None:
     """Return the checkpoint prefix for the active stage architecture."""
     architectures = getattr(hf_config, "architectures", None) or []
     if not architectures:
@@ -322,7 +324,7 @@ def resolve_stage_prefix(hf_config: object) -> str | None:
     return _STAGE_PREFIX_BY_ARCH.get(architectures[0])
 
 
-def normalize_quant_config(model_config: object) -> None:
+def normalize_quant_config(model_config: ModelConfig) -> None:
     """Strip the active stage's checkpoint prefix from the quant config"""
     hf_config = getattr(model_config, "hf_config", None)
     if hf_config is None:

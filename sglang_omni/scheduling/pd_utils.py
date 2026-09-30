@@ -19,6 +19,7 @@ import torch
 from sglang.srt.managers.schedule_batch import Req
 from sglang.srt.mem_cache.allocator.base import BaseTokenToKVPoolAllocator
 from sglang.srt.mem_cache.memory_pool import KVCache, ReqToTokenPool
+from sglang.srt.sampling.sampling_params import SamplingParams
 
 from sglang_omni.comm import KVBufferRegion, KVPageDestination, KVPool
 from sglang_omni.proto import KVTransferPrepareMessage, StagePayload
@@ -359,7 +360,7 @@ def req_from_continuation(
     return req
 
 
-def sampling_params_to_dict(params: object) -> dict[str, object]:
+def sampling_params_to_dict(params: SamplingParams) -> dict[str, object]:
     allowed = inspect.signature(type(params)).parameters
     values = {name: getattr(params, name) for name in allowed if hasattr(params, name)}
     custom = values.get("custom_params")

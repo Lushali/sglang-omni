@@ -303,7 +303,9 @@ class ReceiverAckOperation(RelayOperation):
         self,
         metadata: dict[str, str | dict[str, int] | CudaPoolInfo] | CudaKvMetadata,
         *,
-        held_references: tuple[object, ...] = (),
+        held_references: (
+            tuple[()] | tuple[torch.cuda.Event, tuple[torch.Tensor, ...]]
+        ) = (),
     ) -> None:
         self._metadata = metadata  # noqa: leading-underscore  # upstream spelling, or the public name is already taken
         self.receiver_done = asyncio.get_running_loop().create_future()

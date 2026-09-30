@@ -94,7 +94,9 @@ def resolve_moss_audio_attention_backend(
 
 # Note (Zhang Yiyang): Prefer the runtime model value, then the canonical config
 # field, and finally the legacy config alias for checkpoint compatibility.
-def resolve_moss_audio_sample_rate(model: object, config: object) -> int:
+def resolve_moss_audio_sample_rate(
+    model: MossAudioTokenizerEncoder, config: SimpleNamespace
+) -> int:
     for value in (
         getattr(model, "sampling_rate", None),
         getattr(config, "sampling_rate", None),

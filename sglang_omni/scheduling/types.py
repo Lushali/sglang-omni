@@ -89,7 +89,9 @@ class ARRequestData:
     attention_mask: "torch.Tensor | None" = None
     model_inputs: dict[str, object] = field(default_factory=dict)
     output_ids: list[int] = field(default_factory=list)
-    extra_model_outputs: dict[str, object] = field(default_factory=dict)
+    extra_model_outputs: dict[str, torch.Tensor | list[torch.Tensor] | list[int]] = (
+        field(default_factory=dict)
+    )
     finish_reason: str | None = None
     weight_version: str | None = None
     return_logprob: bool = False
@@ -107,7 +109,9 @@ class ARRequestData:
 RequestDataT = TypeVar("RequestDataT", bound=ARRequestData, default=ARRequestData)
 
 
-def sampled_logprobs_to_list(next_token_logprobs: object) -> list[float] | None:
+def sampled_logprobs_to_list(
+    next_token_logprobs: torch.Tensor | None,
+) -> list[float] | None:
     """Convert sampler-produced per-row selected-token logprobs to a list.
 
     The sampler owns logprob semantics such as temperature and original-logprob

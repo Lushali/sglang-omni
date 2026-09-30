@@ -368,7 +368,7 @@ class DotsTTSModelRunner(ModelRunner[DotsTTSSGLangRequestData]):
                 pass
 
     @staticmethod
-    def hidden_states(result: object) -> torch.Tensor:
+    def hidden_states(result: GenerationBatchResult | None) -> torch.Tensor:
         logits_output = getattr(result, "logits_output", None)
         hidden = getattr(logits_output, "hidden_states", None)
         if hidden is None:

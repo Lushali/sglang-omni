@@ -103,7 +103,7 @@ class MiniMaxMusic3Scheduler(OmniScheduler["MiniMaxMusic3SGLangRequestData"]):
         self,
         reqs: Iterable[Req],
         return_logprob: bool = False,
-        skip_req: object = None,
+        skip_req: Req | None = None,
     ) -> None:
         conditioned = []
         for req in reqs:
@@ -129,7 +129,7 @@ class MiniMaxMusic3Scheduler(OmniScheduler["MiniMaxMusic3SGLangRequestData"]):
         )
 
     @staticmethod
-    def is_cfg_uncond(req: object) -> bool:
+    def is_cfg_uncond(req: Req) -> bool:
         data = getattr(
             req, "omni_data", None
         )  # noqa: leading-underscore  # upstream spelling, or the public name is already taken

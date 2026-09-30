@@ -8,9 +8,10 @@ from typing import TYPE_CHECKING, SupportsIndex, SupportsInt
 
 import torch
 from sglang.srt.layers.vocab_parallel_embedding import VocabParallelEmbedding
-from sglang.srt.managers.schedule_batch import ScheduleBatch
+from sglang.srt.managers.schedule_batch import Req, ScheduleBatch
 from sglang.srt.managers.scheduler import GenerationBatchResult
 from sglang.srt.model_executor.forward_batch_info import ForwardBatch
+from transformers import PretrainedConfig
 from typing_extensions import Buffer
 
 from sglang_omni.model_runner.base import ModelRunner
@@ -74,7 +75,7 @@ class MingThinkerModelRunner(ModelRunner):
 
     @staticmethod
     def token_id(
-        config: object,
+        config: PretrainedConfig,
         name: str,
         *,
         fallback: str | Buffer | SupportsInt | SupportsIndex | None = None,
@@ -229,11 +230,11 @@ class MingThinkerModelRunner(ModelRunner):
         return len(embeds)
 
     @staticmethod
-    def request_id(req: object) -> str:
+    def request_id(req: Req) -> str:
         return str(getattr(req, "rid", getattr(req, "request_id", "<unknown>")))
 
     def validate_final_consumption(
-        self, req: object, omni_inputs: Mapping[str, object], consumed: dict[str, int]
+        self, req: Req, omni_inputs: Mapping[str, object], consumed: dict[str, int]
     ) -> None:
         req_id = self.request_id(req)
         for modality, embed_key in [

@@ -1260,7 +1260,7 @@ def qwen3_tts_ref_audio_input_key(ref_audio: object) -> str | None:
     return None
 
 
-def qwen3_tts_model_revision(model: object, wrapper: object) -> str:
+def qwen3_tts_model_revision(model: PromptModel, wrapper: Qwen3TTSModel) -> str:
     processor = getattr(wrapper, "processor", None)
     candidates = (
         getattr(model, "name_or_path", None),
@@ -1281,7 +1281,7 @@ def qwen3_tts_model_revision(model: object, wrapper: object) -> str:
     return type(model).__module__ + "." + type(model).__qualname__
 
 
-def qwen3_tts_encoder_config_hash(model: object, wrapper: object) -> str:
+def qwen3_tts_encoder_config_hash(model: PromptModel, wrapper: Qwen3TTSModel) -> str:
     processor = getattr(wrapper, "processor", None)
     parts = [
         type(model).__module__ + "." + type(model).__qualname__,
@@ -1345,7 +1345,7 @@ def get_qwen3_tts_adhoc_reference_service(
         return get_qwen3_tts_adhoc_reference_service_locked(model, wrapper)
 
 
-def normalized_model_type(model: object) -> str:
+def normalized_model_type(model: PromptModel) -> str:
     model_type = getattr(model, "tts_model_type", None)
     if model_type is None:
         model_type = getattr(
@@ -1365,7 +1365,7 @@ def normalized_model_type(model: object) -> str:
     return normalized
 
 
-def validate_qwen3_tts_model_task(model: object, state: Qwen3TTSState) -> None:
+def validate_qwen3_tts_model_task(model: PromptModel, state: Qwen3TTSState) -> None:
     model_type = normalized_model_type(model)
     if model_type == "base" and state.task_type != QWEN3_TTS_TASK_BASE:
         if not state.task_type_explicit:

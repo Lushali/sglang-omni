@@ -107,7 +107,7 @@ class CosyVoice3NullTokenizer:
 _COSYVOICE3_NULL_TOKENIZER = CosyVoice3NullTokenizer()
 
 
-def cosyvoice3_model_revision(model: object) -> str:
+def cosyvoice3_model_revision(model: FunCosyVoice3SGLangModel | None) -> str:
     """Return a stable-enough checkpoint identity for the process-local cache."""
     config = getattr(model, "config", None)
     for candidate in (
@@ -285,7 +285,12 @@ class CosyVoice3ReferenceEncodeHook(
     encoder_id = "speech_tokenizer_v3+campplus+matcha_mel"
     artifact_kind = "reference_conditioning"
 
-    def __init__(self, *, model: object, model_revision: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        model: FunCosyVoice3SGLangModel | None,
+        model_revision: str | None = None,
+    ) -> None:
         self.speech_tokenizer = None
         self.speaker_encoder = None
         self.model_revision = model_revision or cosyvoice3_model_revision(model)

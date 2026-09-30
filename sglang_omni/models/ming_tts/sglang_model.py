@@ -590,7 +590,7 @@ class MingBailingMoeDecoderLayer(nn.Module):
         )
 
     @staticmethod
-    def _is_layer_sparse(config: object, layer_id: int) -> bool:
+    def _is_layer_sparse(config: BailingMoeTTSConfig, layer_id: int) -> bool:
         return getattr(config, "num_experts", None) is not None and layer_id >= int(
             getattr(config, "first_k_dense_replace", 0) or 0
         )

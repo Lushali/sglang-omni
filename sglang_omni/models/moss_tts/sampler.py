@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 import torch
 from sglang.srt.layers.sampler import multinomial_with_seed
@@ -20,6 +20,11 @@ from sglang_omni.models.moss_tts.sampling_kernels import (
     multinomial_with_seed_and_token_ids,
     seeded_gumbel_argmax,
 )
+
+if TYPE_CHECKING:
+    from sglang_omni.models.moss_tts.request_builders import MossTTSSGLangRequestData
+else:
+    pass
 
 _NEG_INF = float("-inf")
 _INT64_MAX = torch.iinfo(torch.int64).max
@@ -40,7 +45,7 @@ class DelaySamplingOutput(NamedTuple):
     next_delay_state: torch.Tensor
 
 
-def matches_graph_profile(data: object) -> bool:
+def matches_graph_profile(data: MossTTSSGLangRequestData) -> bool:
     """Return whether a request matches the profile baked into the graph."""
 
     text = ChannelSampling(

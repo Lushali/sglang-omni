@@ -10,11 +10,12 @@ from transformers.cache_utils import Cache
 
 from sglang_omni.model_runner.base import ModelRunner
 from sglang_omni.model_runner.model_worker import ModelWorker
-from sglang_omni.scheduling.types import SchedulerRequest
+from sglang_omni.scheduling.types import ARRequestData, SchedulerRequest
 
 if TYPE_CHECKING:
     from sglang.srt.managers.schedule_batch import ScheduleBatch
     from sglang.srt.managers.scheduler import GenerationBatchResult
+    from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
@@ -34,7 +35,7 @@ class AudioTorchMpsModelRunner(ModelRunner):
         super().__init__(tp_worker, output_processor)
         self.past_key_values: dict[str, Cache | None] = {}
 
-    def lookahead_eligible(self, batch: object) -> bool:
+    def lookahead_eligible(self, batch: ScheduleBatch) -> bool:
         del batch
         return False
 
@@ -59,7 +60,7 @@ class AudioTorchMpsModelRunner(ModelRunner):
     @torch.inference_mode()
     def custom_prefill_forward(
         self,
-        forward_batch: object,
+        forward_batch: ForwardBatch | None,
         schedule_batch: ScheduleBatch,
         requests: list[SchedulerRequest],
     ) -> GenerationBatchResult:
@@ -163,7 +164,7 @@ class AudioTorchMpsModelRunner(ModelRunner):
     @torch.inference_mode()
     def custom_decode_forward(
         self,
-        forward_batch: object,
+        forward_batch: ForwardBatch | None,
         schedule_batch: ScheduleBatch,
         requests: list[SchedulerRequest],
     ) -> GenerationBatchResult:
@@ -190,7 +191,7 @@ class AudioTorchMpsModelRunner(ModelRunner):
         self.past_key_values[request_id] = output.past_key_values
         return self.next_token_result(output.logits[:, -1, :].argmax(dim=-1))
 
-    def on_request_finished(self, request_id: str, req_data: object) -> None:
+    def on_request_finished(self, request_id: str, req_data: ARRequestData) -> None:
         del req_data
         self.past_key_values.pop(request_id, None)
 

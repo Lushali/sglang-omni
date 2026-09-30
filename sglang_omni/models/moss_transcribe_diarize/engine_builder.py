@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Callable
 
 from sglang.srt.managers.mm_utils import init_mm_embedding_cache
 from sglang.srt.server_args import ServerArgs
-from transformers import PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase, ProcessorMixin
 
 from sglang_omni.models.moss_transcribe_diarize import CAPABILITIES, request_builders
 from sglang_omni.models.moss_transcribe_diarize.encoder_service import (
@@ -95,7 +95,7 @@ class MossTranscribeDiarizeEngineBuilder(
         self.request_build_max_workers = request_build_max_workers
         self.request_build_max_pending = request_build_max_pending
         self.stream_emit_interval_s = stream_emit_interval_s
-        self.processor: object = None
+        self.processor: ProcessorMixin | None = None
         self.tokenizer: PreTrainedTokenizerBase | None = None
         self.audio_encoder_service: BatchedAudioEncoderService | None = None
         self.max_new_tokens = 0
