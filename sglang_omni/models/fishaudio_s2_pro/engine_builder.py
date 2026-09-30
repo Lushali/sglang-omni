@@ -8,26 +8,27 @@ import os
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from sglang.srt.server_args import ServerArgs
+from transformers import PreTrainedTokenizerFast
+
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.fishaudio_s2_pro import request_builders
 from sglang_omni.models.fishaudio_s2_pro import stages as fish_stages
+from sglang_omni.models.fishaudio_s2_pro.tokenizer import S2ProTokenizerAdapter
 from sglang_omni.platforms import current_platform
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
 from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputProcessor
 from sglang_omni.utils.gpu_compat import get_visible_gpu_sm_version
 from sglang_omni.vendor.sglang.server_args import override_server_args
 from sglang_omni.vendor.sglang.utils import is_flashinfer_available
 
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
-    from sglang.srt.server_args import ServerArgs
-    from transformers import PreTrainedTokenizerFast
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.fishaudio_s2_pro.model_runner import FishS2ProModelRunner
     from sglang_omni.models.fishaudio_s2_pro.sglang_model import S2ProSGLangTextModel
-    from sglang_omni.models.fishaudio_s2_pro.tokenizer import S2ProTokenizerAdapter
-    from sglang_omni.proto import StagePayload
-    from sglang_omni.scheduling.sglang_backend import SGLangOutputProcessor
 else:
     pass
 

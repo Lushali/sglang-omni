@@ -7,29 +7,23 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import torch
-from sglang.srt.managers.schedule_batch import FINISH_MATCHED_TOKEN
+from sglang.srt.managers.schedule_batch import FINISH_MATCHED_TOKEN, ScheduleBatch
+from sglang.srt.model_executor.forward_batch_info import CaptureHiddenMode, ForwardBatch
 
 from sglang_omni.model_runner.base import ModelRunner
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.dots_tts.flow_head import DotsFlowStep
 from sglang_omni.models.dots_tts.request_builders import (
     DotsFlowResume,
     DotsTTSSGLangRequestData,
 )
+from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputProcessor
 from sglang_omni.scheduling.types import SchedulerRequest
 
 if TYPE_CHECKING:
-    from sglang.srt.managers.schedule_batch import ScheduleBatch
     from sglang.srt.managers.scheduler import GenerationBatchResult
-    from sglang.srt.model_executor.forward_batch_info import (
-        CaptureHiddenMode,
-        ForwardBatch,
-    )
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.dots_tts.sglang_model import DotsTTSSGLangModel
-    from sglang_omni.scheduling.sglang_backend.output_processor import (
-        SGLangOutputProcessor,
-    )
 else:
     pass
 

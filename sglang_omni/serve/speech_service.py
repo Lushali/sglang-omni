@@ -7,9 +7,10 @@ import asyncio
 import base64
 import binascii
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict, TypeVar
+from typing import TYPE_CHECKING, TypedDict
 from urllib.parse import urlparse
 
 from pydantic import ValidationError
@@ -60,7 +61,6 @@ _TTS_TASK_TYPE_ALIASES = {
 }
 _REFERENCE_AUDIO_FIELDS = ("audio_path", "ref_audio", "audio")
 _ReferenceCacheKey = tuple[str, str | None, str | None, str | None, tuple[object, ...]]
-PayloadValue = TypeVar("PayloadValue")
 
 
 class RequiredTTSParams(TypedDict):
@@ -238,7 +238,7 @@ class SpeechRequestValidator:
 
     def validate_raw_speech_fields(
         self,
-        payload: dict[str, PayloadValue],
+        payload: Mapping[str, object],
     ) -> None:
         """Validate speech fields before Pydantic can coerce JSON values."""
 
@@ -818,7 +818,7 @@ class SpeechRequestValidator:
             pass
         return uploaded_voice
 
-    def validate_raw_payload(self, payload: dict[str, PayloadValue]) -> None:
+    def validate_raw_payload(self, payload: Mapping[str, object]) -> None:
         for field_name in (
             "model",
             "input",

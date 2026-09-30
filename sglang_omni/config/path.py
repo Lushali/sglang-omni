@@ -26,7 +26,7 @@ import types
 import typing
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, TypeGuard, TypeVar, get_args, get_origin
+from typing import Any, TypeGuard, get_args, get_origin
 
 from pydantic import BaseModel, TypeAdapter
 
@@ -44,9 +44,6 @@ __all__ = [
 
 # Guard against a pathological schema; the real tree is only a few levels deep.
 _MAX_SCHEMA_DEPTH = 12
-
-ItemT = TypeVar("ItemT")
-ValueT = TypeVar("ValueT")
 
 
 class SegmentKind(str, Enum):
@@ -459,7 +456,7 @@ class ConfigPath:
         else:
             pass
 
-    def read(self, source: BaseModel | dict[str, ValueT]) -> object:
+    def read(self, source: BaseModel | dict[str, object]) -> object:
         """Read the value at this path from a config instance or a dumped dict."""
         current: object = source
         if isinstance(current, BaseModel):
@@ -841,7 +838,7 @@ def read_segment(
     return current[segment.raw]
 
 
-def named_index(items: list[ItemT], name: str, *, path: str) -> int:
+def named_index(items: list[object], name: str, *, path: str) -> int:
     for index, item in enumerate(items):
         if isinstance(item, dict) and item.get("name") == name:
             return index
@@ -906,7 +903,7 @@ def join_prefix(prefix: str) -> str:
     return prefix or "<root>"
 
 
-def coerce_scalar_text(value: ValueT) -> ValueT | bool | int | float | None:
+def coerce_scalar_text(value: str) -> str | bool | int | float | None:
     """Best-effort scalar parsing for untyped (``Any``) positions.
 
     Mirrors the historical behaviour of ``ConfigManager._convert_scalar`` so

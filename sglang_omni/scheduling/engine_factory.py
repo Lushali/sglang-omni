@@ -12,7 +12,10 @@ from typing import TYPE_CHECKING, ClassVar, Generic
 from sglang.srt.arg_groups.model_override_base import resolved_view
 from typing_extensions import NotRequired, TypedDict
 
+from sglang_omni.model_runner.base import ModelRunner
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.proto import StagePayload
+from sglang_omni.scheduling.bootstrap import InfrastructureOptions
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
     build_generation_batch_overrides,
@@ -31,9 +34,6 @@ if TYPE_CHECKING:
     from sglang.srt.mem_cache.memory_pool import ReqToTokenPool
     from sglang.srt.server_args import ServerArgs
 
-    from sglang_omni.model_runner.base import ModelRunner
-    from sglang_omni.model_runner.model_worker import ModelWorker
-    from sglang_omni.scheduling.bootstrap import InfrastructureOptions
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
@@ -389,7 +389,7 @@ class SGLangGenerationEngineBuilder(ABC, Generic[RequestDataT]):
         self,
         model_worker: ModelWorker | MlxTpModelWorker,
         output_proc: SGLangOutputProcessor,
-    ) -> "ModelRunner[RequestDataT]":
+    ) -> ModelRunner[RequestDataT]:
         raise NotImplementedError
 
     @abstractmethod
@@ -410,7 +410,7 @@ class SGLangGenerationEngineBuilder(ABC, Generic[RequestDataT]):
         token_to_kv_pool_allocator: BaseTokenToKVPoolAllocator,
         server_args: ServerArgs,
         model_config: ModelConfig,
-    ) -> tuple["OmniScheduler[RequestDataT]", "ModelRunner[RequestDataT]"]:
+    ) -> tuple["OmniScheduler[RequestDataT]", ModelRunner[RequestDataT]]:
         request_builder, result_adapter = self.make_adapters(model)
         scheduler_kwargs = self.extra_scheduler_kwargs()
         model_runner = self.make_model_runner(model_worker, output_proc)
@@ -452,7 +452,7 @@ class SGLangGenerationEngineBuilder(ABC, Generic[RequestDataT]):
         token_to_kv_pool_allocator: BaseTokenToKVPoolAllocator,
         server_args: ServerArgs,
         model_config: ModelConfig,
-        model_runner: "ModelRunner[RequestDataT]",
+        model_runner: ModelRunner[RequestDataT],
         request_builder: (
             Callable[[StagePayload], RequestDataT | DeferredAdmission[RequestDataT]]
             | None
@@ -482,7 +482,7 @@ class SGLangGenerationEngineBuilder(ABC, Generic[RequestDataT]):
     def post_scheduler_setup(
         self,
         scheduler: "OmniScheduler[RequestDataT]",
-        model_runner: "ModelRunner[RequestDataT]",
+        model_runner: ModelRunner[RequestDataT],
     ) -> None:
         del scheduler, model_runner
 
@@ -505,7 +505,7 @@ class AsrEngineBuilder(SGLangGenerationEngineBuilder[RequestDataT]):
         self,
         model_worker: ModelWorker | MlxTpModelWorker,
         output_proc: SGLangOutputProcessor,
-    ) -> "ModelRunner[RequestDataT]":
+    ) -> ModelRunner[RequestDataT]:
         from sglang_omni.model_runner.base import ModelRunner
 
         return ModelRunner(model_worker, output_proc)
@@ -531,7 +531,7 @@ class TtsEngineBuilder(SGLangGenerationEngineBuilder[RequestDataT]):
         self,
         model_worker: ModelWorker | MlxTpModelWorker,
         output_proc: SGLangOutputProcessor,
-    ) -> "ModelRunner[RequestDataT]":
+    ) -> ModelRunner[RequestDataT]:
         raise NotImplementedError
 
     def resolve_checkpoint(self, model_path: str) -> str:
@@ -558,7 +558,7 @@ class TtsEngineBuilder(SGLangGenerationEngineBuilder[RequestDataT]):
         token_to_kv_pool_allocator: BaseTokenToKVPoolAllocator,
         server_args: ServerArgs,
         model_config: ModelConfig,
-        model_runner: "ModelRunner[RequestDataT]",
+        model_runner: ModelRunner[RequestDataT],
         request_builder: (
             Callable[[StagePayload], RequestDataT | DeferredAdmission[RequestDataT]]
             | None
@@ -589,7 +589,7 @@ class TtsEngineBuilder(SGLangGenerationEngineBuilder[RequestDataT]):
         token_to_kv_pool_allocator: BaseTokenToKVPoolAllocator,
         server_args: ServerArgs,
         model_config: ModelConfig,
-    ) -> tuple["OmniScheduler[RequestDataT]", "ModelRunner[RequestDataT]"]:
+    ) -> tuple["OmniScheduler[RequestDataT]", ModelRunner[RequestDataT]]:
         model_runner = self.make_model_runner(model_worker, output_proc)
         request_builder, result_adapter = self.make_adapters(model)
         scheduler = self.make_scheduler(

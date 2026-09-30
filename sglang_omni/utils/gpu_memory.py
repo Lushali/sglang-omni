@@ -10,13 +10,13 @@ import re
 import tempfile
 from collections.abc import Generator
 from contextlib import contextmanager
+from ctypes import _Pointer as Pointer
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ctypes import _Pointer as Pointer
 
     from pynvml import struct_c_nvmlDevice_t
 else:

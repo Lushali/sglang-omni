@@ -9,7 +9,12 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 from sglang.srt.managers.mm_utils import init_mm_embedding_cache
-from transformers import AutoConfig, AutoTokenizer, WhisperFeatureExtractor
+from transformers import (
+    AutoConfig,
+    AutoTokenizer,
+    PreTrainedTokenizerBase,
+    WhisperFeatureExtractor,
+)
 
 from sglang_omni.models.arkasr import request_builders
 from sglang_omni.models.arkasr.encoder_service import (
@@ -17,18 +22,17 @@ from sglang_omni.models.arkasr.encoder_service import (
     build_cache_namespace,
 )
 from sglang_omni.models.arkasr.request_builders import ArkASRRequestData
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.engine_factory import AsrEngineBuilder, GenerationDefaults
 from sglang_omni.scheduling.generation_batch_policy import CudaGraphBackend
 from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
 from sglang_omni.scheduling.types import DeferredAdmission, RequestOutput
 from sglang_omni.utils.gpu_compat import get_visible_gpu_sm_version
 
 if TYPE_CHECKING:
-    from transformers import PreTrainedTokenizerBase
 
     from sglang_omni.models.arkasr.sglang_model import ArkasrForConditionalGeneration
-    from sglang_omni.proto import StagePayload
-    from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
 else:
     pass
 
@@ -110,7 +114,7 @@ class ArkasrEngineBuilder(AsrEngineBuilder[ArkASRRequestData]):
         self.pre_lm_max_pending = pre_lm_max_pending
         self.enable_encoder_cuda_graph = enable_encoder_cuda_graph
         self.stream_emit_interval_s = stream_emit_interval_s
-        self.tokenizer: "PreTrainedTokenizerBase | None" = None
+        self.tokenizer: PreTrainedTokenizerBase | None = None
         self.feature_extractor: WhisperFeatureExtractor | None = None
         self.merge_factor = 4
         self.audio_token_id = 151663

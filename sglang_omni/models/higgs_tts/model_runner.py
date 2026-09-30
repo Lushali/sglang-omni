@@ -12,12 +12,15 @@ from __future__ import annotations
 
 import logging
 import os
+from queue import Queue
 from typing import TYPE_CHECKING
 
 import torch
-from sglang.srt.managers.schedule_batch import FINISH_MATCHED_TOKEN
+from sglang.srt.managers.schedule_batch import FINISH_MATCHED_TOKEN, Req, ScheduleBatch
+from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 
 from sglang_omni.model_runner.base import ModelRunner
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.model_runner.prefill_inputs import (
     OmniPrefillInputs,
     attach_omni_prefill_inputs,
@@ -36,13 +39,8 @@ from sglang_omni.scheduling.streaming_vocoder import INITIAL_CODEC_CHUNK_FRAMES_
 from sglang_omni.scheduling.types import ARRequestData, SchedulerRequest
 
 if TYPE_CHECKING:
-    from queue import Queue
-
-    from sglang.srt.managers.schedule_batch import Req, ScheduleBatch
     from sglang.srt.managers.scheduler import GenerationBatchResult
-    from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.higgs_tts.model import HiggsTTSModel
     from sglang_omni.models.higgs_tts.request_builders import HiggsSGLangRequestData
     from sglang_omni.scheduling.sglang_backend.output_processor import (

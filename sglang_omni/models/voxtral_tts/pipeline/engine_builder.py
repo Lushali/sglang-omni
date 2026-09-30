@@ -7,23 +7,22 @@ import importlib
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from sglang.srt.server_args import ServerArgs
+from torch import Tensor
+
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.voxtral_tts import request_builders
+from sglang_omni.models.voxtral_tts.model_runner import VoxtralTTSModelRunner
 from sglang_omni.models.voxtral_tts.pipeline import stages as voxtral_stages
 from sglang_omni.models.voxtral_tts.request_builders import VoxtralSGLangRequestData
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
+from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputProcessor
 
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
-    from sglang.srt.server_args import ServerArgs
-    from torch import Tensor
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
-    from sglang_omni.models.voxtral_tts.model_runner import VoxtralTTSModelRunner
     from sglang_omni.models.voxtral_tts.sglang_model import VoxtralSGLangTTSModel
-    from sglang_omni.proto import StagePayload
-    from sglang_omni.scheduling.sglang_backend.output_processor import (
-        SGLangOutputProcessor,
-    )
 else:
     pass
 

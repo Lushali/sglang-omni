@@ -16,12 +16,12 @@ from urllib.parse import ParseResult, urlparse
 from urllib.request import url2pathname
 
 import httpx
+import numpy as np
 import numpy.typing as npt
 
 from .base import MediaIO
 
 if TYPE_CHECKING:
-    import numpy as np
     import torch
     from PIL import Image
 else:

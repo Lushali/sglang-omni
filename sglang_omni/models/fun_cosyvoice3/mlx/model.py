@@ -12,16 +12,11 @@ import json
 import logging
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import mlx.core as mx
 import mlx.nn as nn
+import torch
 from mlx_lm.models.qwen2 import ModelArgs, Qwen2Model
-
-if TYPE_CHECKING:
-    import torch
-else:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -222,7 +217,7 @@ def quantize_loaded_backbone(
     )
 
 
-def to_mlx_float(tensor: "torch.Tensor", dtype: mx.Dtype) -> mx.array:
+def to_mlx_float(tensor: torch.Tensor, dtype: mx.Dtype) -> mx.array:
     import numpy as np
 
     # Note (yexiaodong): NumPy has no bfloat16 representation for this export.

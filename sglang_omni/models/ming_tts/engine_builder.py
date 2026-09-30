@@ -7,23 +7,24 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from transformers import PretrainedConfig
+
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.ming_omni.tp_utils import validate_attention_tp_config
+from sglang_omni.models.ming_tts.tokenizer import MingTTSTokenizerBundle
+from sglang_omni.proto.request import StagePayload
+from sglang_omni.scheduling.bootstrap import InfrastructureOptions
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
 from sglang_omni.scheduling.generation_batch_policy import get_decode_cuda_graph_bs
+from sglang_omni.scheduling.message import OutgoingMessage
 
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
     from sglang.srt.server_args import ServerArgs
-    from transformers import PretrainedConfig
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.ming_tts.engine_io import MingTTSSGLangRequestData
     from sglang_omni.models.ming_tts.model_runner import MingTTSModelRunner
     from sglang_omni.models.ming_tts.sglang_model import MingTTSSGLangModel
-    from sglang_omni.models.ming_tts.tokenizer import MingTTSTokenizerBundle
-    from sglang_omni.proto import StagePayload
-    from sglang_omni.scheduling.bootstrap import InfrastructureOptions
-    from sglang_omni.scheduling.message import OutgoingMessage
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
     )

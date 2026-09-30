@@ -8,7 +8,7 @@ import uuid
 from collections.abc import Mapping
 from contextlib import aclosing
 from dataclasses import replace
-from typing import AsyncIterator, Callable, TypedDict, TypeVar
+from typing import AsyncIterator, Callable, TypedDict
 
 import numpy as np
 
@@ -41,8 +41,6 @@ from sglang_omni.proto.session import (
     SessionLimits,
     TimedChunk,
 )
-
-PayloadValue = TypeVar("PayloadValue")
 
 
 class EncodeAudioOptions(TypedDict, total=False):
@@ -383,7 +381,7 @@ class Client:
     async def admin(
         self,
         action: str,
-        payload: dict[str, PayloadValue] | None = None,
+        payload: dict[str, object] | None = None,
         *,
         stages: list[str] | None = None,
         timeout_s: float = 60.0,
@@ -408,7 +406,7 @@ class Client:
 
     async def pause_generation(
         self,
-        payload: dict[str, PayloadValue] | None = None,
+        payload: dict[str, object] | None = None,
         *,
         stages: list[str] | None = None,
         timeout_s: float = 60.0,
@@ -421,7 +419,7 @@ class Client:
 
     async def continue_generation(
         self,
-        payload: dict[str, PayloadValue] | None = None,
+        payload: dict[str, object] | None = None,
         *,
         stages: list[str] | None = None,
         timeout_s: float = 60.0,
@@ -434,7 +432,7 @@ class Client:
 
     async def update_weights_from_disk(
         self,
-        payload: dict[str, PayloadValue],
+        payload: dict[str, object],
         *,
         stages: list[str] | None = None,
         timeout_s: float = 120.0,
@@ -447,7 +445,7 @@ class Client:
 
     async def init_weights_update_group(
         self,
-        payload: dict[str, PayloadValue],
+        payload: dict[str, object],
         *,
         stages: list[str] | None = None,
         timeout_s: float = 300.0,
@@ -460,7 +458,7 @@ class Client:
 
     async def destroy_weights_update_group(
         self,
-        payload: dict[str, PayloadValue],
+        payload: dict[str, object],
         *,
         stages: list[str] | None = None,
         timeout_s: float = 300.0,
@@ -473,7 +471,7 @@ class Client:
 
     async def update_weights_from_distributed(
         self,
-        payload: dict[str, PayloadValue],
+        payload: dict[str, object],
         *,
         stages: list[str] | None = None,
         timeout_s: float = 300.0,
@@ -486,7 +484,7 @@ class Client:
 
     async def weights_checker(
         self,
-        payload: dict[str, PayloadValue] | None = None,
+        payload: dict[str, object] | None = None,
         *,
         stages: list[str] | None = None,
         timeout_s: float = 120.0,

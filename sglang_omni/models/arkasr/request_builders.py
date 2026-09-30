@@ -14,7 +14,7 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from types import SimpleNamespace
 
 import torch
 from sglang.srt.managers.schedule_batch import (
@@ -24,7 +24,9 @@ from sglang.srt.managers.schedule_batch import (
     Req,
 )
 from sglang.srt.sampling.sampling_params import SamplingParams
+from transformers import PreTrainedTokenizerBase, WhisperFeatureExtractor
 
+from sglang_omni.models.arkasr.encoder_service import ArkasrPreLMEncoderService
 from sglang_omni.preprocessing.transcription import prepare_audio
 from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.message import OutgoingMessage
@@ -35,15 +37,6 @@ from sglang_omni.scheduling.token_text_streaming import (
 from sglang_omni.scheduling.types import DeferredAdmission, RequestOutput
 
 from .audio_lengths import arkasr_num_audio_tokens
-
-if TYPE_CHECKING:
-    from types import SimpleNamespace
-
-    from transformers import PreTrainedTokenizerBase, WhisperFeatureExtractor
-
-    from sglang_omni.models.arkasr.encoder_service import ArkasrPreLMEncoderService
-else:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +59,7 @@ class ArkASRRequestData(SGLangARRequestData):
 
 
 def decode_token_ids(
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     token_ids: list[int],
     skip_special_tokens: bool,
 ) -> str:
@@ -81,7 +74,7 @@ def decode_token_ids(
 
 
 def build_suppressed_token_ids(
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
 ) -> list[int]:
     """All special / ``<...>`` added marker token ids except EOS.
 
@@ -110,12 +103,12 @@ def build_suppressed_token_ids(
 
 def make_arkasr_scheduler_adapters(
     *,
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     max_new_tokens: int,
-    feature_extractor: "WhisperFeatureExtractor | None" = None,
+    feature_extractor: WhisperFeatureExtractor | None = None,
     merge_factor: int = 4,
     audio_token_id: int = 151663,
-    audio_encoder_service: "ArkasrPreLMEncoderService | None" = None,
+    audio_encoder_service: ArkasrPreLMEncoderService | None = None,
 ) -> tuple[
     Callable[[StagePayload], ArkASRRequestData | DeferredAdmission[ArkASRRequestData]],
     Callable[[ArkASRRequestData], StagePayload],
@@ -284,11 +277,11 @@ def make_arkasr_scheduler_adapters(
 
 
 def make_arkasr_stream_output_builder(
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     eos_token_id: int | None = None,
     min_emit_interval_s: float = 0.0,
 ) -> Callable[
-    [str, SGLangARRequestData, "RequestOutput | SimpleNamespace"],
+    [str, SGLangARRequestData, RequestOutput | SimpleNamespace],
     list[OutgoingMessage],
 ]:
     tokenizer_eos = getattr(tokenizer, "eos_token_id", None)

@@ -7,12 +7,11 @@ Reference: https://developers.openai.com/api/docs/guides/realtime
 from __future__ import annotations
 
 import builtins
+from collections.abc import Mapping
 from enum import Enum
-from typing import Literal, TypeVar
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
-
-EventValueT = TypeVar("EventValueT")
 
 
 # Forward compatibility for future event types.
@@ -249,7 +248,7 @@ _TRANSCRIPTION_CLIENT_EVENT_TYPES: dict[str, type[ClientEvent]] = {
 
 
 def parse(
-    raw: dict[str, EventValueT], table: dict[str, type[ClientEvent]]
+    raw: Mapping[str, object], table: dict[str, type[ClientEvent]]
 ) -> ClientEvent | None:
     event_type = raw.get("type")
     if not isinstance(event_type, str):
@@ -264,13 +263,13 @@ def parse(
     return cls.model_validate(raw)
 
 
-def parse_conversation_client_event(raw: dict[str, EventValueT]) -> ClientEvent | None:
+def parse_conversation_client_event(raw: Mapping[str, object]) -> ClientEvent | None:
     """Parse one client event of a conversation session, return None if not part of its protocol."""
     return parse(raw, _CONVERSATION_CLIENT_EVENT_TYPES)
 
 
 def parse_transcription_client_event(
-    raw: dict[str, EventValueT],
+    raw: Mapping[str, object],
 ) -> ClientEvent | None:
     """Parse one client event of a transcription session, return None if not part of its protocol."""
     return parse(raw, _TRANSCRIPTION_CLIENT_EVENT_TYPES)

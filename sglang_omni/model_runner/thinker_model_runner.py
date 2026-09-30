@@ -9,34 +9,27 @@ from __future__ import annotations
 
 import logging
 from numbers import Integral
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 import torch
+from sglang.srt.layers.logits_processor import LogitsProcessorOutput
+from sglang.srt.managers.schedule_batch import Req, ScheduleBatch
 from sglang.srt.managers.scheduler import GenerationBatchResult
+from sglang.srt.model_executor.forward_batch_info import CaptureHiddenMode, ForwardBatch
 
 from sglang_omni.model_runner.base import ModelRunner
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.model_runner.sglang_execution import attn_forward_context
+from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputProcessor
 from sglang_omni.scheduling.types import SchedulerRequest
 
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
-    from sglang.srt.layers.logits_processor import LogitsProcessorOutput
-    from sglang.srt.managers.schedule_batch import Req, ScheduleBatch
-    from sglang.srt.model_executor.forward_batch_info import (
-        CaptureHiddenMode,
-        ForwardBatch,
-    )
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
-    from sglang_omni.scheduling.sglang_backend.output_processor import (
-        SGLangOutputProcessor,
-    )
 else:
     pass
 
 logger = logging.getLogger(__name__)
-
-CursorT = TypeVar("CursorT")
 
 
 class ThinkerModelRunner(ModelRunner):
@@ -112,7 +105,7 @@ class ThinkerModelRunner(ModelRunner):
 
     def req_mm_token_positions(
         self,
-        req: "Req",
+        req: Req,
         pad_values: dict,
     ) -> dict[str, torch.Tensor]:
         """Prompt-absolute placeholder positions per modality, as CPU int64
@@ -141,11 +134,11 @@ class ThinkerModelRunner(ModelRunner):
     @staticmethod
     def plan_modality_chunk(
         positions: torch.Tensor,
-        consumed: dict[str, CursorT],
+        consumed: dict[str, int],
         modality: str,
         prefix: int,
         length: int,
-    ) -> tuple[torch.Tensor, CursorT | int, int]:
+    ) -> tuple[torch.Tensor, int, int]:
         """Plan the embed slice for positions in ``[prefix, prefix + length)``.
 
         The caller owns cursor advancement; this helper never mutates ``consumed``.
@@ -160,7 +153,7 @@ class ThinkerModelRunner(ModelRunner):
 
     @staticmethod
     def ensure_consumed_cursor(
-        req: "Req",
+        req: Req,
     ) -> dict[str, int]:
         consumed = (
             req._omni_consumed

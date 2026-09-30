@@ -3,14 +3,20 @@
 
 from __future__ import annotations
 
-from contextlib import nullcontext
+from contextlib import AbstractContextManager, nullcontext
+from queue import Queue
 from typing import TYPE_CHECKING
 
 import torch
+from sglang.srt.layers.logits_processor import LogitsProcessorOutput
+from sglang.srt.managers.schedule_batch import ScheduleBatch
 from sglang.srt.managers.scheduler import GenerationBatchResult
+from sglang.srt.model_executor.forward_batch_info import ForwardBatch
+from sglang.srt.sampling.sampling_batch_info import SamplingBatchInfo
 
 from sglang_omni.model_runner.base import ModelRunner
 from sglang_omni.model_runner.mlx_model_worker import MlxSchedulerModelRunner
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.model_runner.sglang_execution import attn_forward_context
 from sglang_omni.models.fun_cosyvoice3.request_builders import (
     CosyVoice3SGLangRequestData,
@@ -28,6 +34,7 @@ from sglang_omni.models.fun_cosyvoice3.streaming import (
 from sglang_omni.platforms import current_platform
 from sglang_omni.sampling.seed import SAMPLING_SEED_MASK
 from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputProcessor
 from sglang_omni.scheduling.types import (
     ARRequestData,
     RequestOutput,
@@ -36,19 +43,9 @@ from sglang_omni.scheduling.types import (
 )
 
 if TYPE_CHECKING:
-    from contextlib import AbstractContextManager
-    from queue import Queue
 
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
-    from sglang.srt.layers.logits_processor import LogitsProcessorOutput
-    from sglang.srt.managers.schedule_batch import ScheduleBatch
-    from sglang.srt.model_executor.forward_batch_info import ForwardBatch
-    from sglang.srt.sampling.sampling_batch_info import SamplingBatchInfo
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
-    from sglang_omni.scheduling.sglang_backend.output_processor import (
-        SGLangOutputProcessor,
-    )
 else:
     pass
 

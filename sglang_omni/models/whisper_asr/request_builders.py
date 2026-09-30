@@ -6,7 +6,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from threading import Lock
-from typing import TYPE_CHECKING, Callable
+from typing import Callable
 
 import torch
 from sglang.srt.managers.schedule_batch import (
@@ -16,24 +16,16 @@ from sglang.srt.managers.schedule_batch import (
     Req,
 )
 from sglang.srt.sampling.sampling_params import SamplingParams
-from transformers import GenerationConfig
+from transformers import GenerationConfig, WhisperProcessor, WhisperTokenizer
 
 from sglang_omni.models.whisper_asr.config import WHISPER_MAX_INPUT_SECONDS
+from sglang_omni.models.whisper_asr.encoder_service import WhisperPreLMEncoderService
 from sglang_omni.models.whisper_asr.timestamp_logit_processor import (
     WhisperTimestampLogitProcessor,
 )
 from sglang_omni.preprocessing.transcription import prepare_audio
 from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.sglang_backend import SGLangARRequestData
-
-if TYPE_CHECKING:
-    from transformers import WhisperProcessor, WhisperTokenizer
-
-    from sglang_omni.models.whisper_asr.encoder_service import (
-        WhisperPreLMEncoderService,
-    )
-else:
-    pass
 
 _WHISPER_SAMPLE_RATE = 16000
 
@@ -71,7 +63,7 @@ _TIMESTAMP_STEP_S = 0.02
 
 
 def render_timestamped_text(
-    tokenizer: "WhisperTokenizer",
+    tokenizer: WhisperTokenizer,
     output_ids: list[int],
     *,
     timestamp_begin_id: int,
@@ -119,7 +111,7 @@ def build_logit_bias(generation_config: GenerationConfig) -> dict[str, float] | 
 
 
 def build_prefix_tokens(
-    tokenizer: "WhisperTokenizer",
+    tokenizer: WhisperTokenizer,
     *,
     language: str,
     task: str,
@@ -154,7 +146,7 @@ def decoder_token_budgets(
 
 
 def build_prev_context_tokens(
-    tokenizer: "WhisperTokenizer", prompt: object, *, max_prev_tokens: int
+    tokenizer: WhisperTokenizer, prompt: object, *, max_prev_tokens: int
 ) -> list[int]:
     """Map the OpenAI ``prompt`` field to Whisper prev-context tokens."""
     if max_prev_tokens < 2 or prompt is None:
@@ -174,13 +166,13 @@ def build_prev_context_tokens(
 
 def make_whisper_scheduler_adapters(
     *,
-    processor: "WhisperProcessor",
-    tokenizer: "WhisperTokenizer",
+    processor: WhisperProcessor,
+    tokenizer: WhisperTokenizer,
     generation_config: GenerationConfig,
     encoder_token_count: int,
     max_new_tokens: int,
     decoder_context_len: int | None = None,
-    audio_encoder_service: "WhisperPreLMEncoderService | None" = None,
+    audio_encoder_service: WhisperPreLMEncoderService | None = None,
 ) -> tuple[
     Callable[[StagePayload], WhisperASRRequestData],
     Callable[[WhisperASRRequestData], StagePayload],

@@ -7,20 +7,20 @@ import logging
 from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING
 
+from sglang_omni.model_runner.model_worker import ModelWorker
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
+from sglang_omni.scheduling.message import OutgoingMessage
 from sglang_omni.scheduling.types import RequestOutput
 
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
     from sglang.srt.server_args import ServerArgs
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.dots_tts.model_runner import DotsTTSModelRunner
     from sglang_omni.models.dots_tts.request_builders import DotsTTSSGLangRequestData
     from sglang_omni.models.dots_tts.sglang_model import DotsTTSSGLangModel
     from sglang_omni.models.dots_tts.tail import DotsTtsAcousticTail
-    from sglang_omni.proto import StagePayload
-    from sglang_omni.scheduling.message import OutgoingMessage
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
     )

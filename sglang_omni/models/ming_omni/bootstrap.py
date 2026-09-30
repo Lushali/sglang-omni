@@ -6,22 +6,22 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING, TypeAlias
 
+import torch
 from sglang.srt.arg_groups.model_override_base import resolved_view
+from transformers import PreTrainedTokenizerBase
 
+from sglang_omni.models.ming_omni.io import ThinkerOutput
 from sglang_omni.models.ming_omni.pipeline.sampling import build_ming_sampling_params
+from sglang_omni.proto.request import StagePayload
+from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.types import RequestOutput
 from sglang_omni.vendor.sglang.server_args import override_server_args
 
 if TYPE_CHECKING:
-    import torch
     from sglang.srt.server_args import ServerArgs
-    from transformers import PreTrainedTokenizerBase
 
-    from sglang_omni.models.ming_omni.io import ThinkerOutput
-    from sglang_omni.proto.request import StagePayload
-    from sglang_omni.scheduling.message import OutgoingMessage
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
     from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
-    from sglang_omni.scheduling.types import RequestOutput
 else:
     pass
 
@@ -128,19 +128,19 @@ def create_thinker_scheduler(
 
 def make_thinker_scheduler_adapters(
     *,
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     vocab_size: int,
     image_token_id: int | None = None,
     audio_token_id: int | None = None,
     video_token_id: int | None = None,
     stage_name: str = "thinker",
 ) -> tuple[
-    Callable[["StagePayload"], "SGLangARRequestData"],
-    Callable[["SGLangARRequestData"], "StagePayload"],
+    Callable[[StagePayload], "SGLangARRequestData"],
+    Callable[["SGLangARRequestData"], StagePayload],
 ]:
     """Build StagePayload <-> SGLang request adapters."""
 
-    def request_builder(payload: "StagePayload") -> "SGLangARRequestData":
+    def request_builder(payload: StagePayload) -> "SGLangARRequestData":
         from sglang.srt.managers.schedule_batch import Req
 
         from sglang_omni.models.ming_omni.io import MingOmniPipelineState
@@ -251,7 +251,7 @@ def make_thinker_scheduler_adapters(
         req_data.stage_payload = payload
         return req_data
 
-    def result_adapter(data: "SGLangARRequestData") -> "StagePayload":
+    def result_adapter(data: "SGLangARRequestData") -> StagePayload:
         from sglang_omni.models.ming_omni.io import MingOmniPipelineState
         from sglang_omni.proto import StagePayload
 
@@ -299,9 +299,9 @@ def make_combined_stream_output_builder(
     def _build_stream_output(
         request_id: str,
         req_data: "SGLangARRequestData | None",
-        req_output: "RequestOutput",
-    ) -> list["OutgoingMessage"]:
-        messages: list["OutgoingMessage"] = []
+        req_output: RequestOutput,
+    ) -> list[OutgoingMessage]:
+        messages: list[OutgoingMessage] = []
         for builder in builders:
             messages.extend(builder(request_id, req_data, req_output))
         return messages
@@ -312,7 +312,7 @@ def make_combined_stream_output_builder(
 def select_stream_output_builder(
     enable_streaming_tts: bool,
     *,
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     eos_token_id: int | None,
 ) -> StreamOutputBuilder:
     if enable_streaming_tts:
@@ -348,8 +348,8 @@ def make_text_stream_output_builder(
     def _build_stream_output(
         request_id: str,
         req_data: "SGLangARRequestData | None",
-        req_output: "RequestOutput",
-    ) -> list["OutgoingMessage"]:
+        req_output: RequestOutput,
+    ) -> list[OutgoingMessage]:
         req = getattr(req_data, "req", None)
         if req is None or req_output.data is None:
             return []
@@ -399,7 +399,7 @@ def make_text_stream_output_builder(
 
 def make_thinker_stream_output_builder(
     *,
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     eos_token_id: int | None,
     target_stage: str = "segmenter",
 ) -> StreamOutputBuilder:
@@ -419,8 +419,8 @@ def make_thinker_stream_output_builder(
     def _build_stream_output(
         request_id: str,
         req_data: "SGLangARRequestData | None",
-        req_output: "RequestOutput",
-    ) -> list["OutgoingMessage"]:
+        req_output: RequestOutput,
+    ) -> list[OutgoingMessage]:
         req = getattr(req_data, "req", None)
         # Suppress while chunked prefill is still consuming prompt tokens —
         # prompt-side states could otherwise masquerade as the first
@@ -512,7 +512,7 @@ def make_thinker_stream_output_builder(
     return _build_stream_output
 
 
-def torch_long() -> "torch.dtype":
+def torch_long() -> torch.dtype:
     import torch
 
     return torch.long

@@ -25,9 +25,11 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import wait as wait_futures
 from dataclasses import dataclass
 from itertools import islice
-from typing import TYPE_CHECKING, Callable, Generic, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Callable, Generic, TypedDict
 
 import torch
+from sglang.srt.configs.model_config import ModelConfig
+from sglang.srt.disaggregation.utils import DisaggregationMode
 from sglang.srt.environ import envs
 from sglang.srt.layers.dp_attention import compute_dp_attention_world_info
 from sglang.srt.layers.logits_processor import LogitsProcessorOutput
@@ -39,16 +41,23 @@ from sglang.srt.managers.schedule_batch import (
     ScheduleBatch,
     retract_all,
 )
+from sglang.srt.managers.scheduler import GenerationBatchResult
 from sglang.srt.managers.scheduler import Scheduler as _Upstream
 from sglang.srt.managers.scheduler import validate_input_length
+from sglang.srt.mem_cache.allocator import BaseTokenToKVPoolAllocator
+from sglang.srt.mem_cache.base_prefix_cache import BasePrefixCache
 from sglang.srt.mem_cache.common import release_kv_cache
+from sglang.srt.mem_cache.memory_pool import ReqToTokenPool
 from sglang.srt.runtime_context import get_model, get_serving
+from sglang.srt.server_args import ServerArgs
 from sglang.srt.session.session_controller import SessionController
 from sglang.srt.utils import broadcast_pyobj
 
 from sglang_omni.admission import QueueFullError
 from sglang_omni.model_runner.base import ModelRunner, PendingStep
 from sglang_omni.model_runner.mlx_model_worker import MlxSchedulerPendingStep
+from sglang_omni.model_runner.model_worker import ModelWorker
+from sglang_omni.model_runner.weight_checker import WeightCheckResult
 from sglang_omni.pipeline.stage.stream_queue import StreamItem
 from sglang_omni.profiler.event_recorder import emit as _emit_event
 from sglang_omni.profiler.event_recorder import (
@@ -88,23 +97,12 @@ from sglang_omni.scheduling.types import (
 )
 
 if TYPE_CHECKING:
-    from sglang.srt.configs.model_config import ModelConfig
-    from sglang.srt.disaggregation.utils import DisaggregationMode
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
-    from sglang.srt.managers.scheduler import GenerationBatchResult
-    from sglang.srt.mem_cache.allocator import BaseTokenToKVPoolAllocator
-    from sglang.srt.mem_cache.base_prefix_cache import BasePrefixCache
-    from sglang.srt.mem_cache.memory_pool import ReqToTokenPool
-    from sglang.srt.server_args import ServerArgs
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
-    from sglang_omni.model_runner.weight_checker import WeightCheckResult
 else:
     pass
 
 logger = logging.getLogger(__name__)
-
-PayloadValue = TypeVar("PayloadValue")
 
 
 class RequiredAdminActionResult(TypedDict):
@@ -2484,7 +2482,7 @@ class OmniScheduler(Generic[RequestDataT]):
         self.drain_inbox_for_request(request_id)
 
     def admin(
-        self, action: str, payload: dict[str, PayloadValue] | None = None
+        self, action: str, payload: dict[str, object] | None = None
     ) -> AdminActionResult:
         payload = dict(payload or {})
         if self.should_enqueue_admin():
@@ -2541,7 +2539,7 @@ class OmniScheduler(Generic[RequestDataT]):
         return processed
 
     def run_admin_action(
-        self, action: str, payload: dict[str, PayloadValue] | None = None
+        self, action: str, payload: dict[str, object] | None = None
     ) -> AdminActionResult:
         payload = dict(payload or {})
         if action == ADMIN_MODEL_INFO:
@@ -2615,9 +2613,7 @@ class OmniScheduler(Generic[RequestDataT]):
         )
         return {"success": True, "message": "ok", "data": info}
 
-    def admin_pause_generation(
-        self, payload: dict[str, PayloadValue]
-    ) -> AdminActionResult:
+    def admin_pause_generation(self, payload: dict[str, object]) -> AdminActionResult:
         mode = str(payload.get("mode") or "abort")
         if mode not in {"abort", "retract", "in_place"}:
             return {
@@ -2650,7 +2646,7 @@ class OmniScheduler(Generic[RequestDataT]):
         }
 
     def admin_continue_generation(
-        self, payload: dict[str, PayloadValue]
+        self, payload: dict[str, object]
     ) -> AdminActionResult:
         with self.admin_lock:
             if bool(payload.get("torch_empty_cache", True)):
@@ -2666,7 +2662,7 @@ class OmniScheduler(Generic[RequestDataT]):
         }
 
     def admin_update_weights_from_disk(
-        self, payload: dict[str, PayloadValue]
+        self, payload: dict[str, object]
     ) -> AdminActionResult:
         return self.run_weight_update_with_lifecycle(
             payload,
@@ -2680,7 +2676,7 @@ class OmniScheduler(Generic[RequestDataT]):
 
     def run_weight_update_with_lifecycle(
         self,
-        payload: dict[str, PayloadValue],
+        payload: dict[str, object],
         update_fn,
         result_data: Mapping[str, object],
         *,
@@ -2790,7 +2786,7 @@ class OmniScheduler(Generic[RequestDataT]):
         }
 
     def admin_update_weights_from_tensor(
-        self, payload: dict[str, PayloadValue]
+        self, payload: dict[str, object]
     ) -> AdminActionResult:
         return self.run_weight_update_with_lifecycle(
             payload,
@@ -2802,7 +2798,7 @@ class OmniScheduler(Generic[RequestDataT]):
         )
 
     def admin_update_weights_from_distributed(
-        self, payload: dict[str, PayloadValue]
+        self, payload: dict[str, object]
     ) -> AdminActionResult:
         return self.run_weight_update_with_lifecycle(
             payload,
@@ -2815,7 +2811,7 @@ class OmniScheduler(Generic[RequestDataT]):
         )
 
     def admin_init_weights_update_group(
-        self, payload: dict[str, PayloadValue]
+        self, payload: dict[str, object]
     ) -> AdminActionResult:
         # Note (Xuesong): init blocks on a NCCL/TCP rendezvous and runs on the
         # scheduler serving thread (admin is drained inline in the event loop), so
@@ -2838,7 +2834,7 @@ class OmniScheduler(Generic[RequestDataT]):
         }
 
     def admin_destroy_weights_update_group(
-        self, payload: dict[str, PayloadValue]
+        self, payload: dict[str, object]
     ) -> AdminActionResult:
         with self.admin_lock:
             success, message = self.model_worker.destroy_weights_update_group(payload)
@@ -2849,9 +2845,7 @@ class OmniScheduler(Generic[RequestDataT]):
             "error": None if success else str(message),
         }
 
-    def admin_weights_checker(
-        self, payload: dict[str, PayloadValue]
-    ) -> AdminActionResult:
+    def admin_weights_checker(self, payload: dict[str, object]) -> AdminActionResult:
         action = str(payload.get("action") or "checksum")
         with self.admin_lock:
             data = self.model_worker.weights_checker(action)

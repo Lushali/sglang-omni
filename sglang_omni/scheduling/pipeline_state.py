@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import _MISSING_TYPE as MissingType
 from dataclasses import MISSING, dataclass, field
 from typing import TYPE_CHECKING, Protocol, TypeVar
@@ -49,7 +49,7 @@ class PipelineStateBase:
         raise NotImplementedError(f"{type(self).__name__} must implement to_dict()")
 
     @classmethod
-    def from_dict(cls: type[StateT], data: dict[str, ValueT]) -> StateT:
+    def from_dict(cls: type[StateT], data: object) -> StateT:
         raise NotImplementedError(f"{cls.__name__} must implement from_dict()")
 
     @staticmethod
@@ -241,7 +241,7 @@ def emit_kind(f: dataclasses.Field[FieldT], spec: WireSpec) -> str:
     return "always"
 
 
-def has_complete_typed_tensor_payload(data: dict[str, ValueT], name: str) -> bool:
+def has_complete_typed_tensor_payload(data: Mapping[str, object], name: str) -> bool:
     required = {f"{name}_bytes", f"{name}_shape"}
     keys = (*required, f"{name}_dtype")
     specified = {key for key in keys if key in data}

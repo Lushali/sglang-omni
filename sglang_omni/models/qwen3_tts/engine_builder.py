@@ -6,46 +6,42 @@ from __future__ import annotations
 import importlib
 import logging
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Protocol, TypeVar
+from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 import numpy.typing as npt
 import torch
 from sglang.srt.arg_groups.model_override_base import resolved_view
 from sglang.srt.runtime_context import get_model, get_schedule
+from sglang.srt.server_args import ServerArgs
 
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.qwen3_tts import CAPABILITIES, request_builders
 from sglang_omni.models.qwen3_tts import stages as qwen3_stages
+from sglang_omni.models.qwen3_tts.model_runner import Qwen3TTSModelRunner
 from sglang_omni.models.qwen3_tts.reference_encoder_cuda_graph import (
     DEFAULT_QWEN3_TTS_REFERENCE_ENCODER_BUCKET_FRAMES,
 )
 from sglang_omni.models.qwen3_tts.request_builders import Qwen3TTSSGLangRequestData
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
     build_default_prefill_cuda_graph_bs,
 )
 from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputProcessor
 
 if TYPE_CHECKING:
     from qwen_tts import Qwen3TTSModel
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
-    from sglang.srt.server_args import ServerArgs
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
-    from sglang_omni.models.qwen3_tts.model_runner import Qwen3TTSModelRunner
     from sglang_omni.models.qwen3_tts.prompt_frontend import Qwen3TTSPromptFrontend
     from sglang_omni.models.qwen3_tts.sglang_model import Qwen3TTSTalker
-    from sglang_omni.proto import StagePayload
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
-    from sglang_omni.scheduling.sglang_backend.output_processor import (
-        SGLangOutputProcessor,
-    )
 else:
     pass
 
-
-OverrideValueT = TypeVar("OverrideValueT")
 
 logger = logging.getLogger(__name__)
 
@@ -302,7 +298,7 @@ class Qwen3TtsEngineBuilder(TtsEngineBuilder[Qwen3TTSSGLangRequestData]):
         # runs in before_memory_pool and nothing is left for after the pool.
         del model_worker, checkpoint_dir, device, gpu_id, server_args
 
-    def adjust_overrides(self, overrides: dict[str, OverrideValueT]) -> None:
+    def adjust_overrides(self, overrides: dict[str, object]) -> None:
         if is_truthy(overrides.get("enable_torch_compile", False)):
             raise ValueError("Qwen3-TTS torch.compile is not supported")
         else:

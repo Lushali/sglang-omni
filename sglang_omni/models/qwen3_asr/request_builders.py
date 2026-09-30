@@ -21,7 +21,8 @@ import math
 import time
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Callable
+from types import SimpleNamespace
+from typing import Callable
 
 import torch
 from sglang.srt.managers.schedule_batch import (
@@ -31,7 +32,9 @@ from sglang.srt.managers.schedule_batch import (
     Req,
 )
 from sglang.srt.sampling.sampling_params import SamplingParams
+from transformers import PreTrainedTokenizerBase, WhisperFeatureExtractor
 
+from sglang_omni.models.qwen3_asr.encoder_service import Qwen3ASRPreLMEncoderService
 from sglang_omni.preprocessing.transcription import prepare_audio
 from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.message import OutgoingMessage
@@ -48,15 +51,6 @@ from .audio_lengths import (
     qwen3_asr_num_audio_tokens,
 )
 from .languages import resolve_language
-
-if TYPE_CHECKING:
-    from types import SimpleNamespace
-
-    from transformers import PreTrainedTokenizerBase, WhisperFeatureExtractor
-
-    from sglang_omni.models.qwen3_asr.encoder_service import Qwen3ASRPreLMEncoderService
-else:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +85,7 @@ class Qwen3ASRRequestData(SGLangARRequestData):
 
 
 def decode_token_ids(
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     token_ids: list[int],
     skip_special_tokens: bool,
 ) -> str:
@@ -119,7 +113,7 @@ def find_subsequence(values: list[int], pattern: list[int]) -> int | None:
     return None
 
 
-def encode_literal(tokenizer: "PreTrainedTokenizerBase", text: str) -> list[int]:
+def encode_literal(tokenizer: PreTrainedTokenizerBase, text: str) -> list[int]:
     if hasattr(tokenizer, "encode"):
         return list(tokenizer.encode(text, add_special_tokens=False))
     else:
@@ -133,7 +127,7 @@ def encode_literal(tokenizer: "PreTrainedTokenizerBase", text: str) -> list[int]
 
 
 def retained_streaming_prefix(
-    tokenizer: "PreTrainedTokenizerBase", text: str, rollback_tokens: int
+    tokenizer: PreTrainedTokenizerBase, text: str, rollback_tokens: int
 ) -> tuple[list[int], str]:
     token_ids = encode_literal(tokenizer, text)
     retained = token_ids[: max(len(token_ids) - rollback_tokens, 0)]
@@ -155,9 +149,9 @@ def retained_streaming_prefix(
 
 def make_qwen3_asr_scheduler_adapters(
     *,
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     max_new_tokens: int,
-    feature_extractor: "WhisperFeatureExtractor | None" = None,
+    feature_extractor: WhisperFeatureExtractor | None = None,
     context_length: int | None = None,
     audio_encoder_service: Qwen3ASRPreLMEncoderService | None = None,
     should_wait_for_encode: Callable[[], bool] | None = None,
@@ -577,7 +571,7 @@ def make_qwen3_asr_scheduler_adapters(
 
 
 def make_qwen3_asr_stream_output_builder(
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     eos_token_id: int | None = None,
     min_emit_interval_s: float = 0.0,
 ) -> Callable[

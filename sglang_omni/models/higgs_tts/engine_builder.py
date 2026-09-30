@@ -8,6 +8,9 @@ import logging
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING
 
+from sglang.srt.server_args import ServerArgs
+
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.higgs_tts import request_builders
 from sglang_omni.models.higgs_tts import utils as higgs_utils
 from sglang_omni.models.higgs_tts.request_builders import HiggsSGLangRequestData
@@ -16,25 +19,21 @@ from sglang_omni.models.higgs_tts.vocoder_scheduler import (
     DEFAULT_HIGGS_STREAM_FOLLOWUP_STRIDE,
     DEFAULT_HIGGS_STREAM_STRIDE,
 )
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
     build_default_prefill_cuda_graph_bs,
 )
+from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputProcessor
 from sglang_omni.vendor.sglang.server_args import override_server_args
 
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
-    from sglang.srt.server_args import ServerArgs
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.higgs_tts.model import HiggsTTSModel
     from sglang_omni.models.higgs_tts.model_runner import HiggsTTSModelRunner
-    from sglang_omni.proto import StagePayload
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
-    from sglang_omni.scheduling.sglang_backend.output_processor import (
-        SGLangOutputProcessor,
-    )
 else:
     pass
 

@@ -6,13 +6,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import torch
+from sglang.srt.layers.attention.base_attn_backend import AttentionBackend
 from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 from sglang.srt.model_executor.runner.prefill_cuda_graph_runner import (
     PrefillCudaGraphRunner,
 )
 
 if TYPE_CHECKING:
-    from sglang.srt.layers.attention.base_attn_backend import AttentionBackend
     from sglang.srt.model_executor.model_runner import ModelRunner
 else:
     pass
@@ -31,9 +31,7 @@ class WhisperPrefillCudaGraphRunner(PrefillCudaGraphRunner):
         model_runner.mha_companion_layers = [None] * len(model_runner.attention_layers)
         super().__init__(model_runner)
 
-    def capture_prepare(
-        self, num_tokens: int
-    ) -> "tuple[ForwardBatch, AttentionBackend]":
+    def capture_prepare(self, num_tokens: int) -> tuple[ForwardBatch, AttentionBackend]:
         forward_batch, attn_backend = super().capture_prepare(num_tokens)
         encoder_lens_cpu = [1] * forward_batch.batch_size
         forward_batch.encoder_lens = torch.tensor(

@@ -13,15 +13,13 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Iterator, Mapping, TypeVar
+from typing import Iterable, Iterator
 
 from typing_extensions import NotRequired, TypedDict
 
 from sglang_omni.utils.json import JsonValue
 
 logger = logging.getLogger(__name__)
-
-TableRowT = TypeVar("TableRowT", bound=Mapping[str, object])
 
 
 class ProfilerReport(TypedDict):
@@ -458,7 +456,7 @@ def build_report(source: str | Path | Iterable[str | Path]) -> ProfilerReport:
     }
 
 
-def format_table(rows: list[TableRowT], columns: list[str]) -> str:
+def format_table(rows: list[dict[str, str | int | float]], columns: list[str]) -> str:
     """Pretty-print a list of dicts as a fixed-width table."""
     if not rows:
         return "(empty)\n"

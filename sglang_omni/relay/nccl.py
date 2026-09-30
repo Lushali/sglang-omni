@@ -6,7 +6,7 @@ import logging
 import os
 import time
 from collections.abc import Callable, Mapping
-from typing import Generic, TypedDict, TypeVar
+from typing import TypedDict
 
 import torch
 import torch.distributed as dist
@@ -16,8 +16,6 @@ from .base import CreditAllocator, Relay, RelayOperation, register_relay
 logger = logging.getLogger(__name__)
 
 NIXL_AVAILABLE = dist.is_available()
-
-NcclMetadataT = TypeVar("NcclMetadataT")
 
 
 class NcclAgentMetadata(TypedDict):
@@ -109,7 +107,7 @@ class Connection:
         return target_rank
 
 
-class NcclOperation(RelayOperation, Generic[NcclMetadataT]):
+class NcclOperation(RelayOperation):
     """
     Base class for NCCL async operations.
     """
@@ -119,7 +117,7 @@ class NcclOperation(RelayOperation, Generic[NcclMetadataT]):
         connection: Connection,
         work_handle: dist.Work | None,
         tensor_ref: object,
-        metadata: NcclMetadataT | None = None,
+        metadata: NcclPutMetadata | None = None,
     ) -> None:
         self.conn = connection
         self.work = work_handle
@@ -128,13 +126,13 @@ class NcclOperation(RelayOperation, Generic[NcclMetadataT]):
         self.completed = False
 
     @property
-    def metadata(self) -> NcclMetadataT | None:
+    def metadata(self) -> NcclPutMetadata | None:
         return (
             self._metadata
         )  # noqa: leading-underscore  # upstream spelling, or the public name is already taken
 
 
-class PutOperation(NcclOperation[NcclMetadataT]):
+class PutOperation(NcclOperation):
     """Handle for a Put operation (NCCL isend)."""
 
     def __init__(
@@ -142,7 +140,7 @@ class PutOperation(NcclOperation[NcclMetadataT]):
         connection: Connection,
         work_handle: dist.Work | None,
         tensor_ref: torch.Tensor,
-        metadata: NcclMetadataT,
+        metadata: NcclPutMetadata,
         on_completion_cb: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(connection, work_handle, tensor_ref, metadata)
@@ -173,7 +171,7 @@ class PutOperation(NcclOperation[NcclMetadataT]):
                 pass
 
 
-class GetOperation(NcclOperation[None]):
+class GetOperation(NcclOperation):
     """
     Handle for a Get operation (NCCL irecv).
     """
@@ -295,7 +293,7 @@ class NcclRelay(Relay):
         request_id: str | None = None,
         dst_rank: int | None = None,
         receiver_id: str | None = None,
-    ) -> PutOperation[NcclPutMetadata]:
+    ) -> PutOperation:
         if dst_rank is None:
             if len(self.connection.send_ranks) == 1:
                 dst_rank = self.connection.send_ranks[0]

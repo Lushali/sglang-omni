@@ -13,7 +13,7 @@ import logging
 import uuid
 from collections.abc import Mapping
 from multiprocessing import shared_memory as _shm
-from typing import Callable, Generic, TypedDict, TypeVar
+from typing import Callable, TypedDict
 
 import numpy as np
 import torch
@@ -21,8 +21,6 @@ import torch
 from .base import Relay, RelayOperation, register_relay
 
 logger = logging.getLogger(__name__)
-
-ShmMetadataT = TypeVar("ShmMetadataT")
 
 
 class ShmTransferInfo(TypedDict):
@@ -47,26 +45,26 @@ def shm_create_from_tensor(tensor: torch.Tensor) -> _shm.SharedMemory:
     return shm
 
 
-class ShmOperation(RelayOperation, Generic[ShmMetadataT]):
+class ShmOperation(RelayOperation):
     """Base class implementation for SHM operations."""
 
-    def __init__(self, metadata: ShmMetadataT) -> None:
+    def __init__(self, metadata: Mapping[str, object] | ShmPutMetadata) -> None:
         self._metadata = metadata  # noqa: leading-underscore  # upstream spelling, or the public name is already taken
         self.completed = False
 
     @property
-    def metadata(self) -> ShmMetadataT:
+    def metadata(self) -> Mapping[str, object] | ShmPutMetadata:
         return (
             self._metadata
         )  # noqa: leading-underscore  # upstream spelling, or the public name is already taken
 
 
-class ShmPutOperation(ShmOperation[ShmMetadataT]):
+class ShmPutOperation(ShmOperation):
     """Sender-side handle; completion means the receiver consumed the block."""
 
     def __init__(
         self,
-        metadata: ShmMetadataT,
+        metadata: ShmPutMetadata,
         shm_obj: _shm.SharedMemory,
         *,
         shm_name: str,
@@ -120,7 +118,7 @@ class ShmPutOperation(ShmOperation[ShmMetadataT]):
             shm.close()
 
 
-class ShmGetOperation(ShmOperation[Mapping[str, object] | ShmPutMetadata]):
+class ShmGetOperation(ShmOperation):
     """Receiver-side copy from SHM to destination tensor."""
 
     def __init__(
@@ -190,7 +188,7 @@ class ShmRelay(Relay):
         request_id: str | None = None,
         dst_rank: int | None = None,
         receiver_id: str | None = None,
-    ) -> ShmPutOperation[ShmPutMetadata]:
+    ) -> ShmPutOperation:
         if request_id is None:
             request_id = str(uuid.uuid4())
         else:

@@ -18,6 +18,11 @@ from sglang.srt.managers.schedule_batch import Req
 from sglang.srt.sampling.sampling_params import SamplingParams
 from transformers import PretrainedConfig
 
+from sglang_omni.models.moss_tts.hf_loading import (
+    MossDelayReferences,
+    MossRequestProcessor,
+    MossUserMessage,
+)
 from sglang_omni.models.moss_tts.payload_types import (
     AUDIO_REPETITION_PENALTY,
     AUDIO_SAMPLING,
@@ -34,11 +39,6 @@ from sglang_omni.scheduling.types import ARRequestData, RequestOutput
 from sglang_omni.utils.audio_payload import audio_data_uri_from_reference
 
 if TYPE_CHECKING:
-    from sglang_omni.models.moss_tts.hf_loading import (
-        MossDelayReferences,
-        MossRequestProcessor,
-        MossUserMessage,
-    )
     from sglang_omni.models.moss_tts.sglang_model import MossTTSDelaySGLangModel
     from sglang_omni.models.moss_tts.stages import (
         BatchedReferenceEncoder,
@@ -143,7 +143,7 @@ class MossTTSPreparedRequest:
 
 @dataclass
 class MossTTSPreprocessingContext:
-    processor: "MossRequestProcessor[MossDelayReferences]"
+    processor: MossRequestProcessor[MossDelayReferences]
     reference_encoder: ReferenceEncoder | None = None
 
 
@@ -169,7 +169,7 @@ def close_moss_tts_preprocessing_context(
 
 def set_moss_tts_preprocessing_context(
     *,
-    processor: "MossRequestProcessor[MossDelayReferences]",
+    processor: MossRequestProcessor[MossDelayReferences],
     reference_encoder: ReferenceEncoder | None = None,
 ) -> None:
     """Register the upstream MOSS processor used by preprocessing."""
@@ -528,10 +528,10 @@ def reference_for_processor(
 
 
 def build_processor_message(
-    processor: "MossRequestProcessor[MossDelayReferences]",
+    processor: MossRequestProcessor[MossDelayReferences],
     state: MossTTSState,
     reference_encoder: ReferenceEncoder | None = None,
-) -> "MossUserMessage":
+) -> MossUserMessage:
     reference = reference_for_processor(
         processor,
         state.ref_audio,
@@ -549,7 +549,7 @@ def build_processor_message(
 def prepare_moss_tts_request(
     payload: StagePayload,
     *,
-    processor: "MossRequestProcessor[MossDelayReferences]",
+    processor: MossRequestProcessor[MossDelayReferences],
     reference_encoder: ReferenceEncoder | None = None,
 ) -> MossTTSPreparedRequest:
     state = build_moss_tts_state(payload)

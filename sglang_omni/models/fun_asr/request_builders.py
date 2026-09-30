@@ -8,7 +8,7 @@ import time
 from collections.abc import Mapping, Sized
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Callable, Literal, Protocol
+from typing import Callable, Literal, Protocol
 
 import torch
 from sglang.srt.managers.schedule_batch import (
@@ -18,11 +18,13 @@ from sglang.srt.managers.schedule_batch import (
     Req,
 )
 from sglang.srt.sampling.sampling_params import SamplingParams
+from transformers import PreTrainedTokenizerBase
 
 from sglang_omni.models.fun_asr.configuration_fun_asr import (
     AUDIO_PLACEHOLDER_TOKEN as _AUDIO_PAD,
 )
 from sglang_omni.models.fun_asr.configuration_fun_asr import FunAsrNanoFeatureExtractor
+from sglang_omni.models.fun_asr.encoder_service import FunASRPreLMEncoderService
 from sglang_omni.preprocessing.transcription import prepare_audio
 from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.message import OutgoingMessage
@@ -33,13 +35,6 @@ from sglang_omni.scheduling.token_text_streaming import (
 from sglang_omni.scheduling.types import RequestOutput
 
 from .tool_funcs.audio_lengths import fun_asr_low_frame_rate_length
-
-if TYPE_CHECKING:
-    from transformers import PreTrainedTokenizerBase
-
-    from sglang_omni.models.fun_asr.encoder_service import FunASRPreLMEncoderService
-else:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +102,7 @@ def request_token_budget(
 
 
 def decode_token_ids(
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     token_ids: list[int],
     *,
     skip_special_tokens: bool,
@@ -200,11 +195,11 @@ def fun_asr_prompt_overhead_tokens(
 
 def make_fun_asr_scheduler_adapters(
     *,
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     max_new_tokens: int,
     feature_extractor: FunAsrNanoFeatureExtractor | None = None,
     context_length: int | None = None,
-    audio_encoder_service: "FunASRPreLMEncoderService | None" = None,
+    audio_encoder_service: FunASRPreLMEncoderService | None = None,
 ) -> tuple[
     Callable[[StagePayload], FunASRRequestData],
     Callable[[FunASRRequestData], StagePayload],
@@ -420,7 +415,7 @@ def make_fun_asr_scheduler_adapters(
 
 
 def make_fun_asr_stream_output_builder(
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     eos_token_id: int | None = None,
     min_emit_interval_s: float = 0.0,
 ) -> Callable[

@@ -8,7 +8,7 @@ from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, TypedDict, TypeVar
+from typing import TYPE_CHECKING, TypedDict
 
 from sglang_omni.model_runner.weight_checker import WeightCheckResult
 from sglang_omni.platforms import current_platform
@@ -28,8 +28,6 @@ else:
     pass
 
 logger = logging.getLogger(__name__)
-
-PayloadValueT = TypeVar("PayloadValueT")
 
 
 @dataclass
@@ -484,7 +482,7 @@ class ModelWorker:
         return bool(success), str(message)
 
     def update_weights_from_tensor(
-        self, payload: dict[str, PayloadValueT]
+        self, payload: dict[str, object]
     ) -> tuple[bool, str]:
         if payload.get("serialized_named_tensors") is not None:
             return (
@@ -590,7 +588,7 @@ class ModelWorker:
     def call_optional_weight_method(
         self,
         method_name: str,
-        payload: dict[str, PayloadValueT],
+        payload: dict[str, object],
     ) -> tuple[bool, str]:
         method = getattr(self.model_runner, method_name)
         recv_req = SimpleNamespace(**payload)

@@ -11,7 +11,6 @@ import math
 from collections.abc import AsyncIterator, Collection
 from contextlib import aclosing
 from dataclasses import dataclass
-from typing import TypeVar
 
 from fastapi import File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
@@ -48,8 +47,6 @@ HTTP_DISCONNECT_CANCEL_TIMEOUT_S = 0.1
 DEFAULT_RESPONSE_FORMATS = frozenset({"json", "text", "verbose_json"})
 DEFAULT_STREAMING_RESPONSE_FORMATS = frozenset({"json", "text"})
 SEGMENT_RESPONSE_FORMATS = frozenset({"srt", "vtt"})
-
-TaskResultT = TypeVar("TaskResultT")
 
 
 @dataclass(frozen=True, slots=True)
@@ -458,7 +455,9 @@ def assemble_speech_to_text_response(
     )
 
 
-async def cancel_task_bounded(task: asyncio.Task[TaskResultT]) -> None:
+async def cancel_task_bounded(
+    task: asyncio.Task[GenerateChunk | list[str] | None],
+) -> None:
     task.cancel()
     done, _ = await asyncio.wait({task}, timeout=HTTP_DISCONNECT_CANCEL_TIMEOUT_S)
     if done:
@@ -467,7 +466,9 @@ async def cancel_task_bounded(task: asyncio.Task[TaskResultT]) -> None:
         task.add_done_callback(discard_cancelled_task_result)
 
 
-def discard_cancelled_task_result(task: asyncio.Task[TaskResultT]) -> None:
+def discard_cancelled_task_result(
+    task: asyncio.Task[GenerateChunk | list[str] | None],
+) -> None:
     try:
         task.result()
     except asyncio.CancelledError:

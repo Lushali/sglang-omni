@@ -3,15 +3,11 @@
 
 from __future__ import annotations
 
-from typing import TypeVar
-
 from sglang_omni.proto import EXPLICIT_GENERATION_PARAMS_KEY
-
-MetadataValueT = TypeVar("MetadataValueT")
 
 
 def record_explicit_generation_params(
-    metadata: dict[str, MetadataValueT | list[str]],
+    metadata: dict[str, object],
     explicit_fields: list[str],
 ) -> None:
     if explicit_fields:

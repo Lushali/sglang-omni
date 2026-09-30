@@ -9,11 +9,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import numpy.typing as npt
+import torch
+
 from sglang_omni.scheduling.pipeline_state import DeclarativeStateBase, wire
 
 if TYPE_CHECKING:
-    import numpy.typing as npt
-    import torch
 
     from sglang_omni.models.higgs_tts.rollout_trace import HiggsRolloutTrace
 else:

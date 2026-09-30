@@ -10,6 +10,8 @@ from numbers import Real
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from transformers import PretrainedConfig
+
 from sglang_omni.models.ming_tts.audio_config import resolve_ming_tts_audio_vae_config
 from sglang_omni.models.ming_tts.config import (
     MING_TTS_AUDIO_DECODE_MAX_BATCH_SIZE,
@@ -27,6 +29,9 @@ from sglang_omni.models.ming_tts.hf_config import (
     register_ming_tts_hf_config,
 )
 from sglang_omni.models.ming_tts.request_builders import preprocess_ming_tts_payload
+from sglang_omni.models.ming_tts.streaming_vocoder import (
+    MingTTSStreamingVocoderScheduler,
+)
 from sglang_omni.models.ming_tts.tokenizer import load_ming_tts_tokenizer
 from sglang_omni.models.ming_tts.weight_loading import load_ming_tts_audio_vae_weights
 from sglang_omni.scheduling.simple_scheduler import SimpleScheduler
@@ -41,16 +46,12 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import torch
-    from transformers import PretrainedConfig
 
     from sglang_omni.models.ming_omni.talker.audio_vae.modeling_audio_vae import (
         AudioVAE,
     )
     from sglang_omni.models.ming_tts.audio_config import AudioVAEconfig
     from sglang_omni.models.ming_tts.engine_io import MingTTSSGLangRequestData
-    from sglang_omni.models.ming_tts.streaming_vocoder import (
-        MingTTSStreamingVocoderScheduler,
-    )
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
 else:
     pass
@@ -255,7 +256,7 @@ def create_audio_decode_executor(
     max_batch_wait_ms: int = MING_TTS_AUDIO_DECODE_MAX_BATCH_WAIT_MS,
     total_gpu_memory_fraction: float | None = None,
     process_total_gpu_memory_fraction: float | None = None,
-) -> "MingTTSStreamingVocoderScheduler":
+) -> MingTTSStreamingVocoderScheduler:
     validate_ming_tts_audio_decode_cadence_config(
         initial_chunk_patches=initial_chunk_patches,
         steady_chunk_patches=steady_chunk_patches,
@@ -498,14 +499,14 @@ def create_audio_decode_executor(
     return scheduler
 
 
-def load_ming_tts_config(model_path: str) -> "PretrainedConfig":
+def load_ming_tts_config(model_path: str) -> PretrainedConfig:
     register_ming_tts_hf_config()
     from transformers import AutoConfig
 
     return AutoConfig.from_pretrained(model_path, trust_remote_code=False)
 
 
-def resolve_context_length(config: "PretrainedConfig") -> int:
+def resolve_context_length(config: PretrainedConfig) -> int:
     llm_config = config.llm_config
     value = getattr(llm_config, "max_position_embeddings", None)
     if value is None:

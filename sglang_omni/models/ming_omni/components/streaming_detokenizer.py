@@ -24,8 +24,8 @@ import queue as _queue_mod
 import threading
 import time
 from collections import OrderedDict
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import TypeVar
 
 from transformers import PreTrainedTokenizerBase
 
@@ -53,8 +53,6 @@ _DONE_SEEN_EVICT_TO = 5000
 # evicting either would drop tokens or hang an active request.
 _STATE_MAX = 10000
 _STATE_ORPHAN_IDLE_S = 300.0
-
-ThinkerValueT = TypeVar("ThinkerValueT")
 
 
 @dataclass
@@ -381,7 +379,7 @@ def text_output_requested(request: OmniRequest) -> bool:
 def attach_decode_final_metadata(
     result: dict[str, object],
     state: MingOmniPipelineState,
-    thinker_out: dict[str, ThinkerValueT],
+    thinker_out: Mapping[str, object],
 ) -> None:
     finish_reason = thinker_out.get("finish_reason")
     if finish_reason is not None:

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import NotRequired, TypedDict
 
 from sglang_omni.model_runner.base import ModelRunner
+from sglang_omni.model_runner.model_worker import ModelWorkerConfig
 from sglang_omni.scheduling.types import (
     ModelRunnerOutput,
     SchedulerOutput,
@@ -22,7 +23,6 @@ if TYPE_CHECKING:
     from sglang.srt.model_executor.forward_batch_info import ForwardBatch
     from sglang.srt.server_args import ServerArgs
 
-    from sglang_omni.model_runner.model_worker import ModelWorkerConfig
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
     )

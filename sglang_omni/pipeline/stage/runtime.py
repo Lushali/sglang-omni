@@ -15,10 +15,10 @@ import logging
 import os
 import queue as _queue_mod
 import threading
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from contextlib import suppress
 from dataclasses import replace
-from typing import Awaitable, Callable, Literal, TypeVar
+from typing import Awaitable, Callable, Literal
 
 import torch
 
@@ -69,9 +69,6 @@ logger = logging.getLogger(__name__)
 _SCHEDULER_THREAD_JOIN_TIMEOUT_S = 5.0
 _OUTBOX_DRAIN_BATCH_SIZE = 64
 
-CommConfigValueT = TypeVar("CommConfigValueT")
-AdminDataValueT = TypeVar("AdminDataValueT")
-TaskResultT = TypeVar("TaskResultT")
 
 GetNextFn = Callable[[str, object], str | list[str] | None]
 GetStreamDoneTargetsFn = Callable[[str, object], str | list[str] | None]
@@ -112,7 +109,7 @@ class Stage:
         placement_gpu_id: int | None = None,
         input_handler: InputHandler | None = None,
         relay: Relay | None = None,
-        comm_config: dict[str, CommConfigValueT] | None = None,
+        comm_config: Mapping[str, int | float | str | None] | None = None,
         scheduler: StageScheduler | None = None,
         project_payload: (
             dict[str, Callable[[StagePayload], StagePayload]] | None
@@ -1232,7 +1229,7 @@ class Stage:
         *,
         success: bool,
         message: str = "",
-        data: dict[str, AdminDataValueT] | None = None,
+        data: Mapping[str, object] | None = None,
         error: str | None = None,
     ) -> AdminResult:
         return AdminResult(
@@ -2251,7 +2248,7 @@ class Stage:
             pass
 
     def on_background_task_done(
-        self, task: asyncio.Task[TaskResultT], label: str
+        self, task: asyncio.Task[bool | None], label: str
     ) -> None:
         if task.cancelled():
             return

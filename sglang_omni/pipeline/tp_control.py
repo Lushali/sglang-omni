@@ -15,7 +15,6 @@ import logging
 import queue as queue_mod
 from dataclasses import dataclass
 from multiprocessing.queues import Queue
-from typing import TypeVar
 
 from sglang_omni.proto.messages import (
     AbortMessage,
@@ -30,7 +29,6 @@ from sglang_omni.proto.request import StagePayload
 logger = logging.getLogger(__name__)
 
 _WORK_POLL_SECONDS = 0.1
-QueueMessageT = TypeVar("QueueMessageT")
 
 TPControlMessage = (
     ShutdownMessage | ProfilerStartMessage | ProfilerStopMessage | AdminMessage
@@ -189,7 +187,9 @@ class TPFollowerControlPlane:
             pass
         self.admin_result_queue.put_nowait(msg)
 
-    async def recv_from_queue(self, q: Queue[QueueMessageT]) -> QueueMessageT:
+    async def recv_from_queue(
+        self, q: Queue[TPWorkQueueMessage] | Queue[AbortMessage]
+    ) -> TPWorkQueueMessage | AbortMessage:
         loop = asyncio.get_running_loop()
         while True:
             if self.closed:

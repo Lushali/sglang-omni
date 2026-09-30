@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 from collections import deque
+from queue import Queue
 from typing import TYPE_CHECKING, TypeAlias
 
 import torch
 
 from sglang_omni.model_runner.base import ModelRunner
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.model_runner.prefill_inputs import (
     OmniPrefillInputs,
     attach_omni_prefill_inputs,
@@ -22,13 +24,11 @@ from sglang_omni.scheduling.types import (
 )
 
 if TYPE_CHECKING:
-    from queue import Queue
 
     from sglang.srt.managers.schedule_batch import ScheduleBatch
     from sglang.srt.managers.scheduler import GenerationBatchResult
     from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.qwen3_omni.components.talker import Qwen3OmniTalker
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,

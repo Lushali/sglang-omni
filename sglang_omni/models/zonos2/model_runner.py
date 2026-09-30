@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 import torch
 
 from sglang_omni.model_runner.base import ModelRunner
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.zonos2 import callbacks
 from sglang_omni.models.zonos2.radix_hash import EOS_SENTINEL, poly_row_hash
 from sglang_omni.models.zonos2.sampler import sample_tts
@@ -28,7 +29,6 @@ from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputP
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
 else:
     pass
 

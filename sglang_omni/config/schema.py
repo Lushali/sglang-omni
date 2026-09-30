@@ -6,7 +6,7 @@ import logging
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, Literal, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -15,8 +15,6 @@ if TYPE_CHECKING:
 else:
     pass
 REPLICA_SEPARATOR = "@r"
-
-ConfigValueT = TypeVar("ConfigValueT")
 
 
 @dataclass(frozen=True, slots=True)
@@ -972,5 +970,5 @@ class PipelineConfig(BaseModel):
             pass
 
     @staticmethod
-    def from_dict(data: dict[str, ConfigValueT]) -> PipelineConfig:
+    def from_dict(data: dict[str, object]) -> PipelineConfig:
         return PipelineConfig(**data)

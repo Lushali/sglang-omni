@@ -6,7 +6,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Mapping, Sequence
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -39,7 +39,6 @@ else:
 
 logger = logging.getLogger(__name__)
 
-MessageT = TypeVar("MessageT", bound=Mapping[str, object])
 
 # Ming-Omni chat template tokens
 ROLE_HUMAN = "<role>HUMAN</role>"
@@ -729,7 +728,7 @@ class MingPreprocessor:
 
     def build_prompt(
         self,
-        messages: list[MessageT],
+        messages: Sequence[Mapping[str, object]],
         *,
         audio_token_counts: list[int] | None = None,
         image_token_counts: list[int] | None = None,

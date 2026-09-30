@@ -10,7 +10,7 @@ custom weight loaders.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, TypeVar
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     import torch
@@ -19,8 +19,6 @@ else:
 
 # A weight preprocessor maps `(target_name, loaded_weight) -> loaded_weight`.
 WeightPreprocessor = Callable[[str, "torch.Tensor"], "torch.Tensor"]
-QuantValueT = TypeVar("QuantValueT")
-
 
 _QUANT_METADATA_KEYS: tuple[str, ...] = ("quantization_config", "compression_config")
 _NESTED_QUANT_CONFIG_ATTRS: tuple[str, ...] = (
@@ -107,7 +105,7 @@ def resolve_quant_config(config: object) -> dict[str, object] | None:
     return _search(config)
 
 
-def quant_method_name(quant_dict: dict[str, QuantValueT] | None) -> str | None:
+def quant_method_name(quant_dict: dict[str, object] | None) -> str | None:
     """Return the checkpoint's normalized quantization method name, or `None`."""
     if not quant_dict:
         return None
@@ -121,7 +119,7 @@ def quant_method_name(quant_dict: dict[str, QuantValueT] | None) -> str | None:
     return str(method).lower().replace("_", "-")
 
 
-def is_fp8_block_quant(quant_dict: dict[str, QuantValueT] | None) -> bool:
+def is_fp8_block_quant(quant_dict: dict[str, object] | None) -> bool:
     """True when the checkpoint is native block-FP8."""
     if not quant_dict:
         return False
@@ -188,7 +186,7 @@ def get_weight_preprocessor(
 
 
 def needs_quant_config_normalization(
-    quant_dict: dict[str, QuantValueT] | None,
+    quant_dict: dict[str, object] | None,
 ) -> bool:
     """True when the checkpoint's method uses stage-local per-block quant names."""
     method = quant_method_name(quant_dict)

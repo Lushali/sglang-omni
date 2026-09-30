@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from queue import Queue
 from typing import TYPE_CHECKING
 
 import torch
+from sglang.srt.managers.schedule_batch import ScheduleBatch
+from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 
 from sglang_omni.model_runner.base import ModelRunner
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.moss_tts.model_runner import MossTTSModelRunner
 from sglang_omni.models.moss_tts_local.radix_hash import build_rows_and_radix_token_ids
 from sglang_omni.models.moss_tts_local.request_builders import (
@@ -23,13 +27,8 @@ from sglang_omni.scheduling.types import (
 )
 
 if TYPE_CHECKING:
-    from queue import Queue
-
-    from sglang.srt.managers.schedule_batch import ScheduleBatch
     from sglang.srt.managers.scheduler import GenerationBatchResult
-    from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.moss_tts_local.sglang_model import MossTTSLocalSGLangModel
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,

@@ -66,7 +66,7 @@ def encode_typed_tensor(
 
 @overload
 def decode_typed_tensor(
-    data: dict[str, WireValueT], *, key: str, legacy_key: None = None
+    data: dict[str, bytes | list[int] | str], *, key: str, legacy_key: None = None
 ) -> torch.Tensor | None: ...
 
 

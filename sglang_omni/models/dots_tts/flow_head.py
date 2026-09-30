@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 import torch
 from einops import rearrange
@@ -24,8 +24,6 @@ if TYPE_CHECKING:
     from sglang_omni.models.dots_tts.tail import DotsTtsAcousticTail
 else:
     pass
-
-ConfigValue = TypeVar("ConfigValue")
 
 
 @dataclass
@@ -62,7 +60,7 @@ class DotsTTSFlowHead(nn.Module):
 
     def __init__(
         self,
-        config_dict: dict[str, ConfigValue],
+        config_dict: Mapping[str, object],
         *,
         llm_hidden_size: int,
         latent_stats_path: str,

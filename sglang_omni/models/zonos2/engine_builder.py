@@ -12,6 +12,7 @@ import tempfile
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.zonos2.hf_config import (
     Zonos2Config,
     load_zonos2_pretrained_config,
@@ -19,6 +20,7 @@ from sglang_omni.models.zonos2.hf_config import (
 from sglang_omni.models.zonos2.streaming_contract import (
     DEFAULT_ZONOS2_PRODUCER_FIRST_FLUSH_ROWS,
 )
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
 from sglang_omni.utils.checkpoint import resolve_checkpoint
 from sglang_omni.vendor.sglang.server_args import override_server_args
@@ -27,11 +29,9 @@ if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
     from sglang.srt.server_args import ServerArgs
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.zonos2.model_runner import Zonos2ModelRunner
     from sglang_omni.models.zonos2.request_builders import Zonos2SGLangRequestData
     from sglang_omni.models.zonos2.sglang_model import Zonos2SGLangModel
-    from sglang_omni.proto import StagePayload
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,

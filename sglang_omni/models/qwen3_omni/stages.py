@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, TypedDict
 
 import torch
 import torch.nn.functional as F
+from sglang.srt.server_args import ServerArgs
 
 from sglang_omni.models.qwen3_omni.bootstrap import create_thinker_scheduler
 from sglang_omni.models.qwen3_omni.components.audio_encoder import Qwen3OmniAudioEncoder
@@ -44,18 +45,17 @@ from sglang_omni.scheduling.sglang_backend import (
     apply_encoder_mem_reserve,
     build_sglang_server_args,
 )
+from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
+from sglang_omni.scheduling.simple_scheduler import SimpleScheduler
 from sglang_omni.scheduling.stage_cache import StageOutputCache
+from sglang_omni.scheduling.threaded_simple_scheduler import ThreadedSimpleScheduler
 from sglang_omni.utils.gpu_memory import format_bytes_gib, get_process_gpu_memory_bytes
 from sglang_omni.utils.misc import avail_gpu_mem
 
 if TYPE_CHECKING:
-    from sglang.srt.server_args import ServerArgs
 
     from sglang_omni.models.qwen3_omni.talker_scheduler import QwenTalkerScheduler
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
-    from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
-    from sglang_omni.scheduling.simple_scheduler import SimpleScheduler
-    from sglang_omni.scheduling.threaded_simple_scheduler import ThreadedSimpleScheduler
 else:
     pass
 

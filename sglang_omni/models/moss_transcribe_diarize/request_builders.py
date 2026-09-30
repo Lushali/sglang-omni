@@ -9,7 +9,7 @@ import re
 import time
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Callable, TypeVar
+from typing import Callable, TypeVar
 
 import numpy as np
 import torch
@@ -20,7 +20,11 @@ from sglang.srt.managers.schedule_batch import (
     Req,
 )
 from sglang.srt.sampling.sampling_params import SamplingParams
+from transformers import PreTrainedTokenizerBase, ProcessorMixin
 
+from sglang_omni.models.moss_transcribe_diarize.encoder_service import (
+    BatchedAudioEncoderService,
+)
 from sglang_omni.preprocessing.transcription import prepare_audio
 from sglang_omni.proto import EXPLICIT_GENERATION_PARAMS_KEY, StagePayload
 from sglang_omni.scheduling.message import OutgoingMessage
@@ -28,19 +32,8 @@ from sglang_omni.scheduling.sglang_backend import SGLangARRequestData
 from sglang_omni.scheduling.token_text_streaming import (
     make_token_text_stream_output_builder,
 )
+from sglang_omni.scheduling.types import RequestOutput
 
-if TYPE_CHECKING:
-    from transformers import PreTrainedTokenizerBase, ProcessorMixin
-
-    from sglang_omni.models.moss_transcribe_diarize.encoder_service import (
-        BatchedAudioEncoderService,
-    )
-    from sglang_omni.scheduling.types import RequestOutput
-else:
-    pass
-
-MetadataValueT = TypeVar("MetadataValueT")
-SamplingValueT = TypeVar("SamplingValueT")
 SamplingResultT = TypeVar("SamplingResultT")
 
 logger = logging.getLogger(__name__)
@@ -173,7 +166,7 @@ def unwrap_source_dict(source: object) -> object:
     return source
 
 
-def explicit_generation_fields(metadata: dict[str, MetadataValueT]) -> set[str]:
+def explicit_generation_fields(metadata: dict[str, object]) -> set[str]:
     """Sampling fields the caller set explicitly (see EXPLICIT_GENERATION_PARAMS_KEY).
 
     Anything not listed here resolves to the model's own default, so a client
@@ -189,11 +182,11 @@ def explicit_generation_fields(metadata: dict[str, MetadataValueT]) -> set[str]:
 
 
 def sampling_param(
-    params: dict[str, SamplingValueT],
+    params: dict[str, object],
     explicit_fields: set[str],
     field: str,
     default: SamplingResultT,
-    cast: Callable[[SamplingValueT], SamplingResultT],
+    cast: Callable[[object], SamplingResultT],
 ) -> SamplingResultT:
     if field not in explicit_fields:
         return default
@@ -204,7 +197,7 @@ def sampling_param(
 
 
 def decode_token_ids(
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     token_ids: list[int],
     skip_special_tokens: bool,
 ) -> str:
@@ -222,7 +215,7 @@ def postprocess_moss_transcribe_diarize_text(text: str) -> str:
     return _SPECIAL_TOKEN_RE.sub("", text).strip()
 
 
-def render_prompt(processor: "ProcessorMixin", input_text: str) -> str:
+def render_prompt(processor: ProcessorMixin, input_text: str) -> str:
     messages = [
         {
             "role": "user",
@@ -241,7 +234,7 @@ def render_prompt(processor: "ProcessorMixin", input_text: str) -> str:
 
 def prompt_from_payload(
     payload: StagePayload,
-    processor: "ProcessorMixin",
+    processor: ProcessorMixin,
     *,
     default_prompt: str | None = None,
 ) -> str:
@@ -313,7 +306,7 @@ def contiguous_offsets(input_ids: list[int], token_id: int) -> list[tuple[int, i
 
 def prompt_token_parts(
     prompt: str,
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     audio_token: str,
 ) -> tuple[tuple[int, ...], tuple[int, ...]]:
     audio_token_count = prompt.count(audio_token)
@@ -392,7 +385,7 @@ def extract_audio_features(
 
 def make_moss_transcribe_diarize_scheduler_adapters(
     processor: object,
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     max_new_tokens: int,
     context_length: int,
     duration_scaled_default: bool = True,
@@ -667,7 +660,7 @@ def make_moss_transcribe_diarize_scheduler_adapters(
 
 
 def make_moss_transcribe_diarize_stream_output_builder(
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     eos_token_id: int | None = None,
     min_emit_interval_s: float = 0.0,
 ) -> Callable[

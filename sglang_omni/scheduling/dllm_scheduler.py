@@ -15,28 +15,28 @@ from array import array
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from sglang.srt.configs.model_config import ModelConfig
+from sglang.srt.dllm.config import DllmConfig
 from sglang.srt.managers.schedule_batch import Req, ScheduleBatch
 from sglang.srt.managers.schedule_policy import AddReqResult, PrefillAdder
+from sglang.srt.mem_cache.allocator import BaseTokenToKVPoolAllocator
+from sglang.srt.mem_cache.base_prefix_cache import BasePrefixCache
 from sglang.srt.mem_cache.common import release_kv_cache
+from sglang.srt.mem_cache.memory_pool import ReqToTokenPool
 from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 from sglang.srt.runtime_context import get_schedule
+from sglang.srt.server_args import ServerArgs
 from sglang.srt.speculative.spec_info import SpeculativeAlgorithm
 
 from sglang_omni.model_runner.base import resolve_deferred_prefill_inputs
+from sglang_omni.model_runner.model_worker import ModelWorker
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.message import IncomingMessage, OutgoingMessage
+from sglang_omni.scheduling.sglang_backend.request_data import SGLangDLLMRequestData
 
 if TYPE_CHECKING:
-    from sglang.srt.configs.model_config import ModelConfig
-    from sglang.srt.dllm.config import DllmConfig
     from sglang.srt.managers.scheduler import GenerationBatchResult
-    from sglang.srt.mem_cache.allocator import BaseTokenToKVPoolAllocator
-    from sglang.srt.mem_cache.base_prefix_cache import BasePrefixCache
-    from sglang.srt.mem_cache.memory_pool import ReqToTokenPool
-    from sglang.srt.server_args import ServerArgs
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
-    from sglang_omni.proto import StagePayload
-    from sglang_omni.scheduling.sglang_backend.request_data import SGLangDLLMRequestData
 else:
     pass
 

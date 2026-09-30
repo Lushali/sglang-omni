@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from itertools import count
 from typing import TYPE_CHECKING, Literal, Mapping, TypeVar, overload
 
+import numpy as np
 import torch
 
 from sglang_omni.models.qwen3_tts.codec_state_arena import (
@@ -40,7 +41,6 @@ from sglang_omni.utils.cuda_staging import GrowablePinnedBuffer, PinnedTransferS
 from sglang_omni.utils.snake_beta import fuse_vocoder_decoder
 
 if TYPE_CHECKING:
-    import numpy as np
     from qwen_tts import Qwen3TTSTokenizer
     from qwen_tts.core.tokenizer_12hz.modeling_qwen3_tts_tokenizer_v2 import (
         Qwen3TTSTokenizerV2Decoder,
@@ -3079,7 +3079,7 @@ class Qwen3TTSStreamingVocoderScheduler(
         self,
         payload: StagePayload,
         state: Qwen3TTSState,
-        waveform: "np.ndarray[tuple[int, ...], np.dtype[np.float32]] | None",
+        waveform: np.ndarray[tuple[int, ...], np.dtype[np.float32]] | None,
         sample_rate: int,
     ) -> StagePayload:
         if waveform is None:

@@ -15,8 +15,6 @@ from sglang_omni.models.ming_omni.pipeline.next_stage import AUDIO_STAGE, IMAGE_
 from sglang_omni.models.ming_omni.tp_utils import validate_stage_tp_support
 from sglang_omni.proto import StagePayload
 
-EncoderInputT = TypeVar("EncoderInputT")
-KeyT = TypeVar("KeyT")
 ValueT = TypeVar("ValueT")
 
 
@@ -106,7 +104,7 @@ def payload_with_state(
 
 
 def project_encoder_input_metadata(
-    encoder_inputs: dict[str, EncoderInputT],
+    encoder_inputs: Mapping[str, object],
 ) -> dict[str, dict[str, object]]:
     projected: dict[str, dict[str, object]] = {}
     for stage_name, stage_inputs in encoder_inputs.items():
@@ -162,7 +160,7 @@ def slim_thinker_out(thinker_out: object) -> dict[str, object] | None:
 
 
 @overload
-def copy_mutable_containers(value: dict[KeyT, ValueT]) -> dict[KeyT, object]: ...
+def copy_mutable_containers(value: dict[str, ValueT]) -> dict[str, object]: ...
 
 
 @overload

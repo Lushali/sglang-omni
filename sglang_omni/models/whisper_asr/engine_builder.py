@@ -7,6 +7,8 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from transformers import GenerationConfig, WhisperProcessor, WhisperTokenizer
+
 from sglang_omni.models.whisper_asr.encoder_service import (
     WhisperPreLMEncoderService,
     build_cache_namespace,
@@ -15,6 +17,7 @@ from sglang_omni.models.whisper_asr.request_builders import (
     MAX_PREV_CONTEXT_TOKENS,
     WhisperASRRequestData,
 )
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.engine_factory import AsrEngineBuilder, GenerationDefaults
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
@@ -22,12 +25,10 @@ from sglang_omni.scheduling.generation_batch_policy import (
 )
 
 if TYPE_CHECKING:
-    from transformers import GenerationConfig, WhisperProcessor, WhisperTokenizer
 
     from sglang_omni.models.whisper_asr.sglang_model import (
         WhisperForConditionalGeneration,
     )
-    from sglang_omni.proto import StagePayload
 else:
     pass
 
@@ -240,7 +241,7 @@ class WhisperASREngineBuilder(AsrEngineBuilder[WhisperASRRequestData]):
         self.pre_lm_max_batch_wait_ms = int(pre_lm_max_batch_wait_ms)
         self.pre_lm_cache_pin_host_memory = bool(pre_lm_cache_pin_host_memory)
         self.processor: WhisperProcessor | None = None
-        self.tokenizer: "WhisperTokenizer | None" = None
+        self.tokenizer: WhisperTokenizer | None = None
         self.generation_config: GenerationConfig | None = None
         self.encoder_token_count = 0
         self.context_length = 0

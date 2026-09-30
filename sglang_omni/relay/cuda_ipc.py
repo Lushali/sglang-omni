@@ -10,11 +10,10 @@ import uuid
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
-from typing import Generic, Literal, NamedTuple, TypedDict, TypeVar
+from typing import Literal, NamedTuple, TypedDict
 
 import torch
 from torch.multiprocessing.reductions import rebuild_cuda_tensor
-from typing_extensions import Never
 
 from sglang_omni.comm.kv_transfer import KVPool
 from sglang_omni.profiler.comm_trace import elapsed_ms as _comm_elapsed_ms
@@ -30,9 +29,6 @@ _PEER_ENABLED: set[tuple[int, int]] = set()
 _PEER_UNAVAILABLE: set[tuple[int, int]] = set()
 _PEER_VISIBILITY_WARNED: set[tuple[int, int, int]] = set()
 _DEFAULT_WAIT_THREADS = 8
-
-
-CudaMetadataValueT = TypeVar("CudaMetadataValueT")
 
 
 class CudaStorageHandle(TypedDict):
@@ -300,12 +296,12 @@ class SlotAllocation(NamedTuple):
     last_failed_free_runs: int
 
 
-class ReceiverAckOperation(RelayOperation, Generic[CudaMetadataValueT]):
+class ReceiverAckOperation(RelayOperation):
     """Common operation state for sender resources held until receiver ACK."""
 
     def __init__(
         self,
-        metadata: dict[str, CudaMetadataValueT] | CudaKvMetadata,
+        metadata: dict[str, str | dict[str, int] | CudaPoolInfo] | CudaKvMetadata,
         *,
         held_references: tuple[object, ...] = (),
     ) -> None:
@@ -316,7 +312,9 @@ class ReceiverAckOperation(RelayOperation, Generic[CudaMetadataValueT]):
         self.completed = False
 
     @property
-    def metadata(self) -> dict[str, CudaMetadataValueT] | CudaKvMetadata:
+    def metadata(
+        self,
+    ) -> dict[str, str | dict[str, int] | CudaPoolInfo] | CudaKvMetadata:
         return (
             self._metadata
         )  # noqa: leading-underscore  # upstream spelling, or the public name is already taken
@@ -349,12 +347,12 @@ class ReceiverAckOperation(RelayOperation, Generic[CudaMetadataValueT]):
             pass
 
 
-class CudaIpcPutOperation(ReceiverAckOperation[CudaMetadataValueT]):
+class CudaIpcPutOperation(ReceiverAckOperation):
     """Sender-side handle; completion means the slot can be reused."""
 
     def __init__(
         self,
-        metadata: dict[str, CudaMetadataValueT],
+        metadata: dict[str, str | dict[str, int] | CudaPoolInfo],
         *,
         ready_event: torch.cuda.Event,
         source_tensor: torch.Tensor,
@@ -917,7 +915,7 @@ class CudaIpcRelay(Relay):
         request_id: str | None = None,
         dst_rank: int | None = None,
         receiver_id: str | None = None,
-    ) -> CudaIpcPutOperation[str | dict[str, int] | CudaPoolInfo]:
+    ) -> CudaIpcPutOperation:
         self.raise_if_failed()
         if receiver_id is None:
             raise ValueError("cuda_ipc put requires a receiver identity")
@@ -1250,7 +1248,7 @@ class CudaIpcRelay(Relay):
         source_page_indices: tuple[int, ...],
         destination_ref: dict[str, dict[str, str]],
         transfer_id: str | None = None,
-    ) -> ReceiverAckOperation[Never]:
+    ) -> ReceiverAckOperation:
         pool = self.kv_pools.get(source_pool_id)
         if pool is None:
             raise KeyError(f"unknown cuda_ipc KV pool {source_pool_id!r}")

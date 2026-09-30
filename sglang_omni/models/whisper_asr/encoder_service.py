@@ -16,6 +16,9 @@ from typing import TYPE_CHECKING, TypeGuard
 
 import torch
 from sglang.srt.managers.schedule_batch import MultimodalDataItem, MultimodalInputFormat
+from transformers.models.whisper.feature_extraction_whisper import (
+    WhisperFeatureExtractor,
+)
 
 from sglang_omni.scheduling.pre_lm_encoder import (
     PreLMEncoderService,
@@ -25,9 +28,6 @@ from sglang_omni.scheduling.pre_lm_encoder import (
 from sglang_omni.scheduling.stage_cache import StageOutputCache
 
 if TYPE_CHECKING:
-    from transformers.models.whisper.feature_extraction_whisper import (
-        WhisperFeatureExtractor,
-    )
 
     from sglang_omni.models.whisper_asr.sglang_model import (
         WhisperForConditionalGeneration,

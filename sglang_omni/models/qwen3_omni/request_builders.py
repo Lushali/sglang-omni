@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, TypedDict, TypeVar, overload
 
 import torch
 import xxhash
+from sglang.srt.tokenizer.tiktoken_tokenizer import TiktokenTokenizer
+from transformers import PreTrainedTokenizerBase
 
 from sglang_omni.models.qwen3_omni.components.talker_prefill import TalkerPrefillBuilder
 from sglang_omni.models.qwen3_omni.payload_types import (
@@ -20,20 +22,18 @@ from sglang_omni.models.qwen3_omni.pending_text_queue import (
     PendingTextTensorQueue,
     coerce_pending_text_queue,
 )
+from sglang_omni.pipeline.stage.stream_queue import StreamItem
 from sglang_omni.proto import OmniRequest, StagePayload
 from sglang_omni.scheduling.message import OutgoingMessage
 from sglang_omni.scheduling.sglang_backend import SGLangARRequestData
 from sglang_omni.scheduling.types import ARRequestData, RequestOutput
 
 if TYPE_CHECKING:
-    from sglang.srt.tokenizer.tiktoken_tokenizer import TiktokenTokenizer
-    from transformers import PreTrainedTokenizerBase
     from transformers.models.qwen3_omni_moe.configuration_qwen3_omni_moe import (
         Qwen3OmniMoeThinkerConfig,
     )
 
     from sglang_omni.models.qwen3_omni.components.talker import Qwen3OmniTalker
-    from sglang_omni.pipeline.stage.stream_queue import StreamItem
 else:
     pass
 
@@ -50,7 +50,6 @@ MM_AGGREGATE_STAGE = "mm_aggregate"
 # Note(Chenchen Hong): PyTorch sampling_seed must fit a positive int32.
 MAX_INT32_POSITIVE = 0x7FFFFFFF
 
-KeyT = TypeVar("KeyT")
 ValueT = TypeVar("ValueT")
 
 
@@ -419,7 +418,7 @@ def payload_with_state(
 
 
 @overload
-def copy_mutable_containers(value: dict[KeyT, ValueT]) -> dict[KeyT, object]: ...
+def copy_mutable_containers(value: dict[str, ValueT]) -> dict[str, object]: ...
 
 
 @overload
@@ -468,7 +467,7 @@ def select_encoder_inputs(
 
 
 def project_encoder_input_metadata(
-    encoder_inputs: dict[str, ValueT],
+    encoder_inputs: Mapping[str, object],
 ) -> dict[str, dict[str, object]]:
     projected: dict[str, dict[str, object]] = {}
     for stage_name, stage_inputs in encoder_inputs.items():
@@ -496,7 +495,7 @@ def project_encoder_input_metadata(
 
 
 def encoder_stages_with_model_inputs(
-    encoder_inputs: dict[str, ValueT],
+    encoder_inputs: Mapping[str, object],
 ) -> list[str]:
     return [
         stage_name
@@ -506,7 +505,7 @@ def encoder_stages_with_model_inputs(
 
 
 def active_encoder_stages(
-    encoder_inputs: dict[str, ValueT],
+    encoder_inputs: Mapping[str, object],
 ) -> list[str]:
     return [
         stage_name
@@ -576,7 +575,7 @@ def single_encoder_stage_name(state: Qwen3OmniPipelineState) -> str:
 
 
 def extract_thinker_model_inputs(
-    thinker_inputs: dict[str, ValueT],
+    thinker_inputs: Mapping[str, object],
 ) -> dict[str, object]:
     """Return the model input payload without confusing an empty payload for absence.
 
@@ -606,7 +605,7 @@ def extract_thinker_model_inputs(
 def build_thinker_request(
     state: Qwen3OmniPipelineState,
     *,
-    params: dict[str, ValueT],
+    params: Mapping[str, object],
 ) -> ARRequestData:
     prompt = state.prompt
     input_ids = prompt["input_ids"]
@@ -706,7 +705,7 @@ def build_sglang_thinker_request(
     state: Qwen3OmniPipelineState,
     *,
     params: Mapping[str, object],
-    tokenizer: "PreTrainedTokenizerBase | TiktokenTokenizer | None",
+    tokenizer: PreTrainedTokenizerBase | TiktokenTokenizer | None,
     vocab_size: int,
     request_id: str | None = None,
     thinker_config: Qwen3OmniMoeThinkerConfig | None = None,
@@ -858,7 +857,7 @@ def build_sglang_thinker_request(
 def build_sglang_talker_request(
     thinker_hidden_states: torch.Tensor,
     *,
-    tokenizer: "PreTrainedTokenizerBase | TiktokenTokenizer | None",
+    tokenizer: PreTrainedTokenizerBase | TiktokenTokenizer | None,
     codec_vocab_size: int,
     max_new_tokens: int = 2048,
     temperature: float = 0.7,
@@ -1116,7 +1115,7 @@ def make_thinker_stream_output_builder(
 
 def make_thinker_scheduler_adapters(
     *,
-    tokenizer: "PreTrainedTokenizerBase | TiktokenTokenizer | None",
+    tokenizer: PreTrainedTokenizerBase | TiktokenTokenizer | None,
     vocab_size: int,
     thinker_config: Qwen3OmniMoeThinkerConfig | None = None,
     stage_name: str = "thinker",
@@ -1155,7 +1154,7 @@ def make_thinker_scheduler_adapters(
 
 def make_talker_scheduler_adapters(
     *,
-    tokenizer: "PreTrainedTokenizerBase | TiktokenTokenizer | None",
+    tokenizer: PreTrainedTokenizerBase | TiktokenTokenizer | None,
     codec_vocab_size: int,
     model: Qwen3OmniTalker,
     model_path: str,
@@ -1261,7 +1260,7 @@ def build_talker_request_data(
     payload: StagePayload,
     *,
     prefill_builder: TalkerPrefillBuilder,
-    tokenizer: "PreTrainedTokenizerBase | TiktokenTokenizer | None",
+    tokenizer: PreTrainedTokenizerBase | TiktokenTokenizer | None,
     codec_vocab_size: int,
     codec_bos_id: int,
     audio_token_id: int | None,

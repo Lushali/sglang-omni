@@ -9,24 +9,25 @@ from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from torch import Tensor
+
+from sglang_omni.model_runner.model_worker import ModelWorker
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
 from sglang_omni.scheduling.generation_batch_policy import build_default_cuda_graph_bs
+from sglang_omni.scheduling.message import OutgoingMessage
 from sglang_omni.scheduling.types import RequestOutput
 
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
     from sglang.srt.models.qwen3 import Qwen3ForCausalLM
     from sglang.srt.server_args import ServerArgs
-    from torch import Tensor
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.minimax_music3.model_runner import MiniMaxMusic3ModelRunner
     from sglang_omni.models.minimax_music3.scheduler import MiniMaxMusic3Scheduler
     from sglang_omni.models.minimax_music3.sglang_request_builder import (
         MiniMaxMusic3SGLangRequestData,
     )
-    from sglang_omni.proto import StagePayload
-    from sglang_omni.scheduling.message import OutgoingMessage
     from sglang_omni.scheduling.sglang_backend import SGLangOutputProcessor
 else:
     pass

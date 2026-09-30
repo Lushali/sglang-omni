@@ -10,7 +10,9 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import torch
+from sglang.srt.server_args import ServerArgs
 
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.fun_cosyvoice3 import request_builders
 from sglang_omni.models.fun_cosyvoice3.request_builders import (
     CosyVoice3SGLangRequestData,
@@ -22,24 +24,20 @@ from sglang_omni.models.fun_cosyvoice3.utils import (
     SpeechTokenizerV3,
 )
 from sglang_omni.platforms import current_platform
+from sglang_omni.proto.request import StagePayload
+from sglang_omni.scheduling.bootstrap import InfrastructureOptions
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
+from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputProcessor
 from sglang_omni.utils.checkpoint import resolve_checkpoint as _resolve_checkpoint
 
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
-    from sglang.srt.server_args import ServerArgs
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.fun_cosyvoice3.model_runner import (
         FunCosyVoice3MlxSchedulerModelRunner,
         FunCosyVoice3ModelRunner,
     )
-    from sglang_omni.proto import StagePayload
-    from sglang_omni.scheduling.bootstrap import InfrastructureOptions
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
-    from sglang_omni.scheduling.sglang_backend.output_processor import (
-        SGLangOutputProcessor,
-    )
 else:
     pass
 

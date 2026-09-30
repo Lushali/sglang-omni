@@ -6,7 +6,7 @@ import logging
 import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
-from typing import AsyncIterator, TypedDict, TypeVar
+from typing import AsyncIterator, TypedDict
 
 from sglang_omni.admission import QueueFullError
 from sglang_omni.config.topology import LogicalProcessPlan
@@ -38,8 +38,6 @@ from sglang_omni.proto import (
 from sglang_omni.proto.admin import AdminResponse
 
 logger = logging.getLogger(__name__)
-
-PayloadValueT = TypeVar("PayloadValueT")
 
 
 class CoordinatorHealth(TypedDict):
@@ -213,7 +211,7 @@ class Coordinator(CoordinatorSessions):
     async def admin(
         self,
         action: str,
-        payload: dict[str, PayloadValueT] | None = None,
+        payload: dict[str, object] | None = None,
         *,
         stages: Sequence[str] | None = None,
         timeout_s: float = 60.0,
@@ -281,7 +279,7 @@ class Coordinator(CoordinatorSessions):
 
     async def pause_generation(
         self,
-        payload: dict[str, PayloadValueT] | None = None,
+        payload: dict[str, object] | None = None,
         *,
         stages: Sequence[str] | None = None,
         timeout_s: float = 60.0,
@@ -295,7 +293,7 @@ class Coordinator(CoordinatorSessions):
 
     async def continue_generation(
         self,
-        payload: dict[str, PayloadValueT] | None = None,
+        payload: dict[str, object] | None = None,
         *,
         stages: Sequence[str] | None = None,
         timeout_s: float = 60.0,
@@ -309,7 +307,7 @@ class Coordinator(CoordinatorSessions):
 
     async def update_weights_from_disk(
         self,
-        payload: dict[str, PayloadValueT],
+        payload: dict[str, object],
         *,
         stages: Sequence[str] | None = None,
         timeout_s: float = 120.0,
@@ -323,7 +321,7 @@ class Coordinator(CoordinatorSessions):
 
     async def init_weights_update_group(
         self,
-        payload: dict[str, PayloadValueT],
+        payload: dict[str, object],
         *,
         stages: Sequence[str] | None = None,
         timeout_s: float = 300.0,
@@ -337,7 +335,7 @@ class Coordinator(CoordinatorSessions):
 
     async def destroy_weights_update_group(
         self,
-        payload: dict[str, PayloadValueT],
+        payload: dict[str, object],
         *,
         stages: Sequence[str] | None = None,
         timeout_s: float = 300.0,
@@ -351,7 +349,7 @@ class Coordinator(CoordinatorSessions):
 
     async def update_weights_from_distributed(
         self,
-        payload: dict[str, PayloadValueT],
+        payload: dict[str, object],
         *,
         stages: Sequence[str] | None = None,
         timeout_s: float = 300.0,
@@ -365,7 +363,7 @@ class Coordinator(CoordinatorSessions):
 
     async def weights_checker(
         self,
-        payload: dict[str, PayloadValueT] | None = None,
+        payload: dict[str, object] | None = None,
         *,
         stages: Sequence[str] | None = None,
         timeout_s: float = 120.0,

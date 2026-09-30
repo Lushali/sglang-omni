@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import TypeGuard, TypeVar
+from typing import TypeGuard
 
 from sglang_omni.config.patch import ConfigPatch, ConfigPatchSet
 from sglang_omni.config.path import ConfigPath, ConfigPathError
@@ -27,10 +27,6 @@ from sglang_omni.config.provenance import ProvenanceMap
 from sglang_omni.config.schema import PipelineConfig
 
 __all__ = ["ConfigResolver", "ResolvedConfig", "ConfigDifference", "diff_configs"]
-
-ExpectedValueT = TypeVar("ExpectedValueT")
-ActualValueT = TypeVar("ActualValueT")
-ValueT = TypeVar("ValueT")
 
 
 @dataclass(frozen=True)
@@ -127,7 +123,7 @@ def deep_merge(
     return merged
 
 
-def safe_read(path: ConfigPath, data: dict[str, ValueT]) -> object:
+def safe_read(path: ConfigPath, data: dict[str, object]) -> object:
     """Read a path that may not exist yet (a new mapping key, for instance)."""
     try:
         return path.read(data)
@@ -151,8 +147,8 @@ class ConfigDifference:
 
 
 def diff_configs(
-    expected: PipelineConfig | dict[str, ExpectedValueT],
-    actual: PipelineConfig | dict[str, ActualValueT],
+    expected: PipelineConfig | dict[str, object],
+    actual: PipelineConfig | dict[str, object],
 ) -> list[ConfigDifference]:
     """Compare two configs field by field, addressing stages by name.
 
@@ -164,7 +160,7 @@ def diff_configs(
     return diff(as_dump(expected), as_dump(actual), "")
 
 
-def as_dump(value: PipelineConfig | dict[str, ValueT]) -> Mapping[str, object]:
+def as_dump(value: PipelineConfig | dict[str, object]) -> Mapping[str, object]:
     return value.model_dump() if isinstance(value, PipelineConfig) else value
 
 

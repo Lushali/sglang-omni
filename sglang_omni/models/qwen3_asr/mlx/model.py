@@ -4,28 +4,16 @@
 from __future__ import annotations
 
 import math
-from typing import (
-    TYPE_CHECKING,
-    Dict,
-    List,
-    Optional,
-    Protocol,
-    TypeAlias,
-    TypeVar,
-    Union,
-)
+from collections.abc import Sequence
+from typing import Dict, List, Optional, Protocol, TypeAlias, Union
 
 import mlx.core as mx
 import mlx.nn as nn
 import numpy as np
 from mlx_lm.models.base import create_attention_mask, scaled_dot_product_attention
+from mlx_lm.models.cache import KVCache
 
 from .config import AudioEncoderConfig, ModelConfig, TextConfig
-
-if TYPE_CHECKING:
-    from mlx_lm.models.cache import KVCache
-else:
-    pass
 
 MlxQuantizedTensor: TypeAlias = tuple[mx.array, mx.array, mx.array]
 
@@ -37,9 +25,6 @@ class MlxAttentionCache(Protocol):
     def update_and_fetch(
         self, keys: mx.array, values: mx.array, /
     ) -> tuple[mx.array, mx.array] | tuple[MlxQuantizedTensor, MlxQuantizedTensor]: ...
-
-
-MlxCacheT = TypeVar("MlxCacheT", bound=MlxAttentionCache | None)
 
 
 def rope_safe(rope, x: mx.array, offset: int | mx.array) -> mx.array:
@@ -515,7 +500,7 @@ class TextModel(nn.Module):
         self,
         input_ids: Optional[mx.array] = None,
         inputs_embeds: Optional[mx.array] = None,
-        cache: list[MlxCacheT] | None = None,
+        cache: Sequence[MlxAttentionCache | None] | None = None,
     ) -> mx.array:
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
@@ -600,7 +585,7 @@ class Qwen3ASRModel(nn.Module):
     def forward_last_logits(
         self,
         inputs_embeds: mx.array,
-        cache: list[MlxCacheT] | None = None,
+        cache: Sequence[MlxAttentionCache | None] | None = None,
     ) -> mx.array:
         hidden_states = self.model(inputs_embeds=inputs_embeds, cache=cache)[:, -1:, :]
 
@@ -615,7 +600,7 @@ class Qwen3ASRModel(nn.Module):
         self,
         input_ids: mx.array,
         input_embeddings: Optional[mx.array] = None,
-        cache: list[MlxCacheT] | None = None,
+        cache: Sequence[MlxAttentionCache | None] | None = None,
     ) -> mx.array:
         if input_embeddings is None:
             inputs_embeds = self.model.embed_tokens(input_ids)
@@ -631,7 +616,7 @@ class Qwen3ASRModel(nn.Module):
 
         return logits
 
-    def make_cache(self) -> "list[KVCache]":
+    def make_cache(self) -> list[KVCache]:
         """Create KV cache for generation."""
         from mlx_lm.models.cache import KVCache
 

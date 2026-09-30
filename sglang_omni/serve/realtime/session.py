@@ -5,7 +5,7 @@ import dataclasses
 import json
 import uuid
 from dataclasses import dataclass
-from typing import Mapping, TypedDict, TypeVar, overload
+from typing import Mapping, TypedDict, overload
 
 from fastapi import WebSocket
 from starlette.websockets import WebSocketState
@@ -58,9 +58,6 @@ HANDLERS: dict[type[ClientEvent], str] = {
 }
 
 _UNSET = object()
-EventValueT = TypeVar("EventValueT")
-DetectionValueT = TypeVar("DetectionValueT")
-TaskResultT = TypeVar("TaskResultT")
 
 
 class RequiredTerminalFields(TypedDict):
@@ -195,7 +192,7 @@ class RealtimeSession:
             assert isinstance(payload, dict), "Top-level payload must be a JSON object"
             await self.dispatch(payload)
 
-    async def dispatch(self, payload: dict[str, EventValueT]) -> None:
+    async def dispatch(self, payload: Mapping[str, object]) -> None:
         event = parse_conversation_client_event(payload)
         assert event is not None, f"Unsupported event type: {payload.get('type')!r}"
         method_name = HANDLERS[type(event)]
@@ -390,15 +387,15 @@ class RealtimeSession:
     @staticmethod
     @overload
     def merge_turn_detection(
-        current: Mapping[str, DetectionValueT] | None,
-        update: Mapping[str, DetectionValueT] | None,
-    ) -> dict[str, DetectionValueT | str] | None: ...
+        current: Mapping[str, object] | None,
+        update: Mapping[str, object] | None,
+    ) -> dict[str, object] | None: ...
 
     @staticmethod
     def merge_turn_detection(
-        current: Mapping[str, DetectionValueT] | None,
-        update: Mapping[str, DetectionValueT] | None,
-    ) -> dict[str, DetectionValueT | str] | None:
+        current: Mapping[str, object] | None,
+        update: Mapping[str, object] | None,
+    ) -> dict[str, object] | None:
         if update is None:
             return dict(current) if current is not None else None
         else:
@@ -409,7 +406,7 @@ class RealtimeSession:
             current_data.get("type") or TurnDetectionType.SERVER_VAD.value
         )
         requested_type = str(update_data.get("type") or current_type)
-        merged: dict[str, DetectionValueT | str]
+        merged: dict[str, object]
         if requested_type == current_type:
             merged = {**current_data, **update_data}
         else:
@@ -1200,7 +1197,7 @@ class RealtimeSession:
         )
 
     async def cancel_and_abort(
-        self, task: asyncio.Task[TaskResultT] | None, request_id: str | None
+        self, task: asyncio.Task[None] | None, request_id: str | None
     ) -> None:
         """Cancel the owning turn, abort its engine request, absorb the result.
 

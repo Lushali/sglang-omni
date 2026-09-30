@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import torch
 
 from sglang_omni.model_runner.base import ModelRunner
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.voxtral_tts.acoustic_transformer import AudioSpecialTokens
 from sglang_omni.scheduling.types import (
     RequestOutput,
@@ -20,7 +21,6 @@ if TYPE_CHECKING:
     from sglang.srt.managers.scheduler import GenerationBatchResult
     from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.voxtral_tts.request_builders import VoxtralSGLangRequestData
     from sglang_omni.models.voxtral_tts.sglang_model import VoxtralSGLangTTSModel
     from sglang_omni.scheduling.sglang_backend.output_processor import (

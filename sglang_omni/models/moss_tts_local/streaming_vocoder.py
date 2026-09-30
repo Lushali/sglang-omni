@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Mapping
+from typing import Mapping
 
 import torch
 
@@ -22,6 +22,9 @@ from sglang_omni.models.moss_tts.audio_tokenizer import (
 )
 from sglang_omni.models.moss_tts.vocoder import decode_codes_batch
 from sglang_omni.models.moss_tts_local.payload_types import MossTTSLocalState
+from sglang_omni.models.moss_tts_local.vocoder_cuda_graph import (
+    MossVocoderCudaGraphRunner,
+)
 from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.pipeline_state import build_usage
 from sglang_omni.scheduling.streaming_vocoder import (
@@ -29,13 +32,6 @@ from sglang_omni.scheduling.streaming_vocoder import (
     resolve_initial_codec_chunk_frames,
 )
 from sglang_omni.utils.audio_payload import audio_waveform_payload
-
-if TYPE_CHECKING:
-    from sglang_omni.models.moss_tts_local.vocoder_cuda_graph import (
-        MossVocoderCudaGraphRunner,
-    )
-else:
-    pass
 
 logger = logging.getLogger(__name__)
 

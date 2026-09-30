@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 import torch
 
 from sglang_omni.model_runner.base import ModelRunner
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.sampling.seed import derive_sampling_seed
 from sglang_omni.scheduling.types import SchedulerRequest
 
@@ -30,7 +31,6 @@ if TYPE_CHECKING:
     )
     from sglang.srt.models.qwen3 import Qwen3ForCausalLM
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.minimax_music3.sglang_request_builder import (
         MiniMaxMusic3SGLangRequestData,
     )

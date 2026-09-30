@@ -6,16 +6,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import torch
+from transformers.cache_utils import Cache
 
 from sglang_omni.model_runner.base import ModelRunner
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.scheduling.types import SchedulerRequest
 
 if TYPE_CHECKING:
     from sglang.srt.managers.schedule_batch import ScheduleBatch
     from sglang.srt.managers.scheduler import GenerationBatchResult
-    from transformers.cache_utils import Cache
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,
     )

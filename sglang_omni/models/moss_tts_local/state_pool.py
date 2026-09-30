@@ -20,12 +20,13 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from sglang_omni.scheduling.types import SchedulerRequest
+
 if TYPE_CHECKING:
     from sglang_omni.models.moss_tts_local.request_builders import (
         MossTTSLocalSGLangRequestData,
     )
     from sglang_omni.models.moss_tts_local.sglang_model import MossTTSLocalSGLangModel
-    from sglang_omni.scheduling.types import SchedulerRequest
 else:
     pass
 
@@ -306,7 +307,7 @@ class MossTTSLocalDecodeStatePool:
         return self.rid_to_row.get(rid)
 
     def prepare_active_rows(
-        self, requests: list["SchedulerRequest"]
+        self, requests: list[SchedulerRequest]
     ) -> tuple[torch.Tensor, list[int], bool]:
         """Acquire active rows and write request-static params for this batch."""
         pool_rows = []

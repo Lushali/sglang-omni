@@ -9,9 +9,10 @@ import math
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar, overload
+from typing import TYPE_CHECKING, overload
 
 import torch
+from transformers import PreTrainedTokenizerBase
 
 from sglang_omni.models.dots_tts.codec import (
     DotsReferenceEncoder,
@@ -19,6 +20,7 @@ from sglang_omni.models.dots_tts.codec import (
 )
 from sglang_omni.models.dots_tts.compat import import_dots_tts
 from sglang_omni.models.dots_tts.payload_types import DotsTTSState
+from sglang_omni.models.dots_tts.request_builders import DotsTTSSGLangRequestData
 from sglang_omni.models.dots_tts.vocoder import DotsTTSStreamingVocoder
 from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.omni_scheduler import OmniScheduler
@@ -28,16 +30,11 @@ from sglang_omni.utils.checkpoint import resolve_checkpoint
 
 if TYPE_CHECKING:
     from dots_tts.models.dots_tts.config import ModelConfig
-    from transformers import PreTrainedTokenizerBase
 
-    from sglang_omni.models.dots_tts.request_builders import DotsTTSSGLangRequestData
 else:
     pass
 
 _DEFAULT_CONTEXT_LENGTH = 2048
-
-ValueT = TypeVar("ValueT")
-DefaultT = TypeVar("DefaultT")
 
 
 def configure_optimized_kernels() -> None:
@@ -75,16 +72,14 @@ def configure_optimized_kernels() -> None:
 
 
 @overload
-def first_not_none(*values: ValueT | None, default: DefaultT) -> ValueT | DefaultT: ...
+def first_not_none(*values: str | None, default: str | None = None) -> str | None: ...
 
 
 @overload
-def first_not_none(*values: ValueT | None) -> ValueT | None: ...
+def first_not_none(*values: object, default: object = None) -> object: ...
 
 
-def first_not_none(
-    *values: ValueT | None, default: DefaultT | None = None
-) -> ValueT | DefaultT | None:
+def first_not_none(*values: object, default: object = None) -> object:
     return next((value for value in values if value is not None), default)
 
 
@@ -124,7 +119,7 @@ def reference_path(value: object) -> str | None:
 def preprocess_dots_tts_payload(
     payload: StagePayload,
     *,
-    tokenizer: "PreTrainedTokenizerBase",
+    tokenizer: PreTrainedTokenizerBase,
     model_config: "ModelConfig",
     max_generate_length: int,
     max_sequence_length: int,
@@ -402,7 +397,7 @@ def preprocess_dots_tts_payload(
 
 def load_model_metadata(
     model_path: str,
-) -> tuple[str, "ModelConfig", "PreTrainedTokenizerBase", int]:
+) -> tuple[str, "ModelConfig", PreTrainedTokenizerBase, int]:
     import_dots_tts()
     from dots_tts.models.dots_tts.config import ModelConfig
     from transformers import AutoTokenizer
@@ -495,7 +490,7 @@ def create_sglang_latent_engine_executor(
     device: str | None = None,
     gpu_id: int | None = None,
     server_args_overrides: Mapping[str, object] | None = None,
-) -> "OmniScheduler[DotsTTSSGLangRequestData]":
+) -> OmniScheduler[DotsTTSSGLangRequestData]:
     from sglang_omni.models.dots_tts.engine_builder import DotsTTSEngineBuilder
 
     if not torch.cuda.is_available():

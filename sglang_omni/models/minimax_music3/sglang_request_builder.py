@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import torch
+from transformers import PreTrainedTokenizerBase
 
 from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.message import OutgoingMessage
@@ -22,7 +23,6 @@ from .prompt import AUDIO_CODE_OFFSET, SPECIAL_TOKEN_IDS
 from .request_builders import build_ttm_state
 
 if TYPE_CHECKING:
-    from transformers import PreTrainedTokenizerBase
 
     from sglang_omni.models.minimax_music3.model_runner import MiniMaxMusic3ARState
 else:
@@ -54,7 +54,7 @@ class MiniMaxMusic3SGLangRequestData(SGLangARRequestData):
 
 
 def build_sglang_minimax_request(
-    payload: StagePayload, tokenizer: "PreTrainedTokenizerBase"
+    payload: StagePayload, tokenizer: PreTrainedTokenizerBase
 ) -> MiniMaxMusic3SGLangRequestData:
     from sglang.srt.managers.schedule_batch import Req
     from sglang.srt.sampling.sampling_params import SamplingParams

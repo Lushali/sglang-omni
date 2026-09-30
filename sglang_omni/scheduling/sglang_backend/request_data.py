@@ -7,14 +7,15 @@ import collections
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from sglang.srt.managers.schedule_batch import Req
+
+from sglang_omni.models.qwen3_omni.pending_text_queue import PendingTextTensorQueue
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.types import ARRequestData
 
 if TYPE_CHECKING:
     import torch
-    from sglang.srt.managers.schedule_batch import Req
 
-    from sglang_omni.models.qwen3_omni.pending_text_queue import PendingTextTensorQueue
-    from sglang_omni.proto import StagePayload
 else:
     pass
 

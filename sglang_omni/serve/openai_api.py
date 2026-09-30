@@ -28,7 +28,7 @@ import uuid
 from collections.abc import Awaitable, Callable, Mapping, MutableMapping
 from contextlib import aclosing, suppress
 from dataclasses import asdict
-from typing import AsyncIterator, TypeVar
+from typing import AsyncIterator
 
 from fastapi import (
     Depends,
@@ -138,10 +138,6 @@ from sglang_omni.serve.translations import register_translations
 logger = logging.getLogger(__name__)
 HTTP_DISCONNECT_POLL_INTERVAL_S = 0.05
 HTTP_DISCONNECT_CANCEL_TIMEOUT_S = 0.1
-
-ValueT = TypeVar("ValueT")
-ModelInfoT = TypeVar("ModelInfoT", bound=Mapping[str, object])
-TaskResultT = TypeVar("TaskResultT")
 
 
 class RequestBodyTooLarge(Exception):
@@ -633,7 +629,7 @@ def request_payload(req: AdminRequestBase) -> dict[str, object]:
     return req.model_dump(exclude={"stages", "timeout_s"}, exclude_none=True)
 
 
-def admin_response(result: dict[str, ValueT] | AdminResponse) -> JSONResponse:
+def admin_response(result: AdminResponse) -> JSONResponse:
     if not result.get("success", False):
         raise HTTPException(status_code=400, detail=result)
     else:
@@ -641,7 +637,7 @@ def admin_response(result: dict[str, ValueT] | AdminResponse) -> JSONResponse:
     return JSONResponse(content=result)
 
 
-def model_info_response(result: dict[str, ValueT] | AdminResponse) -> JSONResponse:
+def model_info_response(result: AdminResponse) -> JSONResponse:
     if not result.get("success", False):
         raise HTTPException(status_code=400, detail=result)
     else:
@@ -693,7 +689,7 @@ def extract_model_info_stage_data(
 
 def common_model_info_value(
     result: object,
-    stage_infos: list[ModelInfoT],
+    stage_infos: list[dict[str, object]],
     key: str,
     *,
     mixed_status_code: int | None = None,
@@ -1874,7 +1870,9 @@ async def await_speech_response(
             pass
 
 
-async def cancel_task_bounded(task: asyncio.Task[TaskResultT]) -> None:
+async def cancel_task_bounded(
+    task: asyncio.Task[GenerateChunk | SpeechResult | None],
+) -> None:
     task.cancel()
     done, _ = await asyncio.wait({task}, timeout=HTTP_DISCONNECT_CANCEL_TIMEOUT_S)
     if done:
@@ -1883,7 +1881,9 @@ async def cancel_task_bounded(task: asyncio.Task[TaskResultT]) -> None:
         task.add_done_callback(discard_cancelled_task_result)
 
 
-def discard_cancelled_task_result(task: asyncio.Task[TaskResultT]) -> None:
+def discard_cancelled_task_result(
+    task: asyncio.Task[GenerateChunk | SpeechResult | None],
+) -> None:
     try:
         task.result()
     except asyncio.CancelledError:

@@ -55,7 +55,7 @@ class TensorMeta(msgspec.Struct, frozen=True):
         }
 
     @classmethod
-    def from_dict(cls, value: dict[str, DataRefValueT]) -> "TensorMeta":
+    def from_dict(cls, value: Mapping[str, object]) -> "TensorMeta":
         return cls(
             path=required(value, "path", str),
             shape=int_tuple(value, "shape"),
@@ -73,7 +73,7 @@ class BackendRef(msgspec.Struct, frozen=True):
 
     @classmethod
     def from_relay_info(
-        cls, *, transport: TransportKind, relay_info: dict[str, DataRefValueT]
+        cls, *, transport: TransportKind, relay_info: dict[str, object]
     ) -> "BackendRef":
         transfer_info = required(relay_info, "transfer_info", dict)
         return cls(
@@ -90,7 +90,7 @@ class BackendRef(msgspec.Struct, frozen=True):
         }
 
     @classmethod
-    def from_dict(cls, value: dict[str, DataRefValueT]) -> "BackendRef":
+    def from_dict(cls, value: Mapping[str, object]) -> "BackendRef":
         return cls(
             transport=TransportKind(required(value, "transport", str)),
             info=required(value, "info", dict),
@@ -106,7 +106,7 @@ class MetadataTensorRef(msgspec.Struct, frozen=True):
         return {"path": self.path, "ref": self.ref.to_dict()}
 
     @classmethod
-    def from_dict(cls, value: dict[str, DataRefValueT]) -> "MetadataTensorRef":
+    def from_dict(cls, value: Mapping[str, object]) -> "MetadataTensorRef":
         return cls(
             path=required(value, "path", str),
             ref=DataRef.from_dict(required(value, "ref", dict)),

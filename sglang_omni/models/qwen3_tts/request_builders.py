@@ -12,8 +12,10 @@ import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Literal, TypedDict
 
+import numpy as np
+import numpy.typing as npt
 import torch
 
 from sglang_omni.models.qwen3_omni.pending_text_queue import PendingTextTensorQueue
@@ -46,8 +48,6 @@ from sglang_omni.scheduling.streaming_vocoder import INITIAL_CODEC_CHUNK_FRAMES_
 from sglang_omni.utils.audio_payload import audio_data_uri_from_reference
 
 if TYPE_CHECKING:
-    import numpy as np
-    import numpy.typing as npt
     from qwen_tts import Qwen3TTSModel, Qwen3TTSTokenizer
 
     from sglang_omni.models.qwen3_tts.prompt_frontend import Qwen3TTSPromptFrontend
@@ -57,9 +57,6 @@ if TYPE_CHECKING:
 else:
     pass
 
-RefCodeT = TypeVar("RefCodeT")
-ParamValueT = TypeVar("ParamValueT")
-TTSParamValueT = TypeVar("TTSParamValueT")
 
 QWEN3_TTS_DEFAULT_MAX_NEW_TOKENS = 2048
 QWEN3_TTS_TASK_BASE = "Base"
@@ -499,7 +496,7 @@ def normalize_qwen3_tts_inputs(inputs: object) -> tuple[str, list[dict[str, obje
 
 def resolve_voice_clone_reference(
     references: list[dict[str, object]],
-    tts_params: dict[str, TTSParamValueT],
+    tts_params: dict[str, object],
 ) -> tuple[object, str | None]:
     reference = references[0] if references else {}
     ref_audio = (
@@ -521,7 +518,7 @@ def resolve_voice_clone_reference(
 
 def has_voice_clone_reference(
     references: list[dict[str, object]],
-    tts_params: dict[str, TTSParamValueT],
+    tts_params: dict[str, object],
 ) -> bool:
     if references_contain_audio(references) or references_contain_text(references):
         return True
@@ -591,8 +588,8 @@ def normalize_qwen3_tts_voice(value: object) -> str | None:
 
 
 def has_param(
-    tts_params: dict[str, TTSParamValueT],
-    params: dict[str, ParamValueT],
+    tts_params: dict[str, object],
+    params: dict[str, object],
     name: str,
 ) -> bool:
     return name in tts_params or name in params
@@ -601,8 +598,8 @@ def has_param(
 def resolve_non_streaming_mode(
     *,
     task_type: str,
-    params: dict[str, ParamValueT],
-    tts_params: dict[str, TTSParamValueT],
+    params: dict[str, object],
+    tts_params: dict[str, object],
 ) -> bool:
     for source in (params, tts_params):
         if "non_streaming_mode" in source:
@@ -614,8 +611,8 @@ def resolve_non_streaming_mode(
 
 def resolve_stream_codec_output(
     *,
-    params: dict[str, ParamValueT],
-    tts_params: dict[str, TTSParamValueT],
+    params: dict[str, object],
+    tts_params: dict[str, object],
     default: bool = True,
 ) -> bool:
     # Note (Jiaxin Deng): non_streaming_mode is still honoured as a fallback so the
@@ -659,8 +656,8 @@ def resolve_bootstrap_silence_suppression(
     language: str,
     instructions: str | None,
     stream_codec_output: bool,
-    params: dict[str, ParamValueT],
-    tts_params: dict[str, TTSParamValueT],
+    params: dict[str, object],
+    tts_params: dict[str, object],
 ) -> bool:
     for source in (params, tts_params):
         if "suppress_bootstrap_silence" in source:
@@ -714,8 +711,8 @@ def normalize_language(language: object) -> str:
 
 def resolve_x_vector_only_mode(
     *,
-    params: dict[str, ParamValueT],
-    tts_params: dict[str, TTSParamValueT],
+    params: dict[str, object],
+    tts_params: dict[str, object],
     ref_text: str | None,
 ) -> bool:
     for source in (params, tts_params):
@@ -729,7 +726,7 @@ def resolve_x_vector_only_mode(
 def build_generation_kwargs(
     params: Mapping[str, object],
     *,
-    tts_params: dict[str, TTSParamValueT],
+    tts_params: dict[str, object],
     tts_engine_params: Mapping[str, object],
 ) -> dict[str, object]:
     explicit_generation_params = tts_params.get("explicit_generation_params")
@@ -925,7 +922,7 @@ def new_cuda_encode_stream(device: torch.device) -> torch.cuda.Stream | None:
     return torch.cuda.Stream(device=device)
 
 
-def record_ref_code_consumer_stream(ref_code: RefCodeT) -> RefCodeT:
+def record_ref_code_consumer_stream(ref_code: torch.Tensor) -> torch.Tensor:
     # note (luojiaxuan): reference codes may be allocated on the batcher's
     # private stream; register the consumer stream with the caching allocator
     # so a later batch cannot recycle the block while reads are still queued.

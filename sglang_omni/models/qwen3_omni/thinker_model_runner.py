@@ -6,7 +6,7 @@ from __future__ import annotations
 from array import array
 from dataclasses import dataclass
 from numbers import Integral
-from typing import TypeGuard, TypeVar
+from typing import TypeGuard
 
 import torch
 from sglang.srt.managers.schedule_batch import Req, ScheduleBatch
@@ -32,7 +32,6 @@ _PREFILL_AUDIO_INPUT_KEYS = frozenset(
 
 _SIDECAR = "sidecar"
 _UNSUPPORTED = "unsupported"
-PadValueT = TypeVar("PadValueT")
 
 
 @dataclass(frozen=True)
@@ -104,7 +103,7 @@ class Qwen3OmniThinkerModelRunner(ThinkerModelRunner):
         return [int(item) for item in value]
 
     def mm_positions(
-        self, req: Req, pad_values: dict[str, PadValueT]
+        self, req: Req, pad_values: dict[str, int]
     ) -> dict[str, torch.Tensor] | None:
         try:
             positions = self.req_mm_token_positions(req, pad_values)

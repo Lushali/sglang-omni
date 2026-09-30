@@ -15,6 +15,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 import torch
 
+from sglang_omni.models.zonos2.components.streaming_vocoder import (
+    Zonos2StreamingVocoderScheduler,
+)
 from sglang_omni.models.zonos2.components.text_frontend import (
     build_prompt_rows,
     configure_tts_norm_cache_root,
@@ -34,9 +37,6 @@ from sglang_omni.scheduling.simple_scheduler import SimpleScheduler
 from sglang_omni.utils.audio_payload import audio_waveform_payload
 
 if TYPE_CHECKING:
-    from sglang_omni.models.zonos2.components.streaming_vocoder import (
-        Zonos2StreamingVocoderScheduler,
-    )
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
 else:
     pass
@@ -135,7 +135,7 @@ def create_vocoder_executor(
     gpu_id: int | None = None,
     dac_batch: bool = False,
     vocoder_warmup: bool = False,
-) -> "Zonos2StreamingVocoderScheduler":
+) -> Zonos2StreamingVocoderScheduler:
     from sglang_omni.models.zonos2.components.streaming_vocoder import (
         Zonos2StreamingVocoderScheduler,
         decode_batch,

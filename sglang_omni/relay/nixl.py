@@ -6,7 +6,7 @@ import logging
 import time
 import uuid
 from collections.abc import Mapping
-from typing import Callable, Dict, Generic, TypeVar
+from typing import Callable, Dict
 
 import numpy as np
 import torch
@@ -49,27 +49,24 @@ class Connection:
         return self.remote_agents[remote_engine_id]
 
 
-NixlMetadataT = TypeVar("NixlMetadataT")
-
-
-class NixlOperation(RelayOperation, Generic[NixlMetadataT]):
+class NixlOperation(RelayOperation):
     """Base class for async operations."""
 
     def __init__(
-        self, connection: Connection, metadata: NixlMetadataT | None = None
+        self, connection: Connection, metadata: dict[str, object] | None = None
     ) -> None:
         self.conn = connection
         self._metadata = metadata  # noqa: leading-underscore  # upstream spelling, or the public name is already taken
         self.completed = False
 
     @property
-    def metadata(self) -> NixlMetadataT | None:
+    def metadata(self) -> dict[str, object] | None:
         return (
             self._metadata
         )  # noqa: leading-underscore  # upstream spelling, or the public name is already taken
 
 
-class PutOperation(NixlOperation[NixlMetadataT]):
+class PutOperation(NixlOperation):
     """
     Handle for a Put operation.
     Waits for a notification from the receiver indicating they have finished reading.
@@ -79,7 +76,7 @@ class PutOperation(NixlOperation[NixlMetadataT]):
     def __init__(
         self,
         connection: Connection,
-        metadata: NixlMetadataT,
+        metadata: dict[str, object],
         expected_notification: bytes,
         on_completion_cb: Callable[[], None],
     ) -> None:
@@ -127,7 +124,7 @@ class PutOperation(NixlOperation[NixlMetadataT]):
             self.on_completion_cb()
 
 
-class GetOperation(NixlOperation[None]):
+class GetOperation(NixlOperation):
     """
     Handle for a Get operation.
     Waits for the RDMA transfer handle to complete.
@@ -246,7 +243,7 @@ class NixlRelay(Relay):
         request_id: str | None = None,
         dst_rank: int | None = None,
         receiver_id: str | None = None,
-    ) -> PutOperation[dict[str, object]]:
+    ) -> PutOperation:
         """
         Asynchronously put tensor. Returns a PutOperation.
         """

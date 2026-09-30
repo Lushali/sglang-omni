@@ -7,8 +7,11 @@ from typing import TYPE_CHECKING
 
 import torch
 from sglang.srt.layers.sampler import multinomial_with_seed
+from sglang.srt.managers.schedule_batch import ScheduleBatch
+from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 
 from sglang_omni.model_runner.base import ModelRunner
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.model_runner.prefill_inputs import (
     OmniPrefillInputs,
     attach_omni_prefill_inputs,
@@ -28,11 +31,8 @@ from sglang_omni.scheduling.types import (
 )
 
 if TYPE_CHECKING:
-    from sglang.srt.managers.schedule_batch import ScheduleBatch
     from sglang.srt.managers.scheduler import GenerationBatchResult
-    from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.moss_tts.sglang_model import (
         ChannelLogitsList,
         MossTTSDelaySGLangModel,

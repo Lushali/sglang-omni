@@ -7,6 +7,8 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Callable
 
 from sglang.srt.managers.mm_utils import init_mm_embedding_cache
+from sglang.srt.server_args import ServerArgs
+from transformers import PreTrainedTokenizerBase
 
 from sglang_omni.models.moss_transcribe_diarize import CAPABILITIES, request_builders
 from sglang_omni.models.moss_transcribe_diarize.encoder_service import (
@@ -15,23 +17,21 @@ from sglang_omni.models.moss_transcribe_diarize.encoder_service import (
 from sglang_omni.models.moss_transcribe_diarize.request_builders import (
     MossTranscribeDiarizeRequestData,
 )
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.engine_factory import AsrEngineBuilder, GenerationDefaults
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
     build_default_prefill_cuda_graph_bs,
 )
 from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
 from sglang_omni.scheduling.types import RequestOutput
 
 if TYPE_CHECKING:
-    from sglang.srt.server_args import ServerArgs
-    from transformers import PreTrainedTokenizerBase
 
     from sglang_omni.models.moss_transcribe_diarize.sglang_model import (
         MossTranscribeDiarizeForConditionalGeneration,
     )
-    from sglang_omni.proto import StagePayload
-    from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
 else:
     pass
 
@@ -96,7 +96,7 @@ class MossTranscribeDiarizeEngineBuilder(
         self.request_build_max_pending = request_build_max_pending
         self.stream_emit_interval_s = stream_emit_interval_s
         self.processor: object = None
-        self.tokenizer: "PreTrainedTokenizerBase | None" = None
+        self.tokenizer: PreTrainedTokenizerBase | None = None
         self.audio_encoder_service: BatchedAudioEncoderService | None = None
         self.max_new_tokens = 0
         self.context_length = 0

@@ -7,6 +7,9 @@ import importlib
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING
 
+from sglang.srt.server_args import ServerArgs
+
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.moss_tts.hf_loading import (
     MOSS_TTS_DEFAULT_CONTEXT_LENGTH,
     resolve_moss_tts_context_length,
@@ -16,17 +19,15 @@ from sglang_omni.models.moss_tts_local import stages as moss_local_stages
 from sglang_omni.models.moss_tts_local.request_builders import (
     MossTTSLocalSGLangRequestData,
 )
+from sglang_omni.proto.request import StagePayload
+from sglang_omni.scheduling.bootstrap import InfrastructureOptions
 from sglang_omni.scheduling.engine_factory import GenerationDefaults, TtsEngineBuilder
 
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
-    from sglang.srt.server_args import ServerArgs
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.moss_tts_local.model_runner import MossTTSLocalModelRunner
     from sglang_omni.models.moss_tts_local.sglang_model import MossTTSLocalSGLangModel
-    from sglang_omni.proto import StagePayload
-    from sglang_omni.scheduling.bootstrap import InfrastructureOptions
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,

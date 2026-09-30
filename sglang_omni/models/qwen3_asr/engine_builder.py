@@ -8,9 +8,17 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Callable
 
 from sglang.srt.managers.mm_utils import init_mm_embedding_cache
+from sglang.srt.server_args import ServerArgs
 from sglang.srt.utils import get_hip_version, is_gfx95_supported
-from transformers import AutoFeatureExtractor, AutoTokenizer
+from transformers import (
+    AutoFeatureExtractor,
+    AutoTokenizer,
+    PreTrainedTokenizerBase,
+    WhisperFeatureExtractor,
+)
 
+from sglang_omni.model_runner.base import ModelRunner
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.qwen3_asr import mrope_fast_path, request_builders
 from sglang_omni.models.qwen3_asr.audio_lengths import (
     qwen3_asr_max_audio_tokens,
@@ -22,12 +30,14 @@ from sglang_omni.models.qwen3_asr.encoder_service import (
 )
 from sglang_omni.models.qwen3_asr.request_builders import Qwen3ASRRequestData
 from sglang_omni.platforms import current_platform
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.engine_factory import AsrEngineBuilder, GenerationDefaults
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
     get_decode_cuda_graph_bs,
 )
 from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputProcessor
 from sglang_omni.scheduling.types import DeferredAdmission, RequestOutput
 from sglang_omni.utils.gpu_compat import get_visible_gpu_sm_version
 from sglang_omni.utils.gpu_memory import format_bytes_gib, get_process_gpu_memory_bytes
@@ -35,22 +45,14 @@ from sglang_omni.utils.gpu_memory import format_bytes_gib, get_process_gpu_memor
 if TYPE_CHECKING:
     from sglang.srt.hardware_backend.mlx.model_runner_stub import _DummyModel
     from sglang.srt.hardware_backend.mlx.tp_worker import MlxTpModelWorker
-    from sglang.srt.server_args import ServerArgs
-    from transformers import PreTrainedTokenizerBase, WhisperFeatureExtractor
 
-    from sglang_omni.model_runner.base import ModelRunner
-    from sglang_omni.model_runner.model_worker import ModelWorker
     from sglang_omni.models.qwen3_asr.sglang_model import (
         Qwen3ASRForConditionalGeneration,
     )
     from sglang_omni.models.qwen3_asr.torch_mps_runner import (
         Qwen3ASRTorchMpsModelRunner,
     )
-    from sglang_omni.proto import StagePayload
     from sglang_omni.scheduling.omni_scheduler import OmniScheduler
-    from sglang_omni.scheduling.sglang_backend.output_processor import (
-        SGLangOutputProcessor,
-    )
 else:
     pass
 
@@ -135,7 +137,7 @@ class Qwen3ASREngineBuilder(AsrEngineBuilder[Qwen3ASRRequestData]):
         self.enable_encoder_cuda_graph = enable_encoder_cuda_graph
         self.max_audio_clip_s = max_audio_clip_s
         self.tokenizer: PreTrainedTokenizerBase | None = None
-        self.feature_extractor: "WhisperFeatureExtractor | None" = None
+        self.feature_extractor: WhisperFeatureExtractor | None = None
         self.context_length = 0
         self.device: str | None = None
         self.model_path: str | None = None

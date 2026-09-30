@@ -9,10 +9,16 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import torch
+from sglang.srt.managers.schedule_batch import Req
 from transformers import PretrainedConfig
 
 from sglang_omni.models.moss_tts.audio_tokenizer import (
     _STREAMING_ROPE_CACHE_DURATION_SECONDS,
+)
+from sglang_omni.models.moss_tts.hf_loading import (
+    MossLocalReferences,
+    MossRequestProcessor,
+    MossUserMessage,
 )
 from sglang_omni.models.moss_tts.request_builders import (
     _DATA_URI_RE,
@@ -34,13 +40,7 @@ from sglang_omni.scheduling.streaming_vocoder import INITIAL_CODEC_CHUNK_FRAMES_
 from sglang_omni.scheduling.types import ARRequestData
 
 if TYPE_CHECKING:
-    from sglang.srt.managers.schedule_batch import Req
 
-    from sglang_omni.models.moss_tts.hf_loading import (
-        MossLocalReferences,
-        MossRequestProcessor,
-        MossUserMessage,
-    )
     from sglang_omni.models.moss_tts_local.sglang_model import MossTTSLocalSGLangModel
     from sglang_omni.models.moss_tts_local.stages import (
         BatchedReferenceEncoder,
@@ -108,7 +108,7 @@ class MossTTSLocalPreparedRequest:
 
 @dataclass
 class PreprocessingContext:
-    processor: "MossRequestProcessor[MossLocalReferences]"
+    processor: MossRequestProcessor[MossLocalReferences]
     reference_encoder: ReferenceEncoder | None = None
 
 
@@ -120,7 +120,7 @@ MOSS_STREAM_TRANSPORT_BATCH_FRAMES = 5
 
 def set_moss_tts_local_preprocessing_context(
     *,
-    processor: "MossRequestProcessor[MossLocalReferences]",
+    processor: MossRequestProcessor[MossLocalReferences],
     reference_encoder: ReferenceEncoder | None = None,
 ) -> None:
     _QUEUE.set_context(
@@ -295,12 +295,12 @@ def build_generation_kwargs(
 
 
 def build_processor_message(
-    processor: "MossRequestProcessor[MossLocalReferences]",
+    processor: MossRequestProcessor[MossLocalReferences],
     state: MossTTSLocalState,
     reference_encoder: ReferenceEncoder | None = None,
-) -> "MossUserMessage":
+) -> MossUserMessage:
     ref_audio = state.ref_audio
-    reference: "MossLocalReferences | None"
+    reference: MossLocalReferences | None
     if reference_encoder is not None and isinstance(ref_audio, str):
         if _DATA_URI_RE.match(ref_audio) is None:
             reference = [reference_encoder.encode(ref_audio)]
@@ -321,7 +321,7 @@ def build_processor_message(
 def prepare_moss_tts_local_request(
     payload: StagePayload,
     *,
-    processor: "MossRequestProcessor[MossLocalReferences]",
+    processor: MossRequestProcessor[MossLocalReferences],
     reference_encoder: ReferenceEncoder | None = None,
 ) -> MossTTSLocalPreparedRequest:
     state = build_moss_tts_local_state(payload)

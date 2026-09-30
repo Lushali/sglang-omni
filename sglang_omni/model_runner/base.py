@@ -15,7 +15,9 @@ from typing import TYPE_CHECKING, Generic, Protocol, TypeAlias
 import torch
 from typing_extensions import TypeVar
 
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.model_runner.prefill_inputs import clear_omni_prefill_inputs
+from sglang_omni.model_runner.sglang_execution import SGLangExecutionBridge
 from sglang_omni.platforms import current_platform
 from sglang_omni.sampling.seed import (
     SAMPLING_SEED_MASK,
@@ -42,8 +44,6 @@ if TYPE_CHECKING:
     )
     from sglang.srt.sampling.sampling_batch_info import SamplingBatchInfo
 
-    from sglang_omni.model_runner.model_worker import ModelWorker
-    from sglang_omni.model_runner.sglang_execution import SGLangExecutionBridge
     from sglang_omni.models.dots_tts.model_runner import DotsFlowLaunchBuf
     from sglang_omni.scheduling.sglang_backend.output_processor import (
         SGLangOutputProcessor,

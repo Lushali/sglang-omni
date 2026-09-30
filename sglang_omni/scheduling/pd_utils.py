@@ -12,7 +12,7 @@ from array import array
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager
 from functools import wraps
-from typing import Generic, Literal, ParamSpec, TypeVar
+from typing import Literal, ParamSpec, TypeVar
 
 import msgspec
 import torch
@@ -30,7 +30,6 @@ CONTINUATION_VERSION = 1
 _TRANSFER_TOMBSTONE_LIMIT = 10000
 Params = ParamSpec("Params")
 ResultT = TypeVar("ResultT")
-RequestT = TypeVar("RequestT")
 
 
 def serialize_kv_allocator(
@@ -636,13 +635,11 @@ class DecodeKVReceiver:
             self.closed = True
 
 
-class SGLangKVLease(Generic[RequestT]):
+class SGLangKVLease:
     """Keep source pages owned until the receiver ACKs the copy."""
 
-    def __init__(
-        self, req: RequestT | None, due_releases: queue.SimpleQueue[RequestT]
-    ) -> None:
-        self.req: RequestT | None = req
+    def __init__(self, req: Req | None, due_releases: queue.SimpleQueue[Req]) -> None:
+        self.req: Req | None = req
         self.due_releases = due_releases
         self.lock = threading.Lock()
 

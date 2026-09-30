@@ -8,7 +8,7 @@ import json
 import logging
 from collections.abc import AsyncGenerator, Callable
 from contextlib import AsyncExitStack, asynccontextmanager
-from typing import TypedDict, TypeVar
+from typing import TypedDict
 from urllib.parse import quote, unquote
 
 import httpx
@@ -58,7 +58,6 @@ _ADMIN_UPDATE_PATHS = {
     "/destroy_weights_update_group",
 }
 _ADMIN_UPDATE_LOCK_TIMEOUT_S = 300.0
-ModelInfoValue = TypeVar("ModelInfoValue")
 
 
 class AdminWorkerResultOptional(TypedDict, total=False):
@@ -1172,16 +1171,16 @@ def extract_worker_model_infos(
 
 
 def common_worker_model_info_value(
-    worker_infos: list[dict[str, ModelInfoValue]],
+    worker_infos: list[dict[str, JsonValue]],
     key: str,
     *,
     mixed_status_code: int | None = None,
     results: list[AdminWorkerResult] | None = None,
-) -> ModelInfoValue | None:
+) -> JsonValue | None:
     values = [info[key] for info in worker_infos if info.get(key) is not None]
     if not values:
         return None
-    unique: dict[str, ModelInfoValue] = {}
+    unique: dict[str, JsonValue] = {}
     for value in values:
         unique.setdefault(json.dumps(value, sort_keys=True, default=str), value)
     if len(unique) == 1:

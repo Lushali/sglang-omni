@@ -3,16 +3,14 @@
 
 from __future__ import annotations
 
-from typing import TypeVar
+from collections.abc import Mapping
 
 import numpy as np
 import torch
 from numpy.typing import ArrayLike
 
-ReferenceValueT = TypeVar("ReferenceValueT")
 
-
-def audio_data_uri_from_reference(reference: dict[str, ReferenceValueT]) -> str | None:
+def audio_data_uri_from_reference(reference: Mapping[str, object]) -> str | None:
     data = reference.get("data")
     if data is None:
         return None

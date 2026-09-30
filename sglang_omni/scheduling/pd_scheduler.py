@@ -17,11 +17,7 @@ from sglang.srt.managers.scheduler import Scheduler as _Upstream
 
 from sglang_omni.comm import KVPageTransfer
 from sglang_omni.scheduling.message import OutgoingMessage
-from sglang_omni.scheduling.omni_scheduler import (
-    AdminActionResult,
-    OmniScheduler,
-    PayloadValue,
-)
+from sglang_omni.scheduling.omni_scheduler import AdminActionResult, OmniScheduler
 from sglang_omni.scheduling.pd_utils import (
     DecodeKVReceiver,
     DecodeRequestPoolExhausted,
@@ -85,7 +81,7 @@ class PDKVLifecycle(OmniScheduler):
 
     def run_weight_update_with_lifecycle(
         self,
-        payload: dict[str, PayloadValue],
+        payload: dict[str, object],
         update_fn,
         result_data: Mapping[str, object],
         *,
