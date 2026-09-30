@@ -277,7 +277,9 @@ class FlowEstimatorTRT:
     ) -> tuple[list[IExecutionContext | torch.cuda.Stream], ICudaEngine]:
         return self.pool.get(), self.trt_engine
 
-    def release_estimator(self, context: object, stream: object) -> None:
+    def release_estimator(
+        self, context: IExecutionContext, stream: torch.cuda.Stream
+    ) -> None:
         self.pool.put([context, stream])
 
     def execute(

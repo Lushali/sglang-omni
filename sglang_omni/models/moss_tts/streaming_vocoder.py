@@ -21,6 +21,7 @@ from sglang_omni.scheduling.streaming_vocoder import (
 )
 
 if TYPE_CHECKING:
+    from sglang_omni.models.moss_tts.audio_tokenizer import MossAudioVocoder
     from sglang_omni.models.moss_tts.vocoder import MossTTSVocoder
 else:
     pass
@@ -474,7 +475,7 @@ class MossStreamingVocoderScheduler(StreamingVocoderBase[MossStreamState, None])
 
     @staticmethod
     def resolve_samples_per_frame(
-        audio_vocoder: object,
+        audio_vocoder: MossAudioVocoder,
         sample_rate: int,
     ) -> int | None:
         config = getattr(getattr(audio_vocoder, "model", None), "config", None)

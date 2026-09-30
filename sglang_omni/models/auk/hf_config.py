@@ -11,6 +11,7 @@ from pathlib import Path
 from omegaconf import OmegaConf
 
 from sglang_omni.models.auk import constants as C
+from sglang_omni.utils.json import JsonValue
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ def load_yaml(path: Path) -> dict[object, object]:
     return loaded if isinstance(loaded, dict) else {}
 
 
-def load_json(path: Path) -> object:
+def load_json(path: Path) -> JsonValue:
     import json
 
     with path.open("r", encoding="utf-8") as handle:

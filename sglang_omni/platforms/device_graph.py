@@ -24,6 +24,12 @@ class CudaCaptureKwargs(TypedDict, total=False):
     capture_error_mode: Literal["thread_local"]
 
 
+class NpuCaptureKwargs(TypedDict, total=False):
+    pool: tuple[int, int]
+    stream: torch.Stream
+    capture_error_mode: Literal["thread_local"]
+
+
 class XpuCaptureKwargs(TypedDict, total=False):
     pool: XpuGraphPoolHandle
     stream: torch.xpu.Stream
@@ -88,7 +94,7 @@ class NpuDeviceGraphBackend:
         thread_local_errors: bool = False,
     ) -> Iterator[ReplayableGraph]:
         graph = torch.npu.NPUGraph()
-        kwargs: dict[str, object] = {}
+        kwargs: NpuCaptureKwargs = {}
         if pool is not None:
             kwargs["pool"] = pool
         else:

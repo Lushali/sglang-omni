@@ -15,6 +15,9 @@ from sglang_omni.scheduling.pipeline_state import wire
 
 if TYPE_CHECKING:
     import torch
+    from transformers import PretrainedConfig
+
+    from sglang_omni.models.moss_tts.hf_loading import MossAudioConfig
 else:
     pass
 
@@ -50,7 +53,9 @@ def moss_tts_special_token_defaults(
     )
 
 
-def resolve_moss_audio_pad_code(config: object) -> int:
+def resolve_moss_audio_pad_code(
+    config: MossAudioConfig | PretrainedConfig | None,
+) -> int:
     value = getattr(config, "audio_pad_code", None)
     if value is not None:
         return int(value)

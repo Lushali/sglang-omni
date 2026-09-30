@@ -448,7 +448,12 @@ class CudaIpcGetOperation(RelayOperation):
         wait_executor: ThreadPoolExecutor,
         start_event: torch.cuda.Event | None = None,
         done_event: torch.cuda.Event | None = None,
-        held_references: tuple[object, ...] = (),
+        held_references: (
+            tuple[()]
+            | tuple[
+                torch.cuda.Event, tuple[torch.Tensor, ...], torch.Tensor, torch.Tensor
+            ]
+        ) = (),
         finish_on_interrupt: bool = False,
         emit_trace: bool = True,
     ) -> None:
