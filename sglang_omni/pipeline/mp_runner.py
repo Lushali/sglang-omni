@@ -91,6 +91,33 @@ def resolve_coordinator_max_in_flight(
     return (running + queued) * num_replicas
 
 
+class StageLaunchKwargs(TypedDict):
+    stage_name: str
+    factory: str
+    next_stages: str | list[str] | None
+    route_fn: str | None
+    is_terminal: bool
+    env_defaults: dict[str, str]
+    wait_for: list[str] | None
+    wait_for_fn: str | None
+    merge_fn: str | None
+    project_payload: dict[str, str]
+    coordinator_endpoint: str
+    abort_endpoint: str
+    stage_endpoints: dict[str, str]
+    rank_endpoints: dict[str, tuple[str, ...]]
+    stream_targets: list[str]
+    stream_done_to_fn: str | None
+    gpu_stage_names: set[str]
+    stage_gpu_ids: dict[str, tuple[int, ...]]
+    require_factory_gpu_id: bool
+    same_process_targets: set[str]
+    is_stream_receiver: bool
+    can_accept_stream_before_payload: bool
+    disable_direct_cuda_ipc_payload: bool
+    replica_topology: dict[str, list[str]]
+
+
 def build_stage_groups(
     config: PipelineConfig,
     ctx: multiprocessing.context.BaseContext | None = None,
@@ -161,7 +188,7 @@ def build_stage_groups(
         base_factory_kwargs = resolve_stage_factory_kwargs(stage_cfg, config)
         typed_kwargs = resolve_stage_typed_kwargs(stage_cfg)
 
-        stage_kwargs = dict(
+        stage_kwargs: StageLaunchKwargs = dict(
             stage_name=stage_cfg.name,
             factory=stage_cfg.factory_path,
             next_stages=stage_cfg.next,
@@ -347,7 +374,7 @@ def build_single_stage_spec(
     recv_endpoint: str,
     base_factory_kwargs: Mapping[str, object],
     typed_kwargs: Mapping[str, object],
-    stage_kwargs: Mapping[str, object],
+    stage_kwargs: StageLaunchKwargs,
 ) -> StageLaunchConfig:
     comm_config = resolve_comm_config(stage_cfg, gpu_id=gpu_id)
     return StageLaunchConfig(
@@ -379,7 +406,7 @@ def build_tp_stage_specs(
     recv_endpoint: str,
     base_factory_kwargs: Mapping[str, object],
     typed_kwargs: Mapping[str, object],
-    stage_kwargs: Mapping[str, object],
+    stage_kwargs: StageLaunchKwargs,
 ) -> list[StageLaunchConfig]:
     follower_work_queues = [ctx.Queue() for _ in range(stage_cfg.tp_size - 1)]
     follower_abort_queues = [ctx.Queue() for _ in range(stage_cfg.tp_size - 1)]

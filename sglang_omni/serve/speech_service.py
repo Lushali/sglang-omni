@@ -10,7 +10,7 @@ import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, TypeAlias, TypedDict
 from urllib.parse import urlparse
 
 from pydantic import ValidationError
@@ -50,6 +50,7 @@ if TYPE_CHECKING:
         SpeakerSampleStore,
         UploadedVoiceReference,
     )
+    from sglang_omni.utils.json import JsonValue
 else:
     pass
 
@@ -60,7 +61,12 @@ _TTS_TASK_TYPE_ALIASES = {
     for task_type in SUPPORTED_TTS_TASK_TYPES
 }
 _REFERENCE_AUDIO_FIELDS = ("audio_path", "ref_audio", "audio")
-_ReferenceCacheKey = tuple[str, str | None, str | None, str | None, tuple[object, ...]]
+FrozenJsonValue: TypeAlias = (
+    str | int | float | bool | None | tuple["FrozenJsonValue", ...]
+)
+_ReferenceCacheKey = tuple[
+    str, str | None, str | None, str | None, tuple[FrozenJsonValue, ...]
+]
 
 
 class RequiredTTSParams(TypedDict):
@@ -88,6 +94,11 @@ class TTSParams(RequiredTTSParams, total=False):
 
 
 SpeechReferenceDescriptor = dict[str, str | int | list[int] | list[list[int]]]
+
+
+class SpeechPrompt(TypedDict):
+    text: str
+    references: list[SpeechReferenceDescriptor]
 
 
 class SpeechRequestUpdates(TypedDict, total=False):
@@ -1088,7 +1099,7 @@ def build_sampling_params(request: CreateSpeechRequest) -> SamplingParams:
 def build_speech_prompt(
     request: CreateSpeechRequest,
     reference_descriptors: list[SpeechReferenceDescriptor] | None,
-) -> str | dict[str, object]:
+) -> str | SpeechPrompt:
     if reference_descriptors is None:
         reference_descriptors = reference_descriptors_from_request(request)
     else:
@@ -1269,7 +1280,7 @@ def batch_reference_cache_key(request: CreateSpeechRequest) -> _ReferenceCacheKe
     )
 
 
-def freeze_reference_value(value: object) -> object:
+def freeze_reference_value(value: JsonValue) -> FrozenJsonValue:
     if isinstance(value, dict):
         return tuple(
             (key, freeze_reference_value(item)) for key, item in sorted(value.items())
