@@ -217,15 +217,19 @@ def moss_transformers_processor_compat() -> Generator[None, None, None]:
 
     missing = object()
     undo: list[
-        tuple[Literal["attr"], object, str, object]
+        tuple[Literal["attr"], ModuleType, str, object]
         | tuple[Literal["item"], dict[str, object], str, object]
     ] = []
 
-    def patch_attr(obj: ModuleType, name: str, value: object) -> None:
+    def patch_attr(
+        obj: ModuleType,
+        name: str,
+        value: type[PretrainedConfig] | type[PreTrainedModel] | dict[str, object],
+    ) -> None:
         undo.append(("attr", obj, name, getattr(obj, name, missing)))
         setattr(obj, name, value)
 
-    def patch_item(mapping: dict[str, object], key: str, value: object) -> None:
+    def patch_item(mapping: dict[str, object], key: str, value: str) -> None:
         undo.append(("item", mapping, key, mapping.get(key, missing)))
         mapping[key] = value
 

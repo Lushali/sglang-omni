@@ -20,7 +20,10 @@ from sglang.srt.server_args import ServerArgs
 
 from sglang_omni.models.qwen3_omni.bootstrap import create_thinker_scheduler
 from sglang_omni.models.qwen3_omni.components.audio_encoder import Qwen3OmniAudioEncoder
-from sglang_omni.models.qwen3_omni.components.image_encoder import Qwen3OmniImageEncoder
+from sglang_omni.models.qwen3_omni.components.image_encoder import (
+    ImageEncoderOutput,
+    Qwen3OmniImageEncoder,
+)
 from sglang_omni.models.qwen3_omni.components.preprocessor import Qwen3OmniPreprocessor
 from sglang_omni.models.qwen3_omni.components.streaming_detokenizer import (
     StreamingDetokenizeScheduler,
@@ -94,17 +97,6 @@ class AudioBatchItem(TypedDict):
     mask: torch.Tensor
     lengths: torch.Tensor
     count: int
-
-
-class ImageEncoderOutput(TypedDict, total=False):
-    image_embeds: torch.Tensor | None
-    image_grid_thw: torch.Tensor
-    image_token_counts: torch.Tensor
-    deepstack_visual_embeds_image: list[torch.Tensor] | None
-    video_embeds: torch.Tensor | None
-    video_grid_thw: torch.Tensor
-    video_token_counts: torch.Tensor
-    deepstack_visual_embeds_video: list[torch.Tensor] | None
 
 
 @dataclass(frozen=True)
@@ -478,7 +470,7 @@ def store_cached_encoder_output(
     request_id: str,
     stage_name: str,
     cache: StageOutputCache | None,
-    result: object,
+    result: ImageEncoderOutput | dict[str, torch.Tensor],
 ) -> None:
     if cache is None or request.cache_key is None:
         return

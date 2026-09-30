@@ -8,7 +8,7 @@ import io
 import pickle
 from dataclasses import fields, is_dataclass
 from multiprocessing.reduction import ForkingPickler
-from typing import Protocol, TypeVar, overload
+from typing import Protocol, overload
 
 import torch
 
@@ -29,8 +29,6 @@ from sglang_omni.proto.messages import (
     StageDataRef,
 )
 from sglang_omni.relay.base import Relay, RelayOperation
-
-MetadataValueT = TypeVar("MetadataValueT")
 
 
 class StageMessageSender(Protocol):
@@ -78,7 +76,7 @@ def relay_device(relay: Relay) -> str:
 
 @overload
 def extract_tensors(
-    obj: dict[str, MetadataValueT], path: str = ""
+    obj: dict[str, object], path: str = ""
 ) -> tuple[dict[str, object], dict[str, torch.Tensor]]: ...
 
 
@@ -370,7 +368,7 @@ _INLINE_STREAM_CHUNK_BYTES_LIMIT = 16 * 1024
 
 
 def serialize_inline_stream_chunk(
-    data: object, metadata: dict[str, MetadataValueT] | None
+    data: object, metadata: dict[str, object] | None
 ) -> InlineStreamChunkRef | None:
     if not isinstance(data, torch.Tensor) or data.device.type != "cpu":
         return None
@@ -671,7 +669,7 @@ async def write_stream_chunk(
     from_stage: str,
     chunk_id: int,
     object_id: str | None = None,
-    metadata: dict[str, MetadataValueT] | None = None,
+    metadata: dict[str, object] | None = None,
     transport: TransportKind,
 ) -> tuple[DataRef, list[RelayOperation]]:
     if object_id is None:
@@ -755,7 +753,7 @@ async def send_stream_signal(
 async def with_stream_metadata(
     relay: Relay,
     data_ref: DataRef,
-    metadata: dict[str, MetadataValueT] | None,
+    metadata: dict[str, object] | None,
     transport: TransportKind,
     pending_ops: list[RelayOperation],
     *,
