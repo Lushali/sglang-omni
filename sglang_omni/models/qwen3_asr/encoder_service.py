@@ -77,7 +77,7 @@ def build_cache_namespace(
     """Digest identifying this process's encoder pipeline for cache keying."""
     config = getattr(model, "config", None)
     if hasattr(config, "to_dict"):
-        model_config: object = config.to_dict()
+        model_config: dict[str, object] | str = config.to_dict()
     else:
         model_config = repr(config)
     reference = next(model.audio_tower.parameters())

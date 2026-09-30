@@ -53,7 +53,7 @@ def build_cache_namespace(
     """Digest identifying this process's encoder pipeline for cache keying."""
     config = model.config
     try:
-        model_config: object = config.to_dict()
+        model_config: dict[str, object] | str = config.to_dict()
     except AttributeError:
         model_config = repr(config)
     reference = next(model.model.encoder.parameters())

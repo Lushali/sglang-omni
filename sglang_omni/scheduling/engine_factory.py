@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, ClassVar, Generic
 
 import torch
 from sglang.srt.arg_groups.model_override_base import resolved_view
-from typing_extensions import NotRequired, TypedDict
+from typing_extensions import TypedDict
 
 from sglang_omni.model_runner.base import ModelRunner
 from sglang_omni.model_runner.model_worker import ModelWorker
@@ -19,6 +19,7 @@ from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.bootstrap import InfrastructureOptions
 from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
+    GenerationStageDefaults,
     build_generation_batch_overrides,
     get_prefill_cuda_graph_backend,
     operator_selected_prefill_backend,
@@ -69,37 +70,13 @@ def normalize_context_length(value: object, *, model_name: str) -> int:
     return context_length
 
 
-GenerationDefaults = TypedDict(
-    "GenerationDefaults",
-    {
-        "max_running_requests": int,
-        "cuda_graph_max_bs": NotRequired[int | None],
-        "torch_compile_max_bs": NotRequired[int | None],
-        "cuda_graph_bs_prefill": NotRequired[list[int]],
-        "disable_cuda_graph": NotRequired[bool],
-        "disable_overlap_schedule": NotRequired[bool],
-        "disable_radix_cache": NotRequired[bool],
-        "enable_torch_compile": NotRequired[bool | None],
-        "trust_remote_code": NotRequired[bool],
-        "mlx_enable_sampling": NotRequired[bool],
-        "max_prefill_tokens": NotRequired[int],
-        "chunked_prefill_size": NotRequired[int],
-        "max_total_tokens": NotRequired[int],
-        "context_length": NotRequired[int],
-        "max_queued_requests": NotRequired[int],
-        "random_seed": NotRequired[int],
-        "mem_fraction_static": NotRequired[float | None],
-        "dtype": NotRequired[str],
-        "attention_backend": NotRequired[str],
-        "mm_attention_backend": NotRequired[str],
-        "prefill_attention_backend": NotRequired[str],
-        "quantization": NotRequired[str],
-        "sampling_backend": NotRequired[str],
-        "decrypted_config_file": NotRequired[str | None],
-        "cuda_graph_backend_prefill": NotRequired[str],
-        "cuda_graph_backend_decode": NotRequired[str],
-    },
-)
+class GenerationBatchSizeCaps(GenerationStageDefaults, total=False):
+    cuda_graph_max_bs: int | None
+    torch_compile_max_bs: int | None
+
+
+class GenerationDefaults(GenerationBatchSizeCaps):
+    max_running_requests: int
 
 
 class SchedulerExtras(TypedDict, Generic[RequestDataT], total=False):

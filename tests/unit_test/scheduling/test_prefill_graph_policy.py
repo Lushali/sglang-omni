@@ -13,6 +13,7 @@ from sglang.srt.arg_groups.cuda_graph_hook import (
 )
 
 from sglang_omni.scheduling.generation_batch_policy import (
+    GenerationStageDefaults,
     build_default_prefill_cuda_graph_bs,
     build_generation_batch_overrides,
     validate_generation_batch_policy,
@@ -505,7 +506,7 @@ def test_overrides_derive_prefill_max_bs_from_buckets() -> None:
 
 
 def test_disable_overrides_win_over_default_prefill_backend() -> None:
-    stage_defaults = {
+    stage_defaults: GenerationStageDefaults = {
         "cuda_graph_backend_prefill": "breakable",
         "cuda_graph_bs_prefill": [128, 256],
     }

@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from sglang.srt.arg_groups.model_override_base import resolved_view
 from sglang.srt.model_executor.cuda_graph_config import Backend as CudaGraphBackend
 from sglang.srt.model_executor.cuda_graph_config import CudaGraphConfig
+from typing_extensions import TypedDict, Unpack
 
 if TYPE_CHECKING:
     from sglang.srt.server_args import ServerArgs
@@ -140,13 +141,40 @@ def operator_selected_prefill_backend(
     return "backend" in nested_prefill_overrides(server_args_overrides)
 
 
+class GenerationStageDefaults(TypedDict, total=False):
+    cuda_graph_bs_prefill: list[int]
+    disable_cuda_graph: bool
+    disable_overlap_schedule: bool
+    disable_radix_cache: bool
+    enable_torch_compile: bool | None
+    enable_mixed_chunk: bool
+    trust_remote_code: bool
+    mlx_enable_sampling: bool
+    max_prefill_tokens: int
+    chunked_prefill_size: int
+    max_total_tokens: int
+    context_length: int
+    max_queued_requests: int
+    random_seed: int
+    mem_fraction_static: float | None
+    dtype: str
+    attention_backend: str
+    mm_attention_backend: str
+    prefill_attention_backend: str
+    quantization: str
+    sampling_backend: str
+    decrypted_config_file: str | None
+    cuda_graph_backend_prefill: str
+    cuda_graph_backend_decode: str
+
+
 def build_generation_batch_overrides(
     *,
     max_running_requests: int,
     cuda_graph_max_bs: int | None = None,
     torch_compile_max_bs: int | None = None,
     server_args_overrides: Mapping[str, object] | None = None,
-    **stage_defaults: object,
+    **stage_defaults: Unpack[GenerationStageDefaults],
 ) -> dict[str, object]:
     incoming = dict(server_args_overrides or {})
     # note(ratish): the nested form wins in sglang; mirror its prefill

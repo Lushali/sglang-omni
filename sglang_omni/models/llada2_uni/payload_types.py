@@ -93,5 +93,5 @@ class LLaDA2UniEvent:
 
     type: str
     modality: str
-    payload: dict[str, object]
+    payload: dict[str, str | list[str]]
     is_final: bool = False
