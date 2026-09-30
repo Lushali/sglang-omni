@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 
 import torch
 
@@ -59,7 +59,13 @@ class NemotronCode2WavScheduler(StreamingSimpleScheduler):
         decoder,
         device,
         *,
-        compute_fn: Callable[[StagePayload], object] | None,
+        compute_fn: (
+            Callable[
+                [StagePayload],
+                StagePayload | Coroutine[None, None, StagePayload],
+            ]
+            | None
+        ),
     ) -> None:
         super().__init__(compute_fn)
         self.decoder = decoder

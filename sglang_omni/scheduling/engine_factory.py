@@ -426,7 +426,7 @@ class SGLangGenerationEngineBuilder(ABC, Generic[RequestDataT]):
     @abstractmethod
     def make_adapters(self, model: torch.nn.Module | MlxStubModel) -> tuple[
         Callable[[StagePayload], RequestDataT | DeferredAdmission[RequestDataT]] | None,
-        Callable[[RequestDataT], object] | None,
+        Callable[[RequestDataT], StagePayload] | None,
     ]:
         raise NotImplementedError
 
@@ -488,7 +488,7 @@ class SGLangGenerationEngineBuilder(ABC, Generic[RequestDataT]):
             Callable[[StagePayload], RequestDataT | DeferredAdmission[RequestDataT]]
             | None
         ),
-        result_adapter: Callable[[RequestDataT], object] | None,
+        result_adapter: Callable[[RequestDataT], StagePayload] | None,
         extra_scheduler_kwargs: Mapping[str, object],
     ) -> "OmniScheduler[RequestDataT]":
         from sglang_omni.scheduling import omni_scheduler
@@ -594,7 +594,7 @@ class TtsEngineBuilder(SGLangGenerationEngineBuilder[RequestDataT]):
             Callable[[StagePayload], RequestDataT | DeferredAdmission[RequestDataT]]
             | None
         ),
-        result_adapter: Callable[[RequestDataT], object] | None,
+        result_adapter: Callable[[RequestDataT], StagePayload] | None,
     ) -> "OmniScheduler[RequestDataT]":
         return super().make_scheduler(
             model_worker=model_worker,

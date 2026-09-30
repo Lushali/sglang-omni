@@ -122,7 +122,13 @@ class StreamingVocoderBase(
 
     def __init__(
         self,
-        compute_fn: Callable[[StagePayload], object] | None,
+        compute_fn: (
+            Callable[
+                [StagePayload],
+                StagePayload | Coroutine[None, None, StagePayload],
+            ]
+            | None
+        ),
         *,
         sample_rate: int,
         stream_source_hint: str | None = None,
@@ -130,7 +136,7 @@ class StreamingVocoderBase(
         batch_compute_fn: (
             Callable[
                 [list[StagePayload]],
-                Sequence[object] | Coroutine[object, None, Sequence[object]],
+                Sequence[StagePayload] | Coroutine[None, None, Sequence[StagePayload]],
             ]
             | None
         ) = None,

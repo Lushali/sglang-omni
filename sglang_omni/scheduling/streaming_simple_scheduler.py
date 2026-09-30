@@ -47,12 +47,18 @@ class StreamingSimpleScheduler:
 
     def __init__(
         self,
-        compute_fn: Callable[[StagePayload], object] | None,
+        compute_fn: (
+            Callable[
+                [StagePayload],
+                StagePayload | Coroutine[None, None, StagePayload],
+            ]
+            | None
+        ),
         *,
         batch_compute_fn: (
             Callable[
                 [list[StagePayload]],
-                Sequence[object] | Coroutine[object, None, Sequence[object]],
+                Sequence[StagePayload] | Coroutine[None, None, Sequence[StagePayload]],
             ]
             | None
         ) = None,
@@ -562,7 +568,7 @@ class StreamingSimpleScheduler:
         self,
         payload: StagePayload,
         loop: asyncio.AbstractEventLoop,
-    ) -> object:
+    ) -> StagePayload:
         if self.compute_fn is None:
             raise RuntimeError(
                 f"{self.__class__.__name__} does not support non-streaming compute"
@@ -673,7 +679,7 @@ class StreamingSimpleScheduler:
             else:
                 pass
 
-    def emit_result(self, request_id: str, result: object) -> None:
+    def emit_result(self, request_id: str, result: StagePayload) -> None:
         self.outbox.put(
             OutgoingMessage(
                 request_id=request_id,

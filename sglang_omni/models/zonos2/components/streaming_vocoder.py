@@ -225,11 +225,17 @@ class Zonos2StreamingVocoderScheduler(StreamingVocoderBase[Zonos2StreamState, No
         self,
         *,
         device: str = "cuda",
-        compute_fn: Callable[[StagePayload], object] | None = None,
+        compute_fn: (
+            Callable[
+                [StagePayload],
+                StagePayload | Coroutine[None, None, StagePayload],
+            ]
+            | None
+        ) = None,
         batch_compute_fn: (
             Callable[
                 [list[StagePayload]],
-                list[StagePayload] | Coroutine[object, None, list[StagePayload]],
+                list[StagePayload] | Coroutine[None, None, list[StagePayload]],
             ]
             | None
         ) = None,

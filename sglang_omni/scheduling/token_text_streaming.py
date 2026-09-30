@@ -17,7 +17,7 @@ else:
 
 
 DecodeFn = Callable[[list[int]], str]
-BuildMessageDataFn = Callable[[str], object]
+BuildMessageDataFn = Callable[[str], dict[str, str]]
 BuildMessageMetadataFn = Callable[[int | None], dict[str, str | int | None] | None]
 
 
