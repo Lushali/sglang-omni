@@ -485,7 +485,7 @@ async def wait_for_request_disconnect(request: Request) -> None:
 async def abort_and_close_speech_to_text_stream(
     client: Client,
     request_id: str,
-    stream: AsyncIterator[object],
+    stream: AsyncIterator[GenerateChunk],
 ) -> None:
     try:
         await client.abort(request_id)

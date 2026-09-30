@@ -8,11 +8,12 @@ import json
 import logging
 import uuid
 from collections import deque
-from collections.abc import Awaitable, Generator, Mapping, MutableMapping
+from collections.abc import Awaitable, Generator, Mapping
 from typing import Protocol
 
 from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
+from starlette.types import Message
 from starlette.websockets import WebSocketState
 
 from sglang_omni.client import Client, ClientError
@@ -100,7 +101,7 @@ class SpeechWebSocketSession:
         self.committed_sentence_count = 0
         self.segment_index = 0
         self.active_request_id: str | None = None
-        self.buffered_receive_messages: deque[MutableMapping[str, object]] = deque()
+        self.buffered_receive_messages: deque[Message] = deque()
         self.buffered_receive_message_bytes = 0
         self.config_prepared_request: PreparedSpeechRequest | None = None
 
@@ -633,7 +634,7 @@ class SpeechWebSocketSession:
         return raw
 
     @staticmethod
-    def receive_message_size(message: Mapping[str, object]) -> int:
+    def receive_message_size(message: Message) -> int:
         text = message.get("text")
         if isinstance(text, str):
             return len(text.encode("utf-8"))

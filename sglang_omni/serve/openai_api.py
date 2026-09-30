@@ -25,7 +25,6 @@ import json
 import logging
 import time
 import uuid
-from collections.abc import Awaitable, Callable, Mapping, MutableMapping
 from contextlib import aclosing, suppress
 from dataclasses import asdict
 from typing import AsyncIterator
@@ -42,6 +41,9 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
+from starlette.types import ASGIApp
+from starlette.types import Message as ASGIMessage
+from starlette.types import Receive, Scope, Send
 
 from sglang_omni import __version__
 from sglang_omni.client import (
@@ -147,15 +149,15 @@ class RequestBodyTooLarge(Exception):
 class VoiceUploadBodyLimitMiddleware:
     """Reject oversized voice uploads before Starlette parses multipart bodies."""
 
-    def __init__(self, app: Callable[..., Awaitable[None]], max_bytes: int) -> None:
+    def __init__(self, app: ASGIApp, max_bytes: int) -> None:
         self.app = app
         self.max_bytes = max_bytes
 
     async def __call__(
         self,
-        scope: MutableMapping[str, object],
-        receive: Callable[[], Awaitable[MutableMapping[str, object]]],
-        send: Callable[[dict[str, object]], Awaitable[None]],
+        scope: Scope,
+        receive: Receive,
+        send: Send,
     ) -> None:
         if not is_voice_upload_scope(scope):
             await self.app(scope, receive, send)
@@ -175,7 +177,7 @@ class VoiceUploadBodyLimitMiddleware:
 
         received_bytes = 0
 
-        async def limited_receive() -> MutableMapping[str, object]:
+        async def limited_receive() -> ASGIMessage:
             nonlocal received_bytes
             message = await receive()
             if message["type"] == "http.request":
@@ -408,7 +410,7 @@ async def read_voice_upload(audio_sample: UploadFile) -> bytes:
     return audio_bytes
 
 
-def is_voice_upload_scope(scope: Mapping[str, object]) -> bool:
+def is_voice_upload_scope(scope: Scope) -> bool:
     return (
         scope.get("type") == "http"
         and scope.get("method") == "POST"
@@ -416,7 +418,7 @@ def is_voice_upload_scope(scope: Mapping[str, object]) -> bool:
     )
 
 
-def content_length(scope: Mapping[str, object]) -> int | None:
+def content_length(scope: Scope) -> int | None:
     for name, value in scope.get("headers", ()):
         if name.lower() != b"content-length":
             continue
@@ -430,7 +432,7 @@ def content_length(scope: Mapping[str, object]) -> int | None:
 
 
 async def send_voice_upload_too_large(
-    send: Callable[[dict[str, object]], Awaitable[None]],
+    send: Send,
     max_bytes: int,
 ) -> None:
     body = json.dumps(
@@ -663,7 +665,7 @@ def model_info_response(result: AdminResponse) -> JSONResponse:
 
 
 def extract_model_info_stage_data(
-    result: Mapping[str, object] | AdminResponse,
+    result: AdminResponse,
 ) -> list[dict[str, object]]:
     infos: list[dict[str, object]] = []
     for item in result.get("results", []) or []:
@@ -688,7 +690,7 @@ def extract_model_info_stage_data(
 
 
 def common_model_info_value(
-    result: object,
+    result: AdminResponse,
     stage_infos: list[dict[str, object]],
     key: str,
     *,
@@ -988,7 +990,9 @@ async def chat_stream(
     yield f"data: {STREAM_DONE_SENTINEL}\n\n"
 
 
-def explicit_generation_params(request: object) -> list[str]:
+def explicit_generation_params(
+    request: ChatCompletionRequest | RolloutSamplingParams,
+) -> list[str]:
     fields_set = getattr(request, "model_fields_set", set())
     return sorted(
         field
@@ -1900,7 +1904,7 @@ async def wait_for_request_disconnect(request: Request) -> None:
 async def abort_and_close_speech_stream(
     client: Client,
     request_id: str,
-    stream: AsyncIterator[object],
+    stream: AsyncIterator[GenerateChunk],
 ) -> None:
     try:
         await client.abort(request_id)

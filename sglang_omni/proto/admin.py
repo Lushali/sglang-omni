@@ -25,9 +25,9 @@ class SerializedAdminResult(TypedDict):
     success: bool
     message: str
     data: dict[str, object]
-    error: object
-    rank: object
-    role: object
+    error: str | None
+    rank: int | None
+    role: str | None
 
 
 class AdminResponse(TypedDict):

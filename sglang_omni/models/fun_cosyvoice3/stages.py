@@ -21,8 +21,9 @@ from torch.nn.utils.parametrize import is_parametrized, remove_parametrizations
 
 if TYPE_CHECKING:
     from cosyvoice.flow.flow import CausalMaskedDiffWithDiT
-    from cosyvoice.flow.flow_matching import ConditionalCFM
+    from cosyvoice.flow.flow_matching import CausalConditionalCFM, ConditionalCFM
     from cosyvoice.hifigan.generator import CausalHiFTGenerator
+    from cosyvoice.transformer.upsample_encoder import PreLookaheadLayer
 
     from sglang_omni.models.fun_cosyvoice3.mlx.vocoder import FunCosyVoice3MlxVocoder
     from sglang_omni.models.fun_cosyvoice3.streaming_vocoder import (
@@ -790,6 +791,14 @@ def split_generated_mels(
 
 class FunCosyVoice3Flow:
     """CosyVoice3 Flow with batch inference enabled as its default API."""
+
+    spk_embed_affine_layer: torch.nn.Linear
+    input_embedding: torch.nn.Embedding
+    pre_lookahead_layer: PreLookaheadLayer
+    pre_lookahead_len: int
+    token_mel_ratio: int
+    output_size: int
+    decoder: CausalConditionalCFM
 
     def __init__(
         self,
