@@ -8,7 +8,7 @@ import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from omegaconf import OmegaConf
+from omegaconf import DictKeyType, OmegaConf
 
 from sglang_omni.models.auk import constants as C
 from sglang_omni.utils.json import JsonValue
@@ -57,7 +57,7 @@ class AuKRuntimeConfig:
         return frames * self.downsample_rate / self.sample_rate
 
 
-def load_yaml(path: Path) -> dict[object, object]:
+def load_yaml(path: Path) -> dict[DictKeyType, object]:
     loaded = OmegaConf.to_container(OmegaConf.load(str(path)), resolve=True)
     return loaded if isinstance(loaded, dict) else {}
 
@@ -72,7 +72,7 @@ def load_json(path: Path) -> JsonValue:
 def load_auk_config(model_path: str) -> AuKRuntimeConfig:
     """Read config.yaml or config.json from a checkpoint."""
     root = Path(model_path)
-    raw: object = {}
+    raw: dict[DictKeyType, object] | JsonValue = {}
     for name in CONFIG_YAML_NAMES:
         candidate = root / name
         if candidate.is_file():

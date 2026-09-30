@@ -108,7 +108,7 @@ class ReplicaTopology:
         return {name: list(instances) for name, instances in self.replicas.items()}
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, object] | None) -> "ReplicaTopology":
+    def from_dict(cls, data: Mapping[str, list[str]] | None) -> "ReplicaTopology":
         if not data:
             return cls()
         else:
