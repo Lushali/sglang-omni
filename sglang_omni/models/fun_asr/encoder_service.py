@@ -92,7 +92,7 @@ def expected_audio_tokens(item: MultimodalDataItem) -> int | None:
 
 
 class FunASRPreLMEncoderService(
-    PreLMEncoderService[MultimodalDataItem, torch.Tensor, torch.Tensor, torch.Tensor]
+    PreLMEncoderService[MultimodalDataItem, torch.Tensor, torch.Tensor]
 ):
     """Encode before admission with single-flight deduplication and a CPU LRU."""
 

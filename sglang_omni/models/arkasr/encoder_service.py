@@ -131,7 +131,7 @@ def text_hidden_size(model: ArkasrForConditionalGeneration) -> int:
 
 
 class ArkasrPreLMEncoderService(
-    PreLMEncoderService[MultimodalDataItem, torch.Tensor, torch.Tensor, torch.Tensor]
+    PreLMEncoderService[MultimodalDataItem, torch.Tensor, torch.Tensor]
 ):
     """Encode before admission with single-flight deduplication and a CPU LRU."""
 

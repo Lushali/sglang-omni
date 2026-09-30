@@ -137,21 +137,7 @@ def tensor_items_from_lists(
 # from_dict time only when the key is present in the payload, so absent keys
 # fall back to the dataclass default. Decode receives the field default for
 # star_or variants that treat falsy wire values as "use the default".
-_CODECS: dict[
-    str,
-    tuple[
-        type[int]
-        | type[float]
-        | type[str]
-        | type[bool]
-        | type[dict[object, object]]
-        | type[list[object]]
-        | Callable[[object], object]
-        | Callable[[Iterable[object] | IndexableItems], list[object]],
-        Callable[[object, object], object]
-        | Callable[[Iterable[object] | IndexableItems | None, object], object],
-    ],
-] = {
+_CODECS = {
     "raw": (lambda v: v, lambda v, d: v),
     "int": (int, lambda v, d: int(v or 0)),
     "int_or": (int, lambda v, d: int(v or d)),

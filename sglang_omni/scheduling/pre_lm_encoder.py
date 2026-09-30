@@ -13,14 +13,19 @@ from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import Enum, auto
+from typing import TYPE_CHECKING
 
 from typing_extensions import Generic, TypeVar
+
+if TYPE_CHECKING:
+    import torch
+else:
+    pass
 
 ItemT = TypeVar("ItemT")
 EncodedT = TypeVar("EncodedT")
 EmbeddingT = TypeVar("EmbeddingT")
 ResultT = TypeVar("ResultT")
-HostCopyT = TypeVar("HostCopyT", default=object)
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +41,7 @@ class QueueEntry(Generic[ItemT, ResultT]):
     enqueued_at: float | None = None
 
 
-class PreLMEncoderServiceBase(
-    ABC, Generic[ItemT, EncodedT, EmbeddingT, ResultT, HostCopyT]
-):
+class PreLMEncoderServiceBase(ABC, Generic[ItemT, EncodedT, EmbeddingT, ResultT]):
     """Run model-owned encoder hooks on a queue-backed worker thread."""
 
     def __init__(self, *, worker_name: str, max_queue_size: int = 0) -> None:
@@ -131,7 +134,9 @@ class PreLMEncoderServiceBase(
     def synchronize_batch(self) -> None:
         pass
 
-    def stage_host_copy(self, item: ItemT, embedding: EmbeddingT) -> HostCopyT | None:
+    def stage_host_copy(
+        self, item: ItemT, embedding: EmbeddingT
+    ) -> torch.Tensor | None:
         """Optionally copy embedding from GPU to CPU for the cache.
 
         Called for each item right after split_embeddings, while the encoder
@@ -152,7 +157,7 @@ class PreLMEncoderServiceBase(
         # TODO(Jeffro): once every service stages its own host copy via
         # stage_host_copy, drop this device-side embedding and cache host_copy only.
         embedding: EmbeddingT,
-        host_copy: HostCopyT | None = None,
+        host_copy: torch.Tensor | None = None,
     ) -> None:
         pass
 
@@ -366,8 +371,8 @@ class PreLMEncoderServiceBase(
 
 
 class PreLMEncoderService(
-    PreLMEncoderServiceBase[ItemT, EncodedT, EmbeddingT, EmbeddingT, HostCopyT],
-    Generic[ItemT, EncodedT, EmbeddingT, HostCopyT],
+    PreLMEncoderServiceBase[ItemT, EncodedT, EmbeddingT, EmbeddingT],
+    Generic[ItemT, EncodedT, EmbeddingT],
 ):
     def future_result(self, embedding: EmbeddingT) -> EmbeddingT:
         return embedding

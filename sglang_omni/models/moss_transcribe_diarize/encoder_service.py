@@ -41,9 +41,7 @@ class DetachedFailure:
 
 
 class BatchedAudioEncoderService(
-    PreLMEncoderServiceBase[
-        "MultimodalDataItem", torch.Tensor, torch.Tensor, None, torch.Tensor
-    ]
+    PreLMEncoderServiceBase["MultimodalDataItem", torch.Tensor, torch.Tensor, None]
 ):
     ENCODE_TIMEOUT_S = 300.0
 
