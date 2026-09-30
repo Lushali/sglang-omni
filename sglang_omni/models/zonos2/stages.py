@@ -9,7 +9,9 @@ Each stage is a SimpleScheduler compute-fn over a Zonos2State dict carried in
 
 from __future__ import annotations
 
+import base64
 import logging
+import re
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -26,7 +28,6 @@ from sglang_omni.models.zonos2.payload_types import N_CODEBOOKS, Zonos2State
 from sglang_omni.models.zonos2.request_builders import (
     Zonos2SGLangRequestData,
     build_zonos2_state,
-    ref_audio_to_encoder_input,
 )
 from sglang_omni.models.zonos2.streaming_contract import (
     DEFAULT_ZONOS2_PRODUCER_FIRST_FLUSH_ROWS,
@@ -42,6 +43,8 @@ else:
     pass
 
 logger = logging.getLogger(__name__)
+
+_DATA_URI_RE = re.compile(r"^data:[^;,]*;base64,(?P<data>.+)$", re.DOTALL)
 
 # Default quality conditioning: only trailing-silence (feature 5); rest None.
 _QUALITY_FEATURES = [
@@ -114,7 +117,15 @@ def create_speaker_encode_executor(
     def _speaker(payload: StagePayload) -> StagePayload:
         state = Zonos2State.from_dict(payload.data)
         if state.ref_audio is not None:
-            ref = ref_audio_to_encoder_input(state.ref_audio)
+            ref = state.ref_audio
+            if isinstance(ref, str):
+                m = _DATA_URI_RE.match(ref)
+                if m is not None:
+                    ref = base64.b64decode(m.group("data"))
+                else:
+                    pass
+            else:
+                pass
             state.speaker_emb, state.speaker_fingerprint = (
                 encoder.encode_with_fingerprint(ref)
             )

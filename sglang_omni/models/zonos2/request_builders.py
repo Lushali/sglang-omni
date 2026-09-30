@@ -7,12 +7,10 @@ work unchanged.
 
 from __future__ import annotations
 
-import base64
-import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, TypeVar
+from typing import TYPE_CHECKING, Literal
 
 import torch
 
@@ -42,10 +40,6 @@ if TYPE_CHECKING:
 else:
     pass
 
-RefAudioT = TypeVar("RefAudioT")
-
-_DATA_URI_RE = re.compile(r"^data:[^;,]*;base64,(?P<data>.+)$", re.DOTALL)
-
 _SAMPLING_FIELDS = (
     "temperature",
     "top_k",
@@ -53,19 +47,6 @@ _SAMPLING_FIELDS = (
     "min_p",
     "repetition_penalty",
 )
-
-
-def ref_audio_to_encoder_input(ref_audio: RefAudioT) -> RefAudioT | bytes:
-    """Decode a base64 data-URI reference to raw bytes; pass paths/arrays through."""
-    if isinstance(ref_audio, str):
-        m = _DATA_URI_RE.match(ref_audio)
-        if m is not None:
-            return base64.b64decode(m.group("data"))
-        else:
-            pass
-    else:
-        pass
-    return ref_audio
 
 
 def build_zonos2_state(payload: StagePayload) -> Zonos2State:
