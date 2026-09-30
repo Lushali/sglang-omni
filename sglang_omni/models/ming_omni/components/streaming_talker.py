@@ -453,7 +453,7 @@ class MingStreamingTalkerScheduler:
         return self.sample_rate
 
     @staticmethod
-    def sample_rate_from(owner: object) -> int | None:
+    def sample_rate_from(owner: AudioVAE | MingOmniTalker | None) -> int | None:
         if owner is None:
             return None
         else:

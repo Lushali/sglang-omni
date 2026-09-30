@@ -26,7 +26,7 @@ class ThinkerOutput(TypedDict, total=False):
     output_ids: list[int]
     step: int
     is_final: bool
-    extra_model_outputs: dict[str, object]
+    extra_model_outputs: dict[str, torch.Tensor | list[torch.Tensor] | list[int]]
     finish_reason: str
     weight_version: str
     output_token_logprobs: list[list[float | int]]

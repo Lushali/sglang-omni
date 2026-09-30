@@ -19,7 +19,11 @@ from sglang_omni.models.llada2_uni.config import (
     DEFAULT_THINKER_MAX_NEW_TOKENS,
     IMAGE_STAGE,
 )
-from sglang_omni.models.llada2_uni.payload_types import LLaDA2UniPipelineState
+from sglang_omni.models.llada2_uni.payload_types import (
+    ImageEncoderInputs,
+    LLaDA2UniPipelineState,
+    SkippedEncoderInputs,
+)
 from sglang_omni.models.weight_loader import resolve_model_path
 from sglang_omni.preprocessing.image import (
     compute_image_cache_key,
@@ -221,7 +225,7 @@ class LLaDA2Preprocessor:
 
         images = await ensure_image_list_async(raw_images) if raw_images else []
 
-        encoder_inputs: dict[str, object] = {}
+        encoder_inputs: dict[str, ImageEncoderInputs | SkippedEncoderInputs] = {}
         image_token_counts: list[int] = []
         image_parts_by_msg: dict[int, list[str]] = {}
 
@@ -230,7 +234,7 @@ class LLaDA2Preprocessor:
             img_result = self.image_processor(images=cropped, return_tensors="pt")
             pixel_values = img_result["pixel_values"]
             image_grid_thw = img_result["image_grid_thw"]
-            image_enc_inputs: dict[str, torch.Tensor | str] = {
+            image_enc_inputs: ImageEncoderInputs = {
                 "pixel_values": pixel_values,
                 "image_grid_thw": image_grid_thw,
             }

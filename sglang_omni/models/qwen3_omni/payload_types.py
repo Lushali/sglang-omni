@@ -26,10 +26,16 @@ class ThinkerOutput(TypedDict, total=False):
     output_ids: list[int]
     step: int
     is_final: bool
-    extra_model_outputs: dict[str, object]
+    extra_model_outputs: dict[str, torch.Tensor | list[torch.Tensor] | list[int]]
     finish_reason: str
     weight_version: str
     output_token_logprobs: list[list[float | int]]
+
+
+class StreamState(TypedDict, total=False):
+    token_ids: list[int]
+    text: str
+    emitted_text: str
 
 
 @dataclass
@@ -48,7 +54,7 @@ class Qwen3OmniPipelineState:
     thinker_inputs: dict[str, object] = field(default_factory=dict)
     thinker_out: ThinkerOutput | None = None
     engine_outputs: dict[str, object] = field(default_factory=dict)
-    stream_state: dict[str, object] = field(default_factory=dict)
+    stream_state: StreamState = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: object) -> "Qwen3OmniPipelineState":

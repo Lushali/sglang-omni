@@ -30,6 +30,7 @@ from sglang_omni.proto import StagePayload
 
 if TYPE_CHECKING:
     from transformers import Qwen2VLImageProcessor
+    from transformers.image_utils import ImageInput
     from transformers.models.qwen2_vl.video_processing_qwen2_vl import (
         Qwen2VLVideoProcessor,
     )
@@ -321,7 +322,7 @@ class MingPreprocessor:
         return self.video_processor
 
     def process_images(
-        self, images: list[object]
+        self, images: ImageInput
     ) -> tuple[torch.Tensor, torch.Tensor, list[int]]:
         """Process PIL images into pixel_values, grid_thw, and token counts.
 

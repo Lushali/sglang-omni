@@ -16,6 +16,7 @@ from transformers import PreTrainedTokenizerBase
 from sglang_omni.models.qwen3_omni.components.talker_prefill import TalkerPrefillBuilder
 from sglang_omni.models.qwen3_omni.payload_types import (
     Qwen3OmniPipelineState,
+    StreamState,
     ThinkerOutput,
 )
 from sglang_omni.models.qwen3_omni.pending_text_queue import (
@@ -415,6 +416,10 @@ def payload_with_state(
         request=payload.request,
         data=state.to_dict(),
     )
+
+
+@overload
+def copy_mutable_containers(value: StreamState) -> StreamState: ...
 
 
 @overload
