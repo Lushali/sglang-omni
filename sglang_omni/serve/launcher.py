@@ -34,18 +34,20 @@ import threading
 import time
 from collections.abc import Callable, Generator
 from contextlib import contextmanager, suppress
-from typing import TYPE_CHECKING, TypedDict
+from typing import TypedDict
 
 import uvicorn
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from sglang_omni.client import Client
+from sglang_omni.client.types import GenerateChunk
 from sglang_omni.config import PipelineConfig
 from sglang_omni.models.model_capabilities import get_model_capabilities
 from sglang_omni.pipeline.mp_runner import MultiProcessPipelineRunner
 from sglang_omni.profiler.event_recorder import get_recorder as _get_event_recorder
 from sglang_omni.profiler.profiler_control import ProfilerControlClient
+from sglang_omni.proto.messages import StreamMessage
 from sglang_omni.serve.openai_api import create_app
 from sglang_omni.serve.protocol import DEFAULT_TTS_BATCH_MAX_ITEMS
 from sglang_omni.serve.realtime.manager import RealtimeDeployment
@@ -56,12 +58,6 @@ from sglang_omni.utils.gpu_memory import (
     get_gpu_device_info,
 )
 from sglang_omni.utils.imports import import_string
-
-if TYPE_CHECKING:
-    from sglang_omni.client.types import GenerateChunk
-    from sglang_omni.proto import StreamMessage
-else:
-    pass
 
 logger = logging.getLogger(__name__)
 

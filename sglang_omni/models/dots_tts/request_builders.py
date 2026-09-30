@@ -18,10 +18,10 @@ from sglang_omni.models.dots_tts.payload_types import (
 from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.message import OutgoingMessage
 from sglang_omni.scheduling.sglang_backend import SGLangARRequestData
+from sglang_omni.scheduling.types import RequestOutput
 
 if TYPE_CHECKING:
     from sglang_omni.models.dots_tts.flow_head import DotsFlowState
-    from sglang_omni.scheduling.types import RequestOutput
 else:
     pass
 
@@ -157,7 +157,7 @@ def build_sglang_dots_tts_request(
 def build_stream_output(
     request_id: str,
     data: DotsTTSSGLangRequestData,
-    req_output: "RequestOutput",
+    req_output: RequestOutput,
 ) -> Iterator[OutgoingMessage]:
     del req_output
     latent = data.latest_latent_patch

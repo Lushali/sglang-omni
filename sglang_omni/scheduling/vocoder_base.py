@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar
-
-import torch
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.pipeline_state import PipelineStateBase
 from sglang_omni.scheduling.simple_scheduler import SimpleScheduler
+
+if TYPE_CHECKING:
+    import torch
+else:
+    pass
 
 __all__ = ["BatchVocoderBase"]
 

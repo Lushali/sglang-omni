@@ -6,9 +6,12 @@ from __future__ import annotations
 from array import array
 from dataclasses import dataclass
 from numbers import Integral
-from typing import TYPE_CHECKING, TypeGuard, TypeVar
+from typing import TypeGuard, TypeVar
 
 import torch
+from sglang.srt.managers.schedule_batch import Req, ScheduleBatch
+from sglang.srt.managers.scheduler import GenerationBatchResult
+from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 
 from sglang_omni.model_runner.prefill_inputs import (
     OmniPrefillInputs,
@@ -17,13 +20,6 @@ from sglang_omni.model_runner.prefill_inputs import (
 )
 from sglang_omni.model_runner.thinker_model_runner import ThinkerModelRunner
 from sglang_omni.scheduling.types import SchedulerRequest
-
-if TYPE_CHECKING:
-    from sglang.srt.managers.schedule_batch import Req, ScheduleBatch
-    from sglang.srt.managers.scheduler import GenerationBatchResult
-    from sglang.srt.model_executor.forward_batch_info import ForwardBatch
-else:
-    pass
 
 _PREFILL_AUDIO_INPUT_KEYS = frozenset(
     {
@@ -108,7 +104,7 @@ class Qwen3OmniThinkerModelRunner(ThinkerModelRunner):
         return [int(item) for item in value]
 
     def mm_positions(
-        self, req: "Req", pad_values: dict[str, PadValueT]
+        self, req: Req, pad_values: dict[str, PadValueT]
     ) -> dict[str, torch.Tensor] | None:
         try:
             positions = self.req_mm_token_positions(req, pad_values)
@@ -172,7 +168,7 @@ class Qwen3OmniThinkerModelRunner(ThinkerModelRunner):
 
     def audio_inputs_are_supported(
         self,
-        req: "Req",
+        req: Req,
         model_inputs: object,
         chunk_span: tuple[int, int],
     ) -> bool:

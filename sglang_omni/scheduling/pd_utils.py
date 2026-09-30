@@ -12,21 +12,17 @@ from array import array
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager
 from functools import wraps
-from typing import TYPE_CHECKING, Generic, Literal, ParamSpec, TypeVar
+from typing import Generic, Literal, ParamSpec, TypeVar
 
 import msgspec
 import torch
+from sglang.srt.managers.schedule_batch import Req
+from sglang.srt.mem_cache.allocator.base import BaseTokenToKVPoolAllocator
+from sglang.srt.mem_cache.memory_pool import KVCache, ReqToTokenPool
 
 from sglang_omni.comm import KVBufferRegion, KVPageDestination, KVPool
 from sglang_omni.proto import KVTransferPrepareMessage, StagePayload
 from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
-
-if TYPE_CHECKING:
-    from sglang.srt.managers.schedule_batch import Req
-    from sglang.srt.mem_cache.allocator.base import BaseTokenToKVPoolAllocator
-    from sglang.srt.mem_cache.memory_pool import KVCache, ReqToTokenPool
-else:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -183,9 +179,9 @@ class DecodeAdmission:
 
 
 StateBuilder = Callable[
-    ["Req"], tuple[dict[str, object], dict[str, object] | None, list[int]]
+    [Req], tuple[dict[str, object], dict[str, object] | None, list[int]]
 ]
-StateRestorer = Callable[["Req", SGLangARRequestData, dict[str, object] | None], None]
+StateRestorer = Callable[[Req, SGLangARRequestData, dict[str, object] | None], None]
 
 
 def continuation_from_req(

@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 import torch
 
@@ -22,8 +22,6 @@ if TYPE_CHECKING:
 else:
     pass
 
-RequestT = TypeVar("RequestT")
-
 
 class AudioTorchMpsModelRunner(ModelRunner):
     """Single-request audio prefill and cached Hugging Face Torch decoding."""
@@ -40,7 +38,7 @@ class AudioTorchMpsModelRunner(ModelRunner):
         del batch
         return False
 
-    def one_request(self, requests: list[RequestT]) -> RequestT:
+    def one_request(self, requests: list[SchedulerRequest]) -> SchedulerRequest:
         if len(requests) != 1:
             raise RuntimeError(
                 f"{self.model_name} Torch MPS currently requires max_running_requests=1"

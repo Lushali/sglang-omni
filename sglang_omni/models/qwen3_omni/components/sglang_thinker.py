@@ -10,7 +10,7 @@ prefill, so this wrapper keeps only the text model and LM head.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple
+from typing import Iterable, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -18,21 +18,17 @@ from sglang.srt.layers.logits_processor import LogitsProcessor, LogitsProcessorO
 from sglang.srt.layers.moe.fused_moe_triton.layer import FusedMoE
 from sglang.srt.layers.quantization.base_config import QuantizationConfig
 from sglang.srt.layers.vocab_parallel_embedding import ParallelLMHead
+from sglang.srt.model_executor.forward_batch_info import PPProxyTensors
 from sglang.srt.model_loader.weight_utils import default_weight_loader
 from sglang.srt.models.qwen3_vl_moe import Qwen3MoeLLMModel, load_fused_expert_weights
 from sglang.srt.utils import add_prefix, logger
+from transformers import PretrainedConfig
 
 from sglang_omni.models.qwen3_omni.components.thinker_fused_rope import (
     install_thinker_fused_rope,
 )
 from sglang_omni.quantization import get_weight_preprocessor
 from sglang_omni.vendor.sglang.core import ForwardBatch
-
-if TYPE_CHECKING:
-    from sglang.srt.model_executor.forward_batch_info import PPProxyTensors
-    from transformers import PretrainedConfig
-else:
-    pass
 
 
 def config_uses_mrope(config: object) -> bool:
@@ -51,7 +47,7 @@ class Qwen3OmniThinkerForCausalLM(nn.Module):
 
     def __init__(
         self,
-        config: "PretrainedConfig",
+        config: PretrainedConfig,
         quant_config: Optional[QuantizationConfig] = None,
         prefix: str = "",
     ) -> None:
@@ -92,7 +88,7 @@ class Qwen3OmniThinkerForCausalLM(nn.Module):
         positions: torch.Tensor,
         forward_batch: ForwardBatch,
         get_embedding: bool = False,
-        pp_proxy_tensors: "PPProxyTensors | None" = None,
+        pp_proxy_tensors: PPProxyTensors | None = None,
         input_embeds: torch.Tensor | None = None,
         input_deepstack_embeds: torch.Tensor | None = None,
         omni_prefill_rids: list[str] | tuple[str, ...] | None = None,
