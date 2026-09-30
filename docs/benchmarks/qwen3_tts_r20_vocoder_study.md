@@ -1835,8 +1835,8 @@ vocoder 与 engine 同进程(默认部署):
 - 方向本身成立:同进程下 main 的首包解码 18 ms,占 ICL 首音(约 35 ms)的一半。可行的做法是把 `advance_context` 也按宽度捕获成 CUDA graph
   (只含 quantizer、pre_conv 与 transformer,kernel 少),并把首包宽度(10 + 首块帧数)加进 COLD 的捕获宽度,首包变成"几次轻量 replay 加
   一次完整 replay"。要重测同进程与独立进程两种形态。
-- 两处与模式无关的固定开销:初始 worker 在低负载下固定等 2 ms 攒批;独立进程下 GPU 已完成后 resolve 还要 2.44 ms(同进程只要 0.2 ms,
-  所以是独立进程特有的)。两者合计约占 CustomVoice 首音的 20%(独立进程),待单独处理。
+- 两处与模式无关的固定开销:初始 worker 在低负载下固定等 2 ms 攒批(这就是 C3 自适应等待动过的那一项,端到端只省 0.5 到 1 ms,已在放弃列表);
+  独立进程下 GPU 已完成后 resolve 还要 2.44 ms(同进程只要 0.2 ms,所以是独立进程特有的),约占 CI 形态下 CustomVoice 首音的 10%,待单独查。
 - 独立进程下 vocoder 的首包成本跟 kernel 数走,是 #2294(vocoder 放哪个进程)的又一条证据;同进程下同一份 main 的 ICL 首音 38 ms、20 rps 63 ms,
   独立进程是 48.5 ms 和 100 ms 左右(外加双稳态的塌陷)。
 
