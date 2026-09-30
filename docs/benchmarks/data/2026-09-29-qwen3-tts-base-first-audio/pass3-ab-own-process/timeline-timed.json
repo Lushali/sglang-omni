@@ -1,0 +1,366 @@
+{
+  "main-a": {
+    "events-hot": {
+      "requests": 60,
+      "milestones": [
+        {
+          "stage": "coordinator",
+          "event": "request_admission",
+          "requests": 60,
+          "offset_p50_ms": 0.0,
+          "gap_p50_ms": null
+        },
+        {
+          "stage": "preprocessing",
+          "event": "stage_input_received",
+          "requests": 60,
+          "offset_p50_ms": 0.27,
+          "gap_p50_ms": 0.27
+        },
+        {
+          "stage": "preprocessing",
+          "event": "stage_complete",
+          "requests": 60,
+          "offset_p50_ms": 4.62,
+          "gap_p50_ms": 4.32
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_request_build_start",
+          "requests": 60,
+          "offset_p50_ms": 4.9,
+          "gap_p50_ms": 0.31
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_request_build_end",
+          "requests": 60,
+          "offset_p50_ms": 5.21,
+          "gap_p50_ms": 0.31
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_queue_enter",
+          "requests": 60,
+          "offset_p50_ms": 5.33,
+          "gap_p50_ms": 0.12
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_prefill_start",
+          "requests": 60,
+          "offset_p50_ms": 6.38,
+          "gap_p50_ms": 1.04
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_prefill_end",
+          "requests": 60,
+          "offset_p50_ms": 12.44,
+          "gap_p50_ms": 5.9
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_first_emit",
+          "requests": 60,
+          "offset_p50_ms": 12.56,
+          "gap_p50_ms": 0.12
+        },
+        {
+          "stage": "vocoder",
+          "event": "stage_stream_chunk_received",
+          "requests": 60,
+          "offset_p50_ms": 13.35,
+          "gap_p50_ms": 0.85
+        },
+        {
+          "stage": "vocoder",
+          "event": "stage_first_stream_chunk_sent",
+          "requests": 60,
+          "offset_p50_ms": 44.5,
+          "gap_p50_ms": 30.12
+        },
+        {
+          "stage": "coordinator",
+          "event": "coordinator_stream_received",
+          "requests": 60,
+          "offset_p50_ms": 44.78,
+          "gap_p50_ms": 0.22
+        }
+      ]
+    }
+  },
+  "main-b": {
+    "events-hot": {
+      "requests": 60,
+      "milestones": [
+        {
+          "stage": "coordinator",
+          "event": "request_admission",
+          "requests": 60,
+          "offset_p50_ms": 0.0,
+          "gap_p50_ms": null
+        },
+        {
+          "stage": "preprocessing",
+          "event": "stage_input_received",
+          "requests": 60,
+          "offset_p50_ms": 0.26,
+          "gap_p50_ms": 0.26
+        },
+        {
+          "stage": "preprocessing",
+          "event": "stage_complete",
+          "requests": 60,
+          "offset_p50_ms": 4.52,
+          "gap_p50_ms": 4.23
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_request_build_start",
+          "requests": 60,
+          "offset_p50_ms": 4.81,
+          "gap_p50_ms": 0.29
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_request_build_end",
+          "requests": 60,
+          "offset_p50_ms": 5.15,
+          "gap_p50_ms": 0.31
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_queue_enter",
+          "requests": 60,
+          "offset_p50_ms": 5.28,
+          "gap_p50_ms": 0.12
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_prefill_start",
+          "requests": 60,
+          "offset_p50_ms": 6.28,
+          "gap_p50_ms": 1.02
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_prefill_end",
+          "requests": 60,
+          "offset_p50_ms": 12.21,
+          "gap_p50_ms": 5.73
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_first_emit",
+          "requests": 60,
+          "offset_p50_ms": 12.33,
+          "gap_p50_ms": 0.12
+        },
+        {
+          "stage": "vocoder",
+          "event": "stage_stream_chunk_received",
+          "requests": 60,
+          "offset_p50_ms": 13.19,
+          "gap_p50_ms": 0.83
+        },
+        {
+          "stage": "vocoder",
+          "event": "stage_first_stream_chunk_sent",
+          "requests": 60,
+          "offset_p50_ms": 43.45,
+          "gap_p50_ms": 30.16
+        },
+        {
+          "stage": "coordinator",
+          "event": "coordinator_stream_received",
+          "requests": 60,
+          "offset_p50_ms": 43.65,
+          "gap_p50_ms": 0.21
+        }
+      ]
+    }
+  },
+  "prime-a": {
+    "events-hot": {
+      "requests": 60,
+      "milestones": [
+        {
+          "stage": "coordinator",
+          "event": "request_admission",
+          "requests": 60,
+          "offset_p50_ms": 0.0,
+          "gap_p50_ms": null
+        },
+        {
+          "stage": "preprocessing",
+          "event": "stage_input_received",
+          "requests": 60,
+          "offset_p50_ms": 0.25,
+          "gap_p50_ms": 0.25
+        },
+        {
+          "stage": "preprocessing",
+          "event": "stage_complete",
+          "requests": 60,
+          "offset_p50_ms": 4.53,
+          "gap_p50_ms": 4.27
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_request_build_start",
+          "requests": 60,
+          "offset_p50_ms": 4.88,
+          "gap_p50_ms": 0.29
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_request_build_end",
+          "requests": 60,
+          "offset_p50_ms": 5.19,
+          "gap_p50_ms": 0.3
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_queue_enter",
+          "requests": 60,
+          "offset_p50_ms": 5.3,
+          "gap_p50_ms": 0.11
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_prefill_start",
+          "requests": 60,
+          "offset_p50_ms": 6.33,
+          "gap_p50_ms": 0.98
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_prefill_end",
+          "requests": 60,
+          "offset_p50_ms": 12.2,
+          "gap_p50_ms": 5.71
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_first_emit",
+          "requests": 60,
+          "offset_p50_ms": 12.31,
+          "gap_p50_ms": 0.12
+        },
+        {
+          "stage": "vocoder",
+          "event": "stage_stream_chunk_received",
+          "requests": 60,
+          "offset_p50_ms": 13.23,
+          "gap_p50_ms": 0.88
+        },
+        {
+          "stage": "vocoder",
+          "event": "stage_first_stream_chunk_sent",
+          "requests": 60,
+          "offset_p50_ms": 40.37,
+          "gap_p50_ms": 27.03
+        },
+        {
+          "stage": "coordinator",
+          "event": "coordinator_stream_received",
+          "requests": 60,
+          "offset_p50_ms": 40.6,
+          "gap_p50_ms": 0.21
+        }
+      ]
+    }
+  },
+  "prime-b": {
+    "events-hot": {
+      "requests": 60,
+      "milestones": [
+        {
+          "stage": "coordinator",
+          "event": "request_admission",
+          "requests": 60,
+          "offset_p50_ms": 0.0,
+          "gap_p50_ms": null
+        },
+        {
+          "stage": "preprocessing",
+          "event": "stage_input_received",
+          "requests": 60,
+          "offset_p50_ms": 0.3,
+          "gap_p50_ms": 0.3
+        },
+        {
+          "stage": "preprocessing",
+          "event": "stage_complete",
+          "requests": 60,
+          "offset_p50_ms": 4.62,
+          "gap_p50_ms": 4.29
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_request_build_start",
+          "requests": 60,
+          "offset_p50_ms": 4.96,
+          "gap_p50_ms": 0.31
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_request_build_end",
+          "requests": 60,
+          "offset_p50_ms": 5.26,
+          "gap_p50_ms": 0.31
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_queue_enter",
+          "requests": 60,
+          "offset_p50_ms": 5.37,
+          "gap_p50_ms": 0.12
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_prefill_start",
+          "requests": 60,
+          "offset_p50_ms": 6.4,
+          "gap_p50_ms": 1.03
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_prefill_end",
+          "requests": 60,
+          "offset_p50_ms": 12.19,
+          "gap_p50_ms": 5.73
+        },
+        {
+          "stage": "tts_engine",
+          "event": "scheduler_first_emit",
+          "requests": 60,
+          "offset_p50_ms": 12.31,
+          "gap_p50_ms": 0.12
+        },
+        {
+          "stage": "vocoder",
+          "event": "stage_stream_chunk_received",
+          "requests": 60,
+          "offset_p50_ms": 13.19,
+          "gap_p50_ms": 0.83
+        },
+        {
+          "stage": "vocoder",
+          "event": "stage_first_stream_chunk_sent",
+          "requests": 60,
+          "offset_p50_ms": 40.63,
+          "gap_p50_ms": 27.11
+        },
+        {
+          "stage": "coordinator",
+          "event": "coordinator_stream_received",
+          "requests": 60,
+          "offset_p50_ms": 40.89,
+          "gap_p50_ms": 0.24
+        }
+      ]
+    }
+  }
+}
