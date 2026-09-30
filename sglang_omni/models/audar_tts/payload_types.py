@@ -16,5 +16,7 @@ class AudarTTSState(DeclarativeStateBase):
     reference_audio: dict[str, object] | None = None
     prompt: str | None = None
     audio_codes: list[int] | None = None
-    generation_kwargs: Mapping[str, object] = wire(default_factory=dict, codec="dict")
+    generation_kwargs: Mapping[str, int | float] = wire(
+        default_factory=dict, codec="dict"
+    )
     sample_rate: int = wire(24000, codec="int_or")

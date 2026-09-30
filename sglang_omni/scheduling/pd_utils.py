@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import _thread
 import dataclasses
 import inspect
 import logging
@@ -10,7 +11,7 @@ import queue
 import threading
 from array import array
 from collections.abc import Callable, Generator
-from contextlib import AbstractContextManager, contextmanager
+from contextlib import contextmanager
 from functools import wraps
 from typing import Literal, ParamSpec, TypeVar
 
@@ -36,8 +37,8 @@ ResultT = TypeVar("ResultT")
 def serialize_kv_allocator(
     allocator: BaseTokenToKVPoolAllocator,
     *,
-    lock: AbstractContextManager[object] | None = None,
-) -> AbstractContextManager[object]:
+    lock: _thread.RLock | None = None,
+) -> _thread.RLock:
     """Synchronize the existing allocator, including calls through other holders.
 
     Wrap bound methods in place so concrete types and existing aliases survive.
@@ -473,7 +474,7 @@ class DecodeKVReceiver:
         allocator: BaseTokenToKVPoolAllocator,
         admissions: queue.SimpleQueue[DecodeAdmission],
         resume_schema: str,
-        lifecycle_lock: AbstractContextManager[object] | None = None,
+        lifecycle_lock: _thread.RLock | None = None,
     ) -> None:
         self.pool_id = pool_id
         self.allocator = allocator

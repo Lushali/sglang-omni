@@ -58,7 +58,9 @@ class Zonos2State(DeclarativeStateBase):
     eos_frame: int | None = wire(None, codec="opt_int")
 
     # bookkeeping
-    generation_kwargs: Mapping[str, object] = wire(default_factory=dict, codec="dict")
+    generation_kwargs: Mapping[str, int | float] = wire(
+        default_factory=dict, codec="dict"
+    )
 
 
 __all__ = ["Zonos2State", "ZONOS2_SAMPLE_RATE", "N_CODEBOOKS", "FRAME_WIDTH"]

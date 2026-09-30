@@ -138,7 +138,7 @@ class MossTTSPreparedRequest:
     input_ids_list: list[int]
     input_ids: torch.Tensor
     prompt_rows: torch.Tensor
-    gen_kwargs: Mapping[str, object]
+    gen_kwargs: Mapping[str, int | float]
 
 
 @dataclass
@@ -375,7 +375,7 @@ def build_generation_kwargs(
     else:
         max_new_tokens = int(raw_max_new_tokens)
 
-    generation_kwargs: dict[str, object] = {
+    generation_kwargs: dict[str, int | float] = {
         "max_new_tokens": max_new_tokens,
         # note (chenyang): the checkpoint's own generate() defaults; greedy
         # (temperature=0) collapses the codec LM into copying the reference

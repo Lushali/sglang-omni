@@ -103,7 +103,7 @@ class MossTTSLocalPreparedRequest:
     input_ids_list: list[int]
     input_ids: torch.Tensor
     prompt_rows: torch.Tensor
-    gen_kwargs: Mapping[str, object]
+    gen_kwargs: Mapping[str, int | float]
 
 
 @dataclass
@@ -226,7 +226,7 @@ def build_generation_kwargs(
     else:
         pass
 
-    generation_kwargs: dict[str, object] = {
+    generation_kwargs: dict[str, int | float] = {
         "max_new_tokens": max_new_tokens,
         "text_temperature": 1.0,
         "audio_temperature": 1.7,

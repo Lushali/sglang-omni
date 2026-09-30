@@ -3,19 +3,26 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 import torch
 from sglang.srt.layers.attention.base_attn_backend import AttentionBackend
-from sglang.srt.model_executor.forward_batch_info import ForwardBatch
+from sglang.srt.model_executor.forward_batch_info import ForwardBatch, PPProxyTensors
 from sglang.srt.model_executor.runner.prefill_cuda_graph_runner import (
     PrefillCudaGraphRunner,
 )
+from typing_extensions import Unpack
 
 if TYPE_CHECKING:
     from sglang.srt.model_executor.model_runner import ModelRunner
 else:
     pass
+
+
+class PrefillReplayKwargs(TypedDict, total=False):
+    pp_proxy_tensors: PPProxyTensors | None
+    input_embeds: torch.Tensor
+    get_embedding: bool
 
 
 class WhisperPrefillCudaGraphRunner(PrefillCudaGraphRunner):
@@ -47,7 +54,7 @@ class WhisperPrefillCudaGraphRunner(PrefillCudaGraphRunner):
     def load_batch(
         self,
         forward_batch: ForwardBatch,
-        **kwargs: object,
+        **kwargs: Unpack[PrefillReplayKwargs],
     ) -> ForwardBatch:
         static_forward_batch = super().load_batch(forward_batch, **kwargs)
         static_forward_batch.encoder_lens_cpu = forward_batch.encoder_lens_cpu

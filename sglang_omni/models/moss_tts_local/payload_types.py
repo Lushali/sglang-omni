@@ -49,5 +49,7 @@ class MossTTSLocalState(DeclarativeStateBase):
     language: str | None = None
     instructions: str | None = None
     token_count: int | None = wire(None, codec="opt_int")
-    generation_kwargs: Mapping[str, object] = wire(default_factory=dict, codec="dict")
+    generation_kwargs: Mapping[str, int | float] = wire(
+        default_factory=dict, codec="dict"
+    )
     audio_codes: torch.Tensor | None = wire(None, codec="tensor_cpu")
