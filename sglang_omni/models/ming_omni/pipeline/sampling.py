@@ -3,16 +3,12 @@
 
 from __future__ import annotations
 
-from typing import TypeVar
-
 from transformers import PreTrainedTokenizerBase
-
-ValueT = TypeVar("ValueT")
 
 
 def build_ming_sampling_kwargs(
-    params: dict[str, ValueT],
-) -> dict[str, ValueT | int | float | list[str] | list[int] | None]:
+    params: dict[str, object],
+) -> dict[str, object]:
     return {
         "max_new_tokens": params.get("max_new_tokens", 2048),
         "temperature": params.get("temperature", 0.0),
@@ -27,7 +23,7 @@ def build_ming_sampling_kwargs(
 
 
 def build_ming_sampling_params(
-    params: dict[str, ValueT],
+    params: dict[str, object],
     *,
     tokenizer: PreTrainedTokenizerBase,
     vocab_size: int,

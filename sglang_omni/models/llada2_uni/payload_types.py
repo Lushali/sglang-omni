@@ -4,7 +4,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    import torch
+else:
+    pass
 
 
 class ThinkerOutput(TypedDict, total=False):
@@ -19,11 +24,11 @@ class ThinkerOutput(TypedDict, total=False):
 class LLaDA2UniPipelineState:
     """Typed view of the per-request pipeline state."""
 
-    prompt: dict[str, object] | None = None
+    prompt: dict[str, torch.Tensor] | None = None
     encoder_inputs: dict[str, object] = field(default_factory=dict)
-    encoder_outs: dict[str, object] = field(default_factory=dict)
+    encoder_outs: dict[str, dict[str, list[list[int]]]] = field(default_factory=dict)
     thinker_out: ThinkerOutput | None = None
-    engine_outputs: dict[str, object] = field(default_factory=dict)
+    engine_outputs: dict[str, ThinkerOutput] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: object) -> "LLaDA2UniPipelineState":

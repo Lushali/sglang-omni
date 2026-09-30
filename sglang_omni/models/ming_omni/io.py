@@ -17,6 +17,10 @@ class PromptInputs(TypedDict):
     prompt_text: str
 
 
+class UsagePromptInputs(TypedDict):
+    input_ids: torch.Tensor
+
+
 class ThinkerOutput(TypedDict, total=False):
     """Normalized thinker output used for decoding and streaming."""
 
@@ -36,7 +40,7 @@ class MingOmniPipelineState:
     """
 
     raw_inputs: object | None = None
-    prompt: PromptInputs | None = None
+    prompt: PromptInputs | UsagePromptInputs | None = None
     mm_inputs: dict[str, object] = field(default_factory=dict)
     encoder_inputs: dict[str, dict[str, object]] = field(default_factory=dict)
     encoder_outs: dict[str, object] = field(default_factory=dict)

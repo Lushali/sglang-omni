@@ -49,7 +49,7 @@ def apply_encoder_result(
     state: LLaDA2UniPipelineState,
     *,
     stage_name: str,
-    result: object,
+    result: dict[str, list[list[int]]],
 ) -> None:
     """Apply encoder result to pipeline state."""
     state.encoder_outs[stage_name] = result
