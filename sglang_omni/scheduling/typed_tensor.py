@@ -15,15 +15,14 @@ when it never crosses a control-plane message (relay side-channel hops only).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar, overload
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, overload
 
 if TYPE_CHECKING:
     import torch
     from numpy.typing import ArrayLike
 else:
     pass
-
-WireValueT = TypeVar("WireValueT")
 
 
 def encode_typed_tensor(
@@ -66,19 +65,22 @@ def encode_typed_tensor(
 
 @overload
 def decode_typed_tensor(
-    data: dict[str, bytes | list[int] | str], *, key: str, legacy_key: None = None
+    data: Mapping[str, bytes | list[int] | str],
+    *,
+    key: str,
+    legacy_key: None = None,
 ) -> torch.Tensor | None: ...
 
 
 @overload
 def decode_typed_tensor(
-    data: dict[str, WireValueT], *, key: str, legacy_key: str
-) -> torch.Tensor | WireValueT | None: ...
+    data: Mapping[str, object], *, key: str, legacy_key: str
+) -> object: ...
 
 
 def decode_typed_tensor(
-    data: dict[str, WireValueT], *, key: str, legacy_key: str | None = None
-) -> torch.Tensor | WireValueT | None:
+    data: Mapping[str, object], *, key: str, legacy_key: str | None = None
+) -> object:
     """Inverse of encode_typed_tensor; legacy_key reads pre-encoding list/tensor payloads."""
     import numpy as np
     import torch

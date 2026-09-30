@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Callable, Iterable, Optional, Tuple, TypeVar
+from typing import Callable, Iterable, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -44,10 +44,10 @@ from sglang_omni.models.moss_tts_local.state_pool import MossTTSLocalDecodeState
 
 logger = logging.getLogger(__name__)
 
-ConfigInputT = TypeVar("ConfigInputT")
 
-
-def as_qwen3_config(config: ConfigInputT) -> Qwen3Config | ConfigInputT:
+def as_qwen3_config(
+    config: PretrainedConfig | dict[str, object] | None,
+) -> Qwen3Config | None:
     from transformers import Qwen3Config
 
     if isinstance(config, Qwen3Config):

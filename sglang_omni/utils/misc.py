@@ -6,13 +6,10 @@ from __future__ import annotations
 import pickle
 import random
 import re
-from typing import TypeVar
 
 import numpy as np
 import torch
 import torch.distributed as dist
-
-BroadcastValueT = TypeVar("BroadcastValueT")
 
 
 def get_layer_id(weight_name):
@@ -63,12 +60,12 @@ def avail_gpu_mem(gpu_id: int) -> float | None:
 
 
 def broadcast_pyobj(
-    data: list[BroadcastValueT],
+    data: list[object],
     rank: int,
     dist_group: torch.distributed.ProcessGroup | None = None,
     src: int = 0,
     force_cpu_device: bool = True,
-) -> list[BroadcastValueT]:
+) -> list[object]:
     """Broadcast inputs from rank=0 to all other ranks with torch.dist backend."""
     device = torch.device(
         "cuda" if torch.cuda.is_available() and not force_cpu_device else "cpu"

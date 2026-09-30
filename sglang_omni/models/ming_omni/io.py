@@ -31,6 +31,14 @@ class ThinkerOutput(TypedDict, total=False):
     finish_reason: str
 
 
+class StreamState(TypedDict, total=False):
+    token_ids: list[int]
+    text: str
+    emitted_text: str
+    emitted_ids: list[int]
+    accumulated_text: str
+
+
 @dataclass
 class MingOmniPipelineState:
     """Typed view of the per-request pipeline state.
@@ -47,7 +55,7 @@ class MingOmniPipelineState:
     thinker_inputs: dict[str, object] = field(default_factory=dict)
     thinker_out: ThinkerOutput | None = None
     engine_outputs: dict[str, object] = field(default_factory=dict)
-    stream_state: dict[str, object] = field(default_factory=dict)
+    stream_state: StreamState = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: object) -> "MingOmniPipelineState":

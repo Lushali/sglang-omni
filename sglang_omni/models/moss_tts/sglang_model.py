@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os
 from copy import copy
-from typing import TYPE_CHECKING, Iterable, Optional, Sequence, Tuple, TypeVar
+from typing import TYPE_CHECKING, Iterable, Optional, Sequence, Tuple
 
 import torch
 from sglang.srt.distributed import get_pp_group, get_tensor_model_parallel_world_size
@@ -51,8 +51,6 @@ else:
 
 logger = logging.getLogger(__name__)
 
-ConfigInputT = TypeVar("ConfigInputT")
-
 
 class ChannelLogitsList(list[torch.Tensor | None]):
     """Per-channel logits; ``fused_audio`` carries the [B, n_vq, vocab] fp32
@@ -61,7 +59,9 @@ class ChannelLogitsList(list[torch.Tensor | None]):
     fused_audio: torch.Tensor | None = None
 
 
-def as_qwen3_config(config: ConfigInputT) -> Qwen3Config | ConfigInputT:
+def as_qwen3_config(
+    config: PretrainedConfig | dict[str, object] | None,
+) -> Qwen3Config | None:
     from transformers import Qwen3Config
 
     if isinstance(config, Qwen3Config):

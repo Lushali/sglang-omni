@@ -7,7 +7,7 @@ import dataclasses
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import _MISSING_TYPE as MissingType
 from dataclasses import MISSING, dataclass, field
-from typing import TYPE_CHECKING, Protocol, TypeVar
+from typing import TYPE_CHECKING, Protocol, TypeVar, overload
 
 from sglang_omni.proto import StagePayload
 
@@ -17,8 +17,6 @@ else:
     pass
 
 StateT = TypeVar("StateT", bound="PipelineStateBase")
-FieldT = TypeVar("FieldT")
-ValueT = TypeVar("ValueT")
 
 __all__ = [
     "DeclarativeStateBase",
@@ -53,7 +51,15 @@ class PipelineStateBase:
         raise NotImplementedError(f"{cls.__name__} must implement from_dict()")
 
     @staticmethod
-    def serialize_value(value: ValueT | torch.Tensor) -> ValueT | torch.Tensor:
+    @overload
+    def serialize_value(value: torch.Tensor) -> torch.Tensor: ...
+
+    @staticmethod
+    @overload
+    def serialize_value(value: object) -> object: ...
+
+    @staticmethod
+    def serialize_value(value: object) -> object:
         try:
             import torch
         except ImportError:
@@ -212,11 +218,11 @@ def wire(
     return field(default=default, metadata=metadata)
 
 
-def spec_of(f: dataclasses.Field[FieldT]) -> WireSpec:
+def spec_of(f: dataclasses.Field[object]) -> WireSpec:
     return f.metadata.get("wire", _DEFAULT_SPEC)
 
 
-def default_of(f: dataclasses.Field[FieldT]) -> FieldT | None:
+def default_of(f: dataclasses.Field[object]) -> object:
     if f.default is not MISSING:
         return f.default
     else:
@@ -228,7 +234,7 @@ def default_of(f: dataclasses.Field[FieldT]) -> FieldT | None:
     return None
 
 
-def emit_kind(f: dataclasses.Field[FieldT], spec: WireSpec) -> str:
+def emit_kind(f: dataclasses.Field[object], spec: WireSpec) -> str:
     validate_emit_mode(spec.emit)
     if spec.emit is not None:
         return spec.emit
@@ -295,7 +301,7 @@ class DeclarativeStateBase(PipelineStateBase):
     def encode_field(
         self,
         data: dict[str, object],
-        f: dataclasses.Field[FieldT],
+        f: dataclasses.Field[object],
         spec: WireSpec,
         emit: str,
     ) -> None:

@@ -8,20 +8,19 @@ Ming's config remains usable in lightweight environments.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TypeVar, overload
+from typing import overload
 
 import torch
 
 from sglang_omni.models.ming_omni.io import (
     MingOmniPipelineState,
+    StreamState,
     ThinkerOutput,
     UsagePromptInputs,
 )
 from sglang_omni.models.ming_omni.pipeline.next_stage import AUDIO_STAGE, IMAGE_STAGE
 from sglang_omni.models.ming_omni.tp_utils import validate_stage_tp_support
 from sglang_omni.proto import StagePayload
-
-ValueT = TypeVar("ValueT")
 
 
 def project_preprocessing_to_audio_encoder(payload: StagePayload) -> StagePayload:
@@ -181,7 +180,7 @@ def slim_thinker_out(thinker_out: ThinkerOutput | None) -> ThinkerOutput | None:
 
 
 @overload
-def copy_mutable_containers(value: dict[str, ValueT]) -> dict[str, object]: ...
+def copy_mutable_containers(value: StreamState) -> StreamState: ...
 
 
 @overload

@@ -11,7 +11,7 @@ import threading
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 import torch
 from sglang.srt.managers.schedule_batch import Req
@@ -19,6 +19,7 @@ from sglang.srt.sampling.sampling_params import SamplingParams
 from transformers import PretrainedConfig
 
 from sglang_omni.models.moss_tts.hf_loading import (
+    MossAudioReference,
     MossDelayReferences,
     MossRequestProcessor,
     MossUserMessage,
@@ -49,7 +50,6 @@ if TYPE_CHECKING:
 else:
     pass
 
-RefAudioT = TypeVar("RefAudioT")
 
 MOSS_TTS_DEFAULT_MAX_NEW_TOKENS = 4096
 _MOSS_TTS_PREPARED_MARKER = "_moss_tts_prepared_request"
@@ -505,9 +505,9 @@ def build_row_cache_key_ids(rows: torch.Tensor) -> list[int]:
 
 def reference_for_processor(
     processor: object,
-    ref_audio: RefAudioT | str | None,
+    ref_audio: MossAudioReference | None,
     reference_encoder: ReferenceEncoder | None = None,
-) -> list[RefAudioT | str | torch.Tensor] | None:
+) -> list[str | torch.Tensor] | None:
     if ref_audio is None:
         return None
     else:
