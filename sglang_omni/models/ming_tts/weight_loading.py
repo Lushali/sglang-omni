@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Iterable, TypedDict
 
 if TYPE_CHECKING:
     from sglang_omni.models.ming_omni.talker.audio_vae.modeling_audio_vae import (
@@ -85,6 +85,19 @@ class MingTTSWeightManifest:
         }
 
 
+class MingTTSWeightReportDict(TypedDict):
+    manifest: dict[str, str | int | dict[str, int] | dict[str, list[str]]] | None
+    loaded: dict[str, int]
+    loaded_keys: dict[str, dict[str, int | list[str]]]
+    loaded_params: dict[str, dict[str, int | list[str]]]
+    skipped: dict[str, dict[str, int | list[str]]]
+    deferred: dict[str, dict[str, int | list[str]]]
+    leftover_count: int
+    leftovers: list[str]
+    missing: dict[str, dict[str, int | list[str]]]
+    packed_shards: dict[str, dict[str, int | list[str]]]
+
+
 @dataclass
 class MingTTSWeightReport:
     """Strict-load report for checkpoint ownership and coverage diagnostics."""
@@ -135,7 +148,7 @@ class MingTTSWeightReport:
             else:
                 pass
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> MingTTSWeightReportDict:
         def bucket_summary(
             buckets: dict[str, list[str]]
         ) -> dict[str, dict[str, int | list[str]]]:

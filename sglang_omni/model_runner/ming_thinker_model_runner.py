@@ -22,6 +22,7 @@ from sglang_omni.scheduling.types import SchedulerRequest
 
 if TYPE_CHECKING:
 
+    from sglang_omni.models.ming_omni.io import ThinkerEmbeddingInputs
     from sglang_omni.models.ming_omni.thinker import BailingMoeV2TextModel
 else:
     pass
@@ -234,7 +235,7 @@ class MingThinkerModelRunner(ModelRunner):
         return str(getattr(req, "rid", getattr(req, "request_id", "<unknown>")))
 
     def validate_final_consumption(
-        self, req: Req, omni_inputs: Mapping[str, object], consumed: dict[str, int]
+        self, req: Req, omni_inputs: ThinkerEmbeddingInputs, consumed: dict[str, int]
     ) -> None:
         req_id = self.request_id(req)
         for modality, embed_key in [

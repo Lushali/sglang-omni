@@ -22,13 +22,41 @@ class UsagePromptInputs(TypedDict):
     input_ids: torch.Tensor
 
 
+class EncoderCacheKeyInputs(TypedDict, total=False):
+    cache_key: str
+
+
+class AudioEncoderInputs(EncoderCacheKeyInputs):
+    audio_feats: torch.Tensor
+    audio_feats_lengths: torch.Tensor
+    audio_placeholder_loc_lens: torch.Tensor
+
+
+class ImageEncoderInputs(EncoderCacheKeyInputs, total=False):
+    pixel_values: torch.Tensor | None
+    image_grid_thw: torch.Tensor | None
+    pixel_values_videos: torch.Tensor | None
+    video_grid_thw: torch.Tensor | None
+
+
+class SkippedEncoderInputs(EncoderCacheKeyInputs):
+    _skip: bool
+    _result: dict[str, object]
+
+
+class ThinkerEmbeddingInputs(TypedDict, total=False):
+    audio_embeds: torch.Tensor | None
+    image_embeds: torch.Tensor | None
+    video_embeds: torch.Tensor | None
+
+
 class ThinkerOutput(TypedDict, total=False):
     """Normalized thinker output used for decoding and streaming."""
 
     output_ids: list[int]
     step: int
     is_final: bool
-    extra_model_outputs: dict[str, object]
+    extra_model_outputs: dict[str, torch.Tensor | list[torch.Tensor] | list[int]]
     finish_reason: str
 
 
@@ -51,7 +79,7 @@ class MingOmniPipelineState:
     raw_inputs: object | None = None
     prompt: PromptInputs | UsagePromptInputs | None = None
     mm_inputs: dict[str, object] = field(default_factory=dict)
-    encoder_inputs: dict[str, dict[str, object]] = field(default_factory=dict)
+    encoder_inputs: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
     encoder_outs: dict[str, object] = field(default_factory=dict)
     thinker_inputs: dict[str, Mapping[str, torch.Tensor | str]] = field(
         default_factory=dict
@@ -142,5 +170,5 @@ class MingOmniEvent:
 
     type: MingOmniEventType
     modality: str
-    payload: dict[str, object]
+    payload: dict[str, str | list[str]]
     is_final: bool = False

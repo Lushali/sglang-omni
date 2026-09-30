@@ -15,7 +15,13 @@ from sglang_omni.models.ming_omni.components.common import (
     load_ming_config,
     load_ming_tokenizer,
 )
-from sglang_omni.models.ming_omni.io import MingOmniPipelineState, PromptInputs
+from sglang_omni.models.ming_omni.io import (
+    AudioEncoderInputs,
+    ImageEncoderInputs,
+    MingOmniPipelineState,
+    PromptInputs,
+    SkippedEncoderInputs,
+)
 from sglang_omni.models.ming_omni.pipeline.next_stage import AUDIO_STAGE, IMAGE_STAGE
 from sglang_omni.preprocessing.audio import compute_audio_cache_key, load_audio_path
 from sglang_omni.preprocessing.image import (
@@ -653,7 +659,9 @@ class MingPreprocessor:
         # --- Prepare encoder inputs ---
         # Always include keys so that the aggregated input handler
         # (which waits for ALL configured sources) receives data from every source.
-        encoder_inputs: dict[str, dict[str, object]] = {
+        encoder_inputs: dict[
+            str, AudioEncoderInputs | ImageEncoderInputs | SkippedEncoderInputs
+        ] = {
             AUDIO_STAGE: {"_skip": True, "_result": {}},
             IMAGE_STAGE: {"_skip": True, "_result": {}},
         }
@@ -687,7 +695,7 @@ class MingPreprocessor:
         has_image = pixel_values is not None and image_grid_thw is not None
         has_video = pixel_values_videos is not None and video_grid_thw is not None
         if has_image or has_video:
-            stage_inputs: dict[str, object] = {}
+            stage_inputs: ImageEncoderInputs = {}
             if has_image:
                 stage_inputs["pixel_values"] = pixel_values
                 stage_inputs["image_grid_thw"] = image_grid_thw

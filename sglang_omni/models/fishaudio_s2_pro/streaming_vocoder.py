@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import torch
+from typing_extensions import NotRequired, TypedDict
 
 from sglang_omni.models.fishaudio_s2_pro.payload_types import S2ProState
 from sglang_omni.pipeline.stage.stream_queue import StreamItem
@@ -25,6 +26,16 @@ else:
     pass
 
 logger = logging.getLogger(__name__)
+
+S2ProFinalAudioData = TypedDict(
+    "S2ProFinalAudioData",
+    {
+        "modality": str,
+        "sample_rate": int,
+        "usage": NotRequired[object],
+        "finish_reason": NotRequired[object],
+    },
+)
 
 
 @dataclass
@@ -461,7 +472,7 @@ class S2ProVocoderScheduler(StreamingSimpleScheduler):
             pass
 
         final_state = S2ProState.from_dict(payload.data)
-        final_data: dict[str, object] = {
+        final_data: S2ProFinalAudioData = {
             "modality": "audio",
             "sample_rate": self.codec.sample_rate,
         }

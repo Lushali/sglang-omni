@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TypedDict
 
 import torch
 
@@ -14,9 +15,12 @@ from sglang_omni.models.auk.constants import NO_PROMPT_AUDIO_MARKER
 logger = logging.getLogger(__name__)
 
 
-def build_messages(
-    instruction: str, has_reference_audio: bool
-) -> list[dict[str, object]]:
+class ChatMessage(TypedDict):
+    role: str
+    content: list[dict[str, str | None]]
+
+
+def build_messages(instruction: str, has_reference_audio: bool) -> list[ChatMessage]:
     """Build the single-turn ChatML message list AuK is trained on."""
     text = instruction
     if not has_reference_audio and not text.endswith(NO_PROMPT_AUDIO_MARKER):

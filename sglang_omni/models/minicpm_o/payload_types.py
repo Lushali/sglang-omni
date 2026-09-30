@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, TypedDict
 
@@ -32,6 +33,23 @@ class ThinkerOutput(TypedDict, total=False):
     output_token_logprobs: list[list[float | int]]
 
 
+class ModalityInputs(TypedDict):
+    bounds: object
+    cache_key: str | None
+
+
+class ImageEncoderInputs(TypedDict):
+    pixel_values: list[object]
+    tgt_sizes: object
+    cache_key: str | None
+
+
+class AudioEncoderInputs(TypedDict):
+    audio_features: object
+    audio_feature_lens: object
+    cache_key: str | None
+
+
 class EngineOutputs(TypedDict, total=False):
     thinker: ThinkerOutput
     talker: dict[str, torch.Tensor]
@@ -42,8 +60,8 @@ class MiniCPMOPipelineState:
     """Per-request state serialized as plain dictionaries across processes."""
 
     prompt: PromptInputs | None = None
-    mm_inputs: dict[str, object] = field(default_factory=dict)
-    encoder_inputs: dict[str, dict[str, object]] = field(default_factory=dict)
+    mm_inputs: Mapping[str, object] = field(default_factory=dict)
+    encoder_inputs: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
     encoder_outs: dict[str, object] = field(default_factory=dict)
     thinker_inputs: dict[str, object] = field(default_factory=dict)
     thinker_out: ThinkerOutput | None = None

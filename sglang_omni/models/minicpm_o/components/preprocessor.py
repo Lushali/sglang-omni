@@ -12,7 +12,12 @@ import torch
 from PIL import Image
 from transformers import AutoProcessor, AutoTokenizer
 
-from sglang_omni.models.minicpm_o.payload_types import MiniCPMOPipelineState
+from sglang_omni.models.minicpm_o.payload_types import (
+    AudioEncoderInputs,
+    ImageEncoderInputs,
+    MiniCPMOPipelineState,
+    ModalityInputs,
+)
 from sglang_omni.models.minicpm_o.routing import should_generate_audio_output
 from sglang_omni.models.weight_loader import resolve_model_path
 from sglang_omni.preprocessing.audio import (
@@ -336,8 +341,8 @@ class MiniCPMOPreprocessor:
         input_ids = processed["input_ids"][0].to(dtype=torch.long)
         attention_mask = torch.ones_like(input_ids)
 
-        mm_inputs: dict[str, object] = {}
-        encoder_inputs: dict[str, dict[str, object]] = {}
+        mm_inputs: dict[str, ModalityInputs] = {}
+        encoder_inputs: dict[str, ImageEncoderInputs | AudioEncoderInputs] = {}
         if images:
             image_bound = first_batch_item(processed["image_bound"])
             # note (MayDomine): slice order must match the placeholder bound order.
