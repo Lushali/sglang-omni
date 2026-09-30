@@ -3,6 +3,7 @@
 
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 import torch
@@ -19,6 +20,8 @@ from sglang_omni.models.moss_transcribe_diarize.config import (
 from sglang_omni.models.moss_transcribe_diarize.request_builders import (
     MossTranscribeDiarizeRequestData,
     make_moss_transcribe_diarize_scheduler_adapters,
+    make_moss_transcribe_diarize_stream_output_builder,
+    postprocess_moss_transcribe_diarize_text,
 )
 from sglang_omni.pipeline.replicas import (
     RoundRobinBindingPolicy,
@@ -31,9 +34,12 @@ from sglang_omni.scheduling.pd_utils import (
     continuation_from_req,
     req_from_continuation,
 )
-from sglang_omni.serve.openai_errors import is_bad_request_error
 from tests.unit_test.moss_transcribe_diarize.test_pipeline import stub_factory_env
 from tests.unit_test.moss_transcribe_diarize.test_request_builders import FakeProcessor
+from tests.unit_test.moss_transcribe_diarize.test_stream_output_builder import (
+    ByteTokenizer,
+    make_req_output,
+)
 from tests.unit_test.pipeline.test_pd_utils import make_allocation, prefill_req
 
 
@@ -80,6 +86,12 @@ def test_pd_layout_resolves_concrete_factory_identity(p_count, d_count) -> None:
 @pytest.mark.parametrize("role", ["prefill", "decode"])
 def test_pd_factory_uses_shared_scheduler_and_only_prefill_encoder(monkeypatch, role):
     calls = stub_factory_env(monkeypatch, want_cuda_graph=True)
+    request_builder = Mock(return_value="prefill request")
+    monkeypatch.setattr(
+        pd.MossTranscribeDiarizeEngineBuilder,
+        "make_adapters",
+        lambda self, model: (request_builder, Mock()),
+    )
     captured = {}
 
     def scheduler(**kwargs):
@@ -98,7 +110,7 @@ def test_pd_factory_uses_shared_scheduler_and_only_prefill_encoder(monkeypatch, 
     stages.create_sglang_moss_transcribe_diarize_executor(**args)
 
     assert captured["stage_name"] == f"asr_{role}@r1"
-    assert "stream_output_builder" not in captured
+    assert ("stream_output_builder" in captured) == (role == "decode")
     assert captured["enable_async_decode"] is False
     assert bool(calls["encoder_services"]) == (role == "prefill")
     assert bool(calls["init_encoder_graphs"]) == (role == "prefill")
@@ -112,14 +124,34 @@ def test_pd_factory_uses_shared_scheduler_and_only_prefill_encoder(monkeypatch, 
             captured["request_builder"](StagePayload("r", OmniRequest(None), None))
 
     payload = StagePayload("r", OmniRequest(None, params={"stream": True}), None)
-    with pytest.raises(ValueError, match="requires stream=false") as exc:
-        captured["request_builder"](payload)
-    assert is_bad_request_error(exc.value)
+    if role == "prefill":
+        assert captured["request_builder"](payload) == "prefill request"
+        request_builder.assert_called_once_with(payload)
+    else:
+        with pytest.raises(ValueError, match="KV continuation"):
+            captured["request_builder"](payload)
 
 
-@pytest.mark.parametrize("first_token,max_new_tokens", [(42, 4), (2, 4), (42, 1)])
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize(
+    "first_token,max_new_tokens,decode_tokens,expected_text",
+    [
+        (42, 4, [43, 44, 2], "ABC"),
+        (2, 4, [], ""),
+        (42, 1, [], "A"),
+        (42, 2, [43], "AB"),
+        (45, 1, [], "\ufffd"),
+        (45, 2, [46], "\ufffd"),
+        (45, 3, [46, 47], "你"),
+    ],
+)
 def test_moss_continuation_preserves_first_token_stops_and_result(
-    monkeypatch, first_token, max_new_tokens
+    monkeypatch: pytest.MonkeyPatch,
+    first_token: int,
+    max_new_tokens: int,
+    decode_tokens: list[int],
+    expected_text: str,
+    stream: bool,
 ) -> None:
     source = prefill_req(max_new_tokens=max_new_tokens)
     source.output_ids[0] = first_token
@@ -127,7 +159,7 @@ def test_moss_continuation_preserves_first_token_stops_and_result(
         source.rid,
         OmniRequest(
             inputs={"audio": torch.ones(160)},
-            params={"stream": False, "language": "en"},
+            params={"stream": stream, "language": "en"},
             metadata={"audio": torch.ones(160)},
         ),
         data={"embedding": torch.ones(4, 8)},
@@ -174,6 +206,44 @@ def test_moss_continuation_preserves_first_token_stops_and_result(
     monkeypatch.setattr("time.perf_counter", lambda: 101.0)
     assert adapter(resumed.omni_data).data == adapter(source.omni_data).data
     assert resumed.omni_data.enforce_request_limits is True
+
+    tokenizer = ByteTokenizer(
+        {
+            2: b"<|im_end|>",
+            42: b"A",
+            43: b"B",
+            44: b"C",
+            45: b"\xe4",
+            46: b"\xbd",
+            47: b"\xa0",
+        },
+        special_token_ids={2},
+    )
+    stream_builder = make_moss_transcribe_diarize_stream_output_builder(
+        tokenizer, eos_token_id=2, min_emit_interval_s=3600.0
+    )
+    messages = []
+    for token_id in decode_tokens:
+        assert not resumed.finished()
+        messages.extend(
+            stream_builder(resumed.rid, resumed.omni_data, make_req_output(token_id))
+        )
+        resumed.output_ids.append(token_id)
+        resumed.update_finish_state()
+    assert resumed.finished()
+    messages.extend(stream_builder.flush(resumed.rid, resumed.omni_data))
+    assert stream_builder.flush(resumed.rid, resumed.omni_data) == []
+    streamed_text = "".join(message.data["text"] for message in messages)
+    if stream:
+        assert streamed_text == expected_text
+        assert postprocess_moss_transcribe_diarize_text(streamed_text) == (
+            postprocess_moss_transcribe_diarize_text(
+                tokenizer.decode(resumed.output_ids)
+            )
+        )
+        assert all(message.request_id == resumed.rid for message in messages)
+    else:
+        assert messages == []
     pool.free(resumed)
     assert pool.available_size() == 1
 

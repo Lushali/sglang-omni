@@ -126,7 +126,8 @@ set the request target to `0` to disable coalescing.
 ### Minimal Prefill/Decode Disaggregation
 
 The `pd` variant uses the shared Omni prefill/decode schedulers and CUDA IPC
-KV transfer. It runs on a single host with TP=1 and `stream=false`.
+KV transfer. It runs on a single host with TP=1 and supports both regular and
+streaming transcription responses.
 P owns audio encoding and prompt prefill, including the first sampled token;
 D resumes from the transferred prompt KV and that token, then returns the
 normal transcription response. Raw audio and encoder embeddings stay on P.
@@ -139,9 +140,24 @@ Launch 1P + 1D on GPUs 0 and 1:
 sgl-omni serve --config examples/configs/moss_td_pd.yaml --port 8000
 ```
 
-Use the transcription requests below with `stream=false`
-(the default). Streaming requests are rejected. Radix caching is disabled,
-page size is 1, and both stages use synchronous decoding by default.
+Use the transcription requests below with `stream=false` (the default), or
+request incremental text over SSE with `stream=true` and `response_format=json`
+or `text`:
+
+```bash
+curl -N http://localhost:8000/v1/audio/transcriptions \
+  -F model=OpenMOSS-Team/MOSS-Transcribe-Diarize \
+  -F file=@tests/data/query_to_cars.wav \
+  -F stream=true \
+  -F response_format=json
+```
+
+Only D emits text deltas, including the first token sampled by P. Pending text
+is flushed before the final transcript event, including requests that finish
+at the first token. The full audio is uploaded before inference; this is output
+streaming, not incremental audio input.
+
+Radix caching is disabled, page size is 1, and both stages use synchronous decoding.
 D currently loads the full checkpoint but does not run/capture the encoder.
 
 P and D can be replicated independently using the existing process-level DP
@@ -161,7 +177,7 @@ the KV target uses that D instance's pool (for example, `asr_decode@r1:kv`).
 These examples dedicate a GPU to each process. Colocating processes requires
 explicit per-stage memory budgets under the normal placement rules.
 
-This initial variant does not add multi-host transport, TP, streaming, or
+This initial variant does not add multi-host transport, TP, or
 load-aware replica selection. Decode KV exhaustion currently fails the
 affected request through the shared PD runtime; admission/backpressure tuning
 is separate from this model integration.

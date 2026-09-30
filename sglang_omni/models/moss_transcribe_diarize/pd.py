@@ -56,6 +56,15 @@ def restore_decode_state(
     )
     # The model's request builder uses token-id stops only.
     req.tokenizer = None
+    if (data.stage_payload.request.params or {}).get("stream"):
+        # note (JingwenGu): P's sampled token will not pass through D's forward.
+        req._moss_stream_pending_ids = (
+            list(  # noqa: leading-underscore  # Existing stream builder state
+                req.output_ids
+            )
+        )
+    else:
+        pass
 
 
 class MossTranscribeDiarizePDEngineBuilder(MossTranscribeDiarizeEngineBuilder):
@@ -85,9 +94,7 @@ class MossTranscribeDiarizePDEngineBuilder(MossTranscribeDiarizeEngineBuilder):
         request_builder, result_adapter = super().make_adapters(model)
 
         def build_request(payload: StagePayload) -> Any:
-            if (payload.request.params or {}).get("stream"):
-                raise ValueError("MOSS-Transcribe-Diarize PD requires stream=false")
-            elif self.pd_role == "decode":
+            if self.pd_role == "decode":
                 raise ValueError("MOSS-TD Decode requires a KV continuation")
             else:
                 return request_builder(payload)
@@ -96,7 +103,10 @@ class MossTranscribeDiarizePDEngineBuilder(MossTranscribeDiarizeEngineBuilder):
 
     def extra_scheduler_kwargs(self) -> dict[str, Any]:
         kwargs = super().extra_scheduler_kwargs()
-        kwargs.pop("stream_output_builder")
+        if self.pd_role == "prefill":
+            kwargs.pop("stream_output_builder")
+        else:
+            pass
         return kwargs
 
     def make_scheduler(
