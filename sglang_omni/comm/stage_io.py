@@ -213,7 +213,7 @@ def should_use_direct_cuda_ipc_stream_chunk(
     return inline_size <= _DIRECT_CUDA_IPC_STREAM_INLINE_BYTES_LIMIT
 
 
-def payload_has_cuda_tensor(payload: object) -> bool:
+def payload_has_cuda_tensor(payload: StagePayload) -> bool:
     return contains_cuda_tensor(payload)
 
 

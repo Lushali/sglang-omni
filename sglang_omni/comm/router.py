@@ -12,6 +12,7 @@ from sglang_omni.comm.data_ref import TransportKind
 from sglang_omni.platforms import current_platform
 from sglang_omni.profiler.comm_trace import emit as _comm_trace
 from sglang_omni.profiler.comm_trace import enabled as _comm_trace_enabled
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.relay.base import Relay, create_relay
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,7 @@ class CommRouter:
         gpu_stage_names: set[str] | None,
         stage_gpu_ids: dict[str, tuple[int, ...]] | None = None,
         remote_stage_names: set[str] | None = None,
-        comm_config: Mapping[str, object] | None = None,
+        comm_config: Mapping[str, int | float | str | None] | None = None,
         injected_relay: Relay | None = None,
     ) -> None:
         self.stage_name = stage_name
@@ -288,7 +289,7 @@ class CommRouter:
         return kind, self.relay(kind)
 
     def relay_for_payload(
-        self, target: str, payload: object
+        self, target: str, payload: StagePayload
     ) -> tuple[TransportKind, Relay]:
         kind = self.outbound_payload(target, payload)
         if kind is TransportKind.LOCAL_OBJECT:
