@@ -31,7 +31,7 @@ from sglang_omni.quantization import get_weight_preprocessor
 from sglang_omni.vendor.sglang.core import ForwardBatch
 
 
-def config_uses_mrope(config: object) -> bool:
+def config_uses_mrope(config: PretrainedConfig) -> bool:
     """Return whether the exact Qwen text config declares M-RoPE."""
     for field in ("rope_parameters", "rope_scaling"):
         value = getattr(config, field, None)

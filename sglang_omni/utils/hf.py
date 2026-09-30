@@ -41,7 +41,7 @@ _PERSONAPLEX_ARCHITECTURE = "PersonaPlexForCausalLM"
 _PERSONAPLEX_LAYOUT_MARKER = "tokenizer_spm_32k_3.model"
 
 
-def architecture_from_hf_config(hf_config: object) -> str | None:
+def architecture_from_hf_config(hf_config: PretrainedConfig) -> str | None:
     """Prefer HF architectures; fall back to architecture/model_type."""
     archs = getattr(hf_config, "architectures", None)
     if archs:
@@ -333,7 +333,9 @@ def load_hf_config(
     return cfg
 
 
-def instantiate_module(module_cls: type[nn.Module], config: object) -> nn.Module:
+def instantiate_module(
+    module_cls: type[nn.Module], config: PretrainedConfig
+) -> nn.Module:
     """Instantiate a module without allocating its parameters."""
     with no_init_weights():
         if hasattr(module_cls, "_from_config"):

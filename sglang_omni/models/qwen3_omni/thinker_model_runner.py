@@ -136,7 +136,7 @@ class Qwen3OmniThinkerModelRunner(ThinkerModelRunner):
 
     @classmethod
     def batch_chunk_spans(
-        cls, forward_batch: object, expected_batch_size: int
+        cls, forward_batch: ForwardBatch | None, expected_batch_size: int
     ) -> list[tuple[int, int]] | None:
         extend_lens = cls.cpu_int_sequence(
             getattr(forward_batch, "extend_seq_lens_cpu", None)

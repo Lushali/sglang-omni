@@ -26,7 +26,7 @@ _CHUNK_WAIT_LOG_INTERVAL_S = 10.0
 
 
 class DecodeMode(Protocol):
-    def is_decode(self) -> object: ...
+    def is_decode(self) -> bool: ...
 
 
 class DecodeBatch(Protocol):

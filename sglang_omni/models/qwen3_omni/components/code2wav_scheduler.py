@@ -50,7 +50,7 @@ _LARGE_BATCH_MAX_FRAMES = 20
 
 
 class IngestProfile(TypedDict):
-    run_id: object
+    run_id: str | None
     messages: int
     accepted_frames: int
     ingest_host_ns: int

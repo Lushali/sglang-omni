@@ -14,12 +14,12 @@ from contextlib import AbstractContextManager
 from copy import deepcopy
 from dataclasses import dataclass
 from types import ModuleType
-from typing import Literal, Protocol, TypeAlias, TypedDict
+from typing import Literal, TypeAlias, TypedDict
 
 import torch
 
 from sglang_omni.platforms import current_platform
-from sglang_omni.platforms.device_graph import DeviceGraphBackend
+from sglang_omni.platforms.device_graph import DeviceGraphBackend, ReplayableGraph
 
 logger = logging.getLogger(__name__)
 _MASK_SWAP_LOCK = threading.Lock()
@@ -96,10 +96,6 @@ class Code2WavRunResult:
     execution_mode: str
     key: GraphKey | None
     fallback_reason: str | None
-
-
-class ReplayableGraph(Protocol):
-    def replay(self) -> object: ...
 
 
 @dataclass(slots=True)

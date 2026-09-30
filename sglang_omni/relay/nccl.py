@@ -116,7 +116,7 @@ class NcclOperation(RelayOperation):
         self,
         connection: Connection,
         work_handle: dist.Work | None,
-        tensor_ref: object,
+        tensor_ref: torch.Tensor,
         metadata: NcclPutMetadata | None = None,
     ) -> None:
         self.conn = connection

@@ -6,12 +6,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal, TypedDict
 
+import torch
+
 
 class PromptInputs(TypedDict):
     """Tokenized prompt inputs for the thinker."""
 
-    input_ids: object
-    attention_mask: object
+    input_ids: torch.Tensor
+    attention_mask: torch.Tensor
     prompt_text: str
 
 

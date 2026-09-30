@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, TypeGuard
 import torch
 from sglang.srt.managers.schedule_batch import MultimodalDataItem, MultimodalInputFormat
 from sglang.srt.utils import create_device_stream, device_stream_context
+from transformers import WhisperFeatureExtractor
 
 from sglang_omni.scheduling.pre_lm_encoder import (
     PreLMEncoderService,
@@ -70,7 +71,7 @@ def build_cache_namespace(
     model: Qwen3ASRForConditionalGeneration,
     *,
     model_path: str,
-    feature_extractor: object,
+    feature_extractor: WhisperFeatureExtractor | None,
     mm_attention_backend: str | None,
 ) -> str:
     """Digest identifying this process's encoder pipeline for cache keying."""
@@ -95,7 +96,7 @@ def build_cache_namespace(
     return hashlib.blake2b(blob, digest_size=8).hexdigest()
 
 
-def expected_audio_tokens(item: object) -> int | None:
+def expected_audio_tokens(item: MultimodalDataItem) -> int | None:
     """Audio placeholder token count for an item (rows the LM expects)."""
     num_tokens = getattr(item, "num_audio_tokens", None)
     return int(num_tokens) if num_tokens is not None else None
@@ -380,7 +381,7 @@ class Qwen3ASRPreLMEncoderService(
                 "cache_evictions": self.cache.eviction_count,
             }
 
-    def cache_key(self, item: object) -> str | None:
+    def cache_key(self, item: MultimodalDataItem) -> str | None:
         return self.cache_key_from_fingerprint(getattr(item, "audio_fingerprint", None))
 
     def cache_key_from_fingerprint(self, audio_fingerprint: str | None) -> str | None:
@@ -516,7 +517,7 @@ class Qwen3ASRPreLMEncoderService(
 
     def cache_embedding(
         self,
-        item: object,
+        item: MultimodalDataItem,
         embedding: torch.Tensor,
         host_copy: torch.Tensor | None = None,
     ) -> None:

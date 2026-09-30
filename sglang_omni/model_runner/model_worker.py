@@ -51,7 +51,7 @@ class PrefillCudaGraphUsage:
 
 
 class PrefillCudaGraphInfo(TypedDict):
-    backend: object
+    backend: str
     runner: str | None
     backend_runner: str | None
     capture_num_tokens: list[int] | None

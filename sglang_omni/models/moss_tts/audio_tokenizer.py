@@ -155,12 +155,14 @@ def feed_forward(module: nn.Module) -> nn.Module:
     )
 
 
-class AttentionKwargs(TypedDict, total=False):
+class PackedAttentionKwargs(TypedDict, total=False):
     cu_seqlens: torch.Tensor | None
     max_seqlen: int | None
     position_ids: torch.Tensor | None
     local_flash_plan: LocalCausalFlashPlan | None
 
+
+class AttentionKwargs(PackedAttentionKwargs, total=False):
     input_lengths: torch.Tensor | None
     execution_context: StreamingExecutionContext | None
 
@@ -602,7 +604,7 @@ class MossAudioTokenizerProjectedTransformer(nn.Module):
         *,
         input_lengths_cpu: Sequence[int] | None = None,
         execution_context: StreamingExecutionContext | None = None,
-        **kwargs: object,
+        **kwargs: Unpack[PackedAttentionKwargs],
     ) -> tuple[torch.Tensor, torch.Tensor]:
         if execution_context is not None and not self.is_streaming:
             raise RuntimeError(

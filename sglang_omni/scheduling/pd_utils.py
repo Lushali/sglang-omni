@@ -33,7 +33,9 @@ ResultT = TypeVar("ResultT")
 
 
 def serialize_kv_allocator(
-    allocator: object, *, lock: AbstractContextManager[object] | None = None
+    allocator: BaseTokenToKVPoolAllocator,
+    *,
+    lock: AbstractContextManager[object] | None = None,
 ) -> AbstractContextManager[object]:
     """Synchronize the existing allocator, including calls through other holders.
 

@@ -40,7 +40,7 @@ else:
 
 
 class SpeculativeAlgorithm(Protocol):
-    def is_none(self) -> object: ...
+    def is_none(self) -> bool: ...
 
 
 def attn_forward_context(

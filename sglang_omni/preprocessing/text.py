@@ -4,14 +4,19 @@
 from __future__ import annotations
 
 import json
-from typing import Mapping, Protocol
+from typing import TYPE_CHECKING, Mapping, Protocol
 
 from transformers.utils.hub import cached_file
+
+if TYPE_CHECKING:
+    from transformers import PreTrainedTokenizerBase
+else:
+    pass
 
 
 class ChatTemplateHolder(Protocol):
     @property
-    def chat_template(self) -> object: ...
+    def chat_template(self) -> str | dict[str, str] | None: ...
 
     @chat_template.setter
     def chat_template(self, value: str) -> None: ...
@@ -123,7 +128,9 @@ def append_modality_placeholders(
     return updated
 
 
-def apply_chat_template(tokenizer: object, messages: list[dict[str, str]]) -> str:
+def apply_chat_template(
+    tokenizer: PreTrainedTokenizerBase, messages: list[dict[str, str]]
+) -> str:
     """Apply the tokenizer's chat template with a generation prompt."""
     return tokenizer.apply_chat_template(
         messages,

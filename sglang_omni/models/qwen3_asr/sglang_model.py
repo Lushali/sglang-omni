@@ -22,6 +22,7 @@ from sglang.srt.model_loader.weight_utils import default_weight_loader
 from sglang.srt.models.qwen3 import Qwen3Attention, Qwen3ForCausalLM
 from sglang.srt.models.qwen3_omni_moe import Qwen3OmniMoeAudioEncoder
 from sglang.srt.utils import add_prefix
+from transformers import PretrainedConfig
 
 from sglang_omni.platforms import current_platform
 
@@ -39,7 +40,7 @@ fused_qk_norm_rope = current_platform.get_fused_qk_norm_rope()
 _MROPE_ONLY_KEYS = frozenset({"interleaved", "mrope_interleaved", "mrope_section"})
 
 
-def normalize_asr_text_rope(text_config: object) -> None:
+def normalize_asr_text_rope(text_config: PretrainedConfig) -> None:
     # note (luojiaxuan): ASR has no spatial axes: all three MRoPE position
     # rows are identical, so ordinary text RoPE is numerically equivalent and
     # avoids the multimodal permutation/copy path on every decoder layer.
