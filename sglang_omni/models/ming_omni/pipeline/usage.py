@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from sglang_omni.models.ming_omni.io import MingOmniPipelineState
+
 
 def mapping_get(value: object, key: str, default: None = None) -> object:
     if isinstance(value, Mapping):
@@ -30,7 +32,7 @@ def count_ids(ids: object) -> int:
 
 
 def build_text_usage(
-    state: object,
+    state: MingOmniPipelineState | Mapping[str, object],
     thinker_out: Mapping[str, object] | None = None,
 ) -> dict[str, int]:
     """Build OpenAI-style token usage for Ming thinker text generation."""
