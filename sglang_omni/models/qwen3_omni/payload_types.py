@@ -42,6 +42,35 @@ class StreamState(TypedDict, total=False):
     emitted_text: str
 
 
+class ThinkerModelInputs(TypedDict, total=False):
+    image_embeds: torch.Tensor
+    video_embeds: torch.Tensor
+    audio_embeds: torch.Tensor
+    image_grid_thw: torch.Tensor
+    video_grid_thw: torch.Tensor
+    feature_attention_mask: torch.Tensor
+    audio_feature_lengths: torch.Tensor
+    video_second_per_grid: torch.Tensor
+    image_deepstack_visual_embeds: list[torch.Tensor]
+    video_deepstack_visual_embeds: list[torch.Tensor]
+    deepstack_visual_embeds: list[torch.Tensor]
+    use_audio_in_video: bool
+
+
+class ThinkerInputs(TypedDict, total=False):
+    model_inputs: ThinkerModelInputs
+    media_cache_keys: dict[str, str]
+
+
+class EncoderOutputs(TypedDict, total=False):
+    image_encoder: ImageEncoderOutput
+    audio_encoder: dict[str, torch.Tensor]
+
+
+class EngineOutputs(EncoderOutputs, total=False):
+    thinker: ThinkerOutput
+
+
 class EncoderInputs(TypedDict, total=False):
     pixel_values: torch.Tensor | None
     image_grid_thw: torch.Tensor | None
@@ -72,10 +101,10 @@ class Qwen3OmniPipelineState:
         default_factory=dict
     )
     encoder_inputs: dict[str, EncoderInputs] = field(default_factory=dict)
-    encoder_outs: dict[str, object] = field(default_factory=dict)
+    encoder_outs: EncoderOutputs = field(default_factory=dict)
     thinker_inputs: dict[str, object] = field(default_factory=dict)
     thinker_out: ThinkerOutput | None = None
-    engine_outputs: dict[str, object] = field(default_factory=dict)
+    engine_outputs: EngineOutputs = field(default_factory=dict)
     stream_state: StreamState = field(default_factory=dict)
 
     @classmethod
