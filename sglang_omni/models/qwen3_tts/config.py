@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, TypedDict
 
 from sglang_omni.config import (
     CustomVoiceConfig,
@@ -28,6 +28,15 @@ _QWEN3_TTS_CUSTOM_VARIANT_MARKERS = (
     "voice_design",
     "voicedesign",
 )
+
+
+class Qwen3TTSStageFactoryKwargs(TypedDict, total=False):
+    load_frontend: bool
+    max_concurrency: int
+    server_args_overrides: dict[str, bool]
+    enable_deterministic_inference: bool
+    initial_cuda_graph: bool
+    followup_cuda_graph: bool
 
 
 class Qwen3TTSPipelineConfig(PipelineConfig):
@@ -89,8 +98,8 @@ class Qwen3TTSPipelineConfig(PipelineConfig):
         stages = {stage.name: stage for stage in self.stages}
         return stages["preprocessing"].process != stages["tts_engine"].process
 
-    def stage_factory_kwargs(self, stage_name: str) -> dict[str, object]:
-        kwargs: dict[str, object] = {}
+    def stage_factory_kwargs(self, stage_name: str) -> Qwen3TTSStageFactoryKwargs:
+        kwargs: Qwen3TTSStageFactoryKwargs = {}
         # Note (Jiaxin Deng): outside the engine process the preprocessing stage
         # loads its own prompt frontend and ships prepared tensors in the payload.
         if stage_name == "preprocessing" and self.preprocessing_in_own_process():
