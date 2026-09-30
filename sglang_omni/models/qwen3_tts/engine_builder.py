@@ -33,8 +33,8 @@ from sglang_omni.scheduling.generation_batch_policy import (
     CudaGraphBackend,
     build_default_prefill_cuda_graph_bs,
 )
-from sglang_omni.scheduling.message import OutgoingMessage
 from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputProcessor
+from sglang_omni.scheduling.types import StreamOutputBuilder
 
 if TYPE_CHECKING:
     from qwen_tts import Qwen3TTSModel
@@ -167,8 +167,7 @@ class Qwen3TtsEngineBuilder(TtsEngineBuilder[Qwen3TTSSGLangRequestData]):
         self.silence_codec_ids: torch.Tensor | None = None
         self.wrapper: Qwen3TTSModel | None = None
         self.stream_output_builder: (
-            Callable[[str, Qwen3TTSSGLangRequestData, object], list[OutgoingMessage]]
-            | None
+            StreamOutputBuilder[Qwen3TTSSGLangRequestData] | None
         ) = None
 
     def resolve_checkpoint(self, model_path: str) -> str:

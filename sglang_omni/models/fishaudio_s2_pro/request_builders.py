@@ -14,6 +14,7 @@ from sglang_omni.models.fishaudio_s2_pro.payload_types import S2ProState
 from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.message import OutgoingMessage
 from sglang_omni.scheduling.sglang_backend import SGLangARRequestData
+from sglang_omni.scheduling.types import RequestOutput
 
 _S2PRO_GRAPH_TOP_K = 30
 
@@ -273,7 +274,7 @@ def make_tts_scheduler_adapters(
         )
 
     def stream_output_builder(
-        request_id: str, data: S2ProSGLangRequestData, req_output: object
+        request_id: str, data: S2ProSGLangRequestData, req_output: RequestOutput
     ) -> list[OutgoingMessage]:
         del req_output
         if not data.stage_payload.request.params.get("stream"):

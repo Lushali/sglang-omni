@@ -45,6 +45,7 @@ from sglang_omni.scheduling.speaker_cache import (
     get_speaker_artifact_cache,
 )
 from sglang_omni.scheduling.streaming_vocoder import INITIAL_CODEC_CHUNK_FRAMES_PARAM
+from sglang_omni.scheduling.types import RequestOutput
 from sglang_omni.utils.audio_payload import audio_data_uri_from_reference
 
 if TYPE_CHECKING:
@@ -1905,7 +1906,7 @@ def make_qwen3_tts_scheduler_adapters(
 ) -> tuple[
     Callable[[StagePayload], Qwen3TTSSGLangRequestData],
     Callable[[Qwen3TTSSGLangRequestData], StagePayload],
-    Callable[[str, Qwen3TTSSGLangRequestData, object], list[OutgoingMessage]],
+    Callable[[str, Qwen3TTSSGLangRequestData, RequestOutput], list[OutgoingMessage]],
 ]:
     """Build StagePayload <-> SGLang request adapters for Qwen3-TTS."""
 
@@ -1922,7 +1923,7 @@ def make_qwen3_tts_scheduler_adapters(
     def stream_output_builder(
         request_id: str,
         data: Qwen3TTSSGLangRequestData,
-        req_output: object,
+        req_output: RequestOutput,
     ) -> list[OutgoingMessage]:
         del req_output
         params = data.stage_payload.request.params
