@@ -15,6 +15,7 @@ from sglang.srt.model_executor.runner_utils.capture_mode import get_is_capture_m
 from sglang.srt.model_loader.weight_utils import default_weight_loader
 from sglang.srt.runtime_context import get_context, get_schedule
 from sglang.srt.sampling.sampling_batch_info import SamplingBatchInfo
+from sglang.srt.server_args import ServerArgs
 from sglang.srt.utils import add_prefix
 from torch import nn
 
@@ -1586,7 +1587,7 @@ class Qwen3OmniTalker(nn.Module):
 
     @staticmethod
     def normalize_predictor_decode_graph_batch_sizes(
-        server_args: object,
+        server_args: ServerArgs,
         *,
         max_batch_size: int,
     ) -> tuple[int, ...]:

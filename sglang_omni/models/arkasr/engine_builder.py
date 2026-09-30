@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 from sglang.srt.managers.mm_utils import init_mm_embedding_cache
+from sglang.srt.server_args import ServerArgs
 from transformers import (
     AutoConfig,
     AutoTokenizer,
@@ -160,7 +161,7 @@ class ArkasrEngineBuilder(AsrEngineBuilder[ArkASRRequestData]):
     def setup_model_resources(
         self,
         model: ArkasrForConditionalGeneration,
-        server_args: object,
+        server_args: ServerArgs,
         *,
         generation_cuda_graph_enabled: bool,
     ) -> None:

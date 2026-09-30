@@ -125,7 +125,7 @@ class BatchedAudioEncoderService(
         self.cache.remove_if_same(key, cached)
         return None
 
-    def cache_key(self, item: object) -> str | None:
+    def cache_key(self, item: MultimodalDataItem) -> str | None:
         fingerprint = getattr(item, "audio_fingerprint", None)
         if fingerprint is None:
             fingerprint = getattr(item, "hash", None)
@@ -196,7 +196,7 @@ class BatchedAudioEncoderService(
 
     def cache_embedding(
         self,
-        item: object,
+        item: MultimodalDataItem,
         embedding: torch.Tensor,
         host_copy: torch.Tensor | None = None,
     ) -> None:

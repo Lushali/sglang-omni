@@ -45,6 +45,7 @@ from typing import TYPE_CHECKING, TypeGuard
 
 import torch
 from sglang.srt.managers.schedule_batch import MultimodalDataItem, MultimodalInputFormat
+from transformers import WhisperFeatureExtractor
 
 from sglang_omni.scheduling.pre_lm_encoder import (
     PreLMEncoderService,
@@ -85,7 +86,7 @@ def build_cache_namespace(
     model: ArkasrForConditionalGeneration,
     *,
     model_path: str,
-    feature_extractor: object,
+    feature_extractor: WhisperFeatureExtractor | None,
     mm_attention_backend: str | None,
 ) -> str:
     """Digest identifying this process's encoder pipeline for cache keying."""
@@ -112,7 +113,7 @@ def build_cache_namespace(
     return hashlib.blake2b(blob, digest_size=8).hexdigest()
 
 
-def expected_audio_tokens(item: object) -> int | None:
+def expected_audio_tokens(item: MultimodalDataItem) -> int | None:
     """Audio placeholder token count for an item (rows the LM expects)."""
     num_tokens = getattr(item, "num_audio_tokens", None)
     return int(num_tokens) if num_tokens is not None else None
@@ -416,7 +417,7 @@ class ArkasrPreLMEncoderService(
                 "cache_evictions": self.cache.eviction_count,
             }
 
-    def cache_key(self, item: object) -> str | None:
+    def cache_key(self, item: MultimodalDataItem) -> str | None:
         item_hash = getattr(item, "audio_fingerprint", None)
         if item_hash is None:
             return None
@@ -542,7 +543,7 @@ class ArkasrPreLMEncoderService(
 
     def cache_embedding(
         self,
-        item: object,
+        item: MultimodalDataItem,
         embedding: torch.Tensor,
         host_copy: torch.Tensor | None = None,
     ) -> None:

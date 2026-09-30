@@ -148,7 +148,7 @@ class FishS2ProEngineBuilder(TtsEngineBuilder[request_builders.S2ProSGLangReques
         else:
             pass
 
-    def customize_server_args(self, server_args: ServerArgs | None) -> None:
+    def customize_server_args(self, server_args: ServerArgs) -> None:
         updates: dict[str, bool] = {"disable_overlap_schedule": True}
         override_server_args(
             server_args,
@@ -197,7 +197,7 @@ class FishS2ProEngineBuilder(TtsEngineBuilder[request_builders.S2ProSGLangReques
         return fish_stages.resolve_s2pro_model_buffer_bs(model)
 
     def compile_model(
-        self, model: S2ProSGLangTextModel | None, server_args: ServerArgs | None
+        self, model: S2ProSGLangTextModel | None, server_args: ServerArgs
     ) -> None:
         from sglang.srt.runtime_context import get_exec
 

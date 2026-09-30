@@ -127,7 +127,7 @@ class DotsTTSEngineBuilder(TtsEngineBuilder["DotsTTSSGLangRequestData"]):
         checkpoint_dir: str,
         device: str,
         gpu_id: int,
-        server_args: ServerArgs | None,
+        server_args: ServerArgs,
     ) -> None:
         del checkpoint_dir, device, gpu_id
         from sglang.srt.runtime_context import get_exec, get_schedule

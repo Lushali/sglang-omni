@@ -23,6 +23,7 @@ from sglang.srt.layers.quantization.unquant import (
 )
 from sglang.srt.layers.sampler import multinomial_with_seed
 from sglang.srt.runtime_context import get_context, get_exec, get_parallel, get_schedule
+from sglang.srt.server_args import ServerArgs
 from sglang.srt.utils import add_prefix
 from sglang.srt.utils.common import is_pin_memory_available
 from torch import nn
@@ -1317,7 +1318,7 @@ class Qwen3TTSTalker(Qwen3TTSPromptBuilderMixin, nn.Module):
 
     @staticmethod
     def normalize_predictor_graph_batch_sizes(
-        server_args: object,
+        server_args: ServerArgs,
         *,
         max_batch_size: int,
     ) -> tuple[int, ...]:

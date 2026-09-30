@@ -27,6 +27,9 @@ from sglang_omni.scheduling.pre_lm_encoder import (
 from sglang_omni.scheduling.stage_cache import StageOutputCache
 
 if TYPE_CHECKING:
+    from sglang_omni.models.fun_asr.configuration_fun_asr import (
+        FunAsrNanoFeatureExtractor,
+    )
     from sglang_omni.models.fun_asr.sglang_model import (
         FunAsrNanoForConditionalGeneration,
     )
@@ -58,7 +61,7 @@ def build_cache_namespace(
     model: FunAsrNanoForConditionalGeneration,
     *,
     model_path: str,
-    feature_extractor: object,
+    feature_extractor: FunAsrNanoFeatureExtractor | None,
     mm_attention_backend: str | None,
 ) -> str:
     """Digest identifying this process's encoder pipeline for cache keying."""
@@ -82,7 +85,7 @@ def build_cache_namespace(
     return hashlib.blake2b(blob, digest_size=8).hexdigest()
 
 
-def expected_audio_tokens(item: object) -> int | None:
+def expected_audio_tokens(item: MultimodalDataItem) -> int | None:
     """Audio placeholder token count for an item (rows the LM expects)."""
     num_tokens = getattr(item, "num_audio_tokens", None)
     return int(num_tokens) if num_tokens is not None else None
@@ -290,7 +293,7 @@ class FunASRPreLMEncoderService(
                 "cache_evictions": self.cache.eviction_count,
             }
 
-    def cache_key(self, item: object) -> str | None:
+    def cache_key(self, item: MultimodalDataItem) -> str | None:
         item_hash = getattr(item, "audio_fingerprint", None)
         if item_hash is None:
             return None
@@ -402,7 +405,7 @@ class FunASRPreLMEncoderService(
 
     def cache_embedding(
         self,
-        item: object,
+        item: MultimodalDataItem,
         embedding: torch.Tensor,
         host_copy: torch.Tensor | None = None,
     ) -> None:

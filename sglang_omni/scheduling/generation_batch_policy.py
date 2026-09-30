@@ -6,10 +6,16 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from numbers import Integral
+from typing import TYPE_CHECKING
 
 from sglang.srt.arg_groups.model_override_base import resolved_view
 from sglang.srt.model_executor.cuda_graph_config import Backend as CudaGraphBackend
 from sglang.srt.model_executor.cuda_graph_config import CudaGraphConfig
+
+if TYPE_CHECKING:
+    from sglang.srt.server_args import ServerArgs
+else:
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -20,19 +26,19 @@ _MISSING = object()
 _PREFILL_PADDING_FACTOR = 2
 
 
-def get_decode_cuda_graph_max_bs(server_args: object) -> int | None:
+def get_decode_cuda_graph_max_bs(server_args: ServerArgs) -> int | None:
     """Read the resolved SGLang decode CUDA Graph batch cap."""
     cfg = resolved_view(server_args)
     return cfg.cuda_graph_config.decode.max_bs
 
 
-def get_decode_cuda_graph_bs(server_args: object) -> list[int] | None:
+def get_decode_cuda_graph_bs(server_args: ServerArgs) -> list[int] | None:
     """Read the resolved SGLang decode CUDA Graph batch buckets."""
     cfg = resolved_view(server_args)
     return cfg.cuda_graph_config.decode.bs
 
 
-def get_prefill_cuda_graph_backend(server_args: object) -> str:
+def get_prefill_cuda_graph_backend(server_args: ServerArgs) -> str:
     """Read the resolved SGLang prefill CUDA graph backend."""
     cfg = resolved_view(server_args)
     return cfg.cuda_graph_config.prefill.backend
@@ -274,7 +280,7 @@ def build_generation_batch_overrides(
 def validate_generation_batch_policy(
     *,
     model_name: str,
-    server_args: object,
+    server_args: ServerArgs,
     model_buffer_bs: int | None = None,
 ) -> None:
     errors: list[str] = []
@@ -367,7 +373,7 @@ def validate_generation_batch_policy(
 
 
 def validate_prefill_graph_policy(
-    server_args: object,
+    server_args: ServerArgs,
     cuda_graph_enabled: bool,
     errors: list[str],
 ) -> None:
