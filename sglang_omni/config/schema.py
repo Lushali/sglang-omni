@@ -6,9 +6,11 @@ import logging
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal, Protocol, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic.main import IncEx
+from typing_extensions import Unpack
 
 if TYPE_CHECKING:
     from sglang_omni.serve.realtime.transcription_session import StreamingASRStrategy
@@ -549,6 +551,27 @@ class CustomVoiceConfig:
     task_type: str
 
 
+class SerializationFallback(Protocol):
+    def __call__(self, value: object, /) -> object: ...
+
+
+class ModelDumpOptions(TypedDict, total=False):
+    mode: Literal["json", "python"] | str
+    include: IncEx | None
+    exclude: IncEx | None
+    context: object
+    by_alias: bool | None
+    exclude_unset: bool
+    exclude_defaults: bool
+    exclude_none: bool
+    exclude_computed_fields: bool
+    round_trip: bool
+    warnings: bool | Literal["none", "warn", "error"]
+    fallback: SerializationFallback | None
+    serialize_as_any: bool
+    polymorphic_serialization: bool | None
+
+
 class PipelineConfig(BaseModel):
     """Top-level pipeline configuration.
 
@@ -589,7 +612,7 @@ class PipelineConfig(BaseModel):
     terminal_stages_fn: str | None = None
     config_cls: str | None = None
 
-    def model_dump(self, **kwargs: object) -> dict[str, object]:
+    def model_dump(self, **kwargs: Unpack[ModelDumpOptions]) -> dict[str, object]:
         """Dump with each stage serialized by its runtime class.
 
         Pydantic serializes a ``list[StageConfig]`` field by the declared
