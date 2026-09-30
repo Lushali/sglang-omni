@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 _DEFAULT_AR_CONCURRENCY = int(os.environ.get("MINIMAX_MUSIC3_AR_CONCURRENCY", "16"))
 
 
-def create_preprocessing_executor(model_path: str) -> SimpleScheduler:
+def create_preprocessing_executor(
+    model_path: str,
+) -> SimpleScheduler[StagePayload, StagePayload]:
     del model_path
 
     def _preprocess(payload: StagePayload) -> StagePayload:

@@ -73,7 +73,9 @@ def caller_audio_source(payload: StagePayload) -> str | bytes:
     return resolve_audio_source(payload)
 
 
-def create_preprocessing_executor(model_path: str, **_) -> SimpleScheduler:
+def create_preprocessing_executor(
+    model_path: str, **_
+) -> SimpleScheduler[StagePayload, StagePayload]:
     model_dir = Path(resolve_model_path(model_path))
     tokenizer = load_text_tokenizer(model_dir)
 
@@ -138,7 +140,7 @@ def load_codec(
 
 def create_mimi_encode_executor(
     model_path: str, *, device: str | None = None, gpu_id: int | None = None, **_
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     codec, device = load_codec(model_path, device=device, gpu_id=gpu_id)
 
     def encode_waveform(waveform: torch.Tensor) -> torch.Tensor:
@@ -189,7 +191,9 @@ def create_lm_executor(
     )
 
 
-def create_decode_executor(model_path: str, **_) -> SimpleScheduler:
+def create_decode_executor(
+    model_path: str, **_
+) -> SimpleScheduler[StagePayload, StagePayload]:
     """Turn the frame-locked text stream into the reply text."""
     tokenizer = load_text_tokenizer(resolve_model_path(model_path))
 

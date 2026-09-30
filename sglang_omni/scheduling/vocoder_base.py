@@ -55,7 +55,7 @@ class BatchVocoderBase(Generic[StateT, WaveformT]):
 
     def build_scheduler(
         self, *, max_batch_size: int = 8, max_batch_wait_ms: int = 2
-    ) -> SimpleScheduler:
+    ) -> SimpleScheduler[StagePayload, StagePayload]:
         async def _single(payload: StagePayload) -> StagePayload:
             state, codes = self.prepare_item(payload)
             results = await self.decode_batch([(state, codes)])

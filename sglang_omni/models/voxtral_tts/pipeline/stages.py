@@ -101,7 +101,9 @@ def ensure_non_empty_audio_codes(audio_codes: object) -> None:
         pass
 
 
-def create_preprocessing_executor(model_path: str) -> SimpleScheduler:
+def create_preprocessing_executor(
+    model_path: str,
+) -> SimpleScheduler[StagePayload, StagePayload]:
     """Factory for the preprocessing stage."""
     checkpoint_dir = _resolve_checkpoint(model_path)
     SpeechRequest, MistralTokenizer = import_mistral_common_for_voxtral()
@@ -376,7 +378,7 @@ class VoxtralTTSVocoder(BatchVocoderBase[VoxtralTTSState, torch.Tensor]):
 
 def create_vocoder_executor(
     model_path: str, *, device: str | None = None, gpu_id: int | None = None
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     from sglang_omni.utils.device import resolve_concrete_device
 
     device = str(resolve_concrete_device(device, gpu_id))

@@ -32,6 +32,7 @@ from sglang_omni.models.qwen3_tts.streaming_vocoder import (
     Qwen3TTSStreamingVocoderScheduler,
 )
 from sglang_omni.platforms import current_platform
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.threaded_simple_scheduler import ThreadedSimpleScheduler
 from sglang_omni.utils.checkpoint import resolve_checkpoint as _resolve_checkpoint
 from sglang_omni.utils.json import JsonValue
@@ -191,7 +192,7 @@ def create_preprocessing_executor(
     gpu_id: int | None = None,
     dtype: str = "bfloat16",
     attn_implementation: str | None = None,
-) -> ThreadedSimpleScheduler:
+) -> ThreadedSimpleScheduler[StagePayload, StagePayload]:
     if load_frontend:
         load_standalone_preprocessing_context(
             model_path,

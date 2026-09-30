@@ -34,6 +34,7 @@ from sglang_omni.models.ming_tts.streaming_vocoder import (
 )
 from sglang_omni.models.ming_tts.tokenizer import load_ming_tts_tokenizer
 from sglang_omni.models.ming_tts.weight_loading import load_ming_tts_audio_vae_weights
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.simple_scheduler import SimpleScheduler
 from sglang_omni.utils.checkpoint import resolve_checkpoint as _resolve_checkpoint
 from sglang_omni.utils.gpu_memory import (
@@ -118,7 +119,7 @@ def create_preprocessing_executor(
     context_length: int | None = None,
     max_decode_steps_cap: int | None = None,
     max_concurrency: int = 1,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     checkpoint_dir = _resolve_checkpoint(model_path)
     config = load_ming_tts_config(checkpoint_dir)
     context_length = int(context_length or resolve_context_length(config))
@@ -195,7 +196,7 @@ def create_reference_encode_executor(
     ref_audio_cache: bool = True,
     ref_audio_cache_max_items: int = 256,
     ref_audio_cache_max_bytes: int = 64 * 1024 * 1024,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     from sglang_omni.models.ming_tts.reference_encode import (
         MingSpeakerEmbeddingExtractor,
         MingTTSReferenceEncoder,

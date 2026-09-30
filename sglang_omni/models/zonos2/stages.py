@@ -73,7 +73,7 @@ def create_preprocessing_executor(
     max_concurrency: int = 16,
     tts_norm: bool = True,
     tts_norm_cache_dir: str | None = None,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     # note (lennox): CPU-only stage declaring gpu only to share the pipeline
     # process; it does not touch the device.
     del device, gpu_id
@@ -104,7 +104,7 @@ def create_speaker_encode_executor(
     speaker_cache_max_items: int = 256,
     max_concurrency: int = 4,
     spk_compile: bool = False,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     from sglang_omni.models.zonos2.components.speaker_encoder import SpeakerEncoder
     from sglang_omni.utils.device import resolve_concrete_device
 

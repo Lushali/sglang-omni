@@ -22,7 +22,7 @@ def create_talker_scheduler(
     tp_rank: int = 0,
     nccl_port: int | None = None,
     total_gpu_memory_fraction: float | None = None,
-) -> OmniScheduler:
+) -> OmniScheduler[SGLangARRequestData]:
     """Create a codec scheduler with per-request condition embeddings."""
     from sglang.srt.arg_groups.model_override_base import resolved_view
     from sglang.srt.utils.hf_transformers_utils import get_tokenizer

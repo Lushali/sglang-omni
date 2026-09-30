@@ -1306,7 +1306,7 @@ def compile_dit_backbone(
 def create_preprocessing_executor(
     model_path: str,
     max_concurrency: int = 8,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     if max_concurrency <= 0:
         raise ValueError("max_concurrency must be greater than zero")
     else:

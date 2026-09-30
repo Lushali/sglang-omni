@@ -9,8 +9,9 @@ import logging
 import queue as _queue_mod
 import threading
 import time
+from collections.abc import Coroutine
 from concurrent.futures import Future, ThreadPoolExecutor
-from typing import Callable
+from typing import Callable, Generic, TypeVar
 
 from sglang_omni.scheduling.message import IncomingMessage, OutgoingMessage
 
@@ -67,7 +68,11 @@ class CountingInbox(_queue_mod.Queue[IncomingMessage]):
                 self.claimed_counts.pop(request_id, None)
 
 
-class ThreadedSimpleScheduler:
+ComputeInput = TypeVar("ComputeInput")
+ComputeResult = TypeVar("ComputeResult")
+
+
+class ThreadedSimpleScheduler(Generic[ComputeInput, ComputeResult]):
     """Run per-request work concurrently while preserving scheduler IO shape.
 
     This is meant for CPU-bound or blocking simple stages that previously used
@@ -79,7 +84,9 @@ class ThreadedSimpleScheduler:
 
     def __init__(
         self,
-        compute_fn: Callable,
+        compute_fn: Callable[
+            [ComputeInput], ComputeResult | Coroutine[None, None, ComputeResult]
+        ],
         *,
         max_concurrency: int = 8,
         abort_callback: Callable[[str], None] | None = None,
@@ -216,7 +223,7 @@ class ThreadedSimpleScheduler:
                     pass
             time.sleep(0.001)
 
-    def run_one(self, payload: object) -> object:
+    def run_one(self, payload: ComputeInput) -> ComputeResult:
         result = self.fn(payload)
         if inspect.isawaitable(result):
             result = asyncio.run(result)

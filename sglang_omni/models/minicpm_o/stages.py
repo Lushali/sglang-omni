@@ -49,17 +49,19 @@ def create_preprocessing_executor(
     model_path: str,
     *,
     speech_enabled: bool = False,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     preprocessor = MiniCPMOPreprocessor(model_path, speech_enabled=speech_enabled)
 
-    return SimpleScheduler(preprocessor)
+    return SimpleScheduler[StagePayload, StagePayload](preprocessor)
 
 
 ENCODER_CACHE_MAX_ENTRIES = 64
 ENCODER_CACHE_MAX_BYTES = 4 * 1024**3
 
 
-def create_encoder_executor(encoder: nn.Module, *, stage_name: str) -> SimpleScheduler:
+def create_encoder_executor(
+    encoder: nn.Module, *, stage_name: str
+) -> SimpleScheduler[StagePayload, StagePayload]:
     cache = StageOutputCache(
         max_size=ENCODER_CACHE_MAX_ENTRIES,
         max_bytes=ENCODER_CACHE_MAX_BYTES,
@@ -93,7 +95,7 @@ def create_image_encoder_executor(
     device: str | None = None,
     gpu_id: int | None = None,
     dtype: str | None = None,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     encoder = MiniCPMOImageEncoder(
         model_path, device=str(resolve_concrete_device(device, gpu_id)), dtype=dtype
     )
@@ -106,7 +108,7 @@ def create_audio_encoder_executor(
     device: str | None = None,
     gpu_id: int | None = None,
     dtype: str | None = None,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     encoder = MiniCPMOAudioEncoder(
         model_path, device=str(resolve_concrete_device(device, gpu_id)), dtype=dtype
     )
@@ -124,7 +126,7 @@ def create_sglang_talker_executor_from_config(
     max_seq_len: int = 4096,
     server_args_overrides: Mapping[str, object] | None = None,
     total_gpu_memory_fraction: float | None = None,
-) -> OmniScheduler:
+) -> OmniScheduler[SGLangARRequestData]:
     """Returns OmniScheduler for the native sglang MiniCPM-o talker."""
     concrete_device = resolve_concrete_device(device, gpu_id)
     gpu_id = concrete_device.index or 0
@@ -217,7 +219,7 @@ def create_code2wav_executor(
     enable_flow_variable_length: bool = True,
     reference_workers: int = 8,
     prompt_cache_capacity: int = 32,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     model = MiniCPMOCode2Wav(
         model_path,
         device=str(resolve_concrete_device(device, gpu_id)),

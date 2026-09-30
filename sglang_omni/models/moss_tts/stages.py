@@ -41,6 +41,7 @@ from sglang_omni.models.moss_tts.request_builders import (
 from sglang_omni.models.moss_tts.streaming_vocoder import MossStreamingVocoderScheduler
 from sglang_omni.models.moss_tts.vocoder import MossTTSVocoder
 from sglang_omni.preprocessing.cache_key import hash_bytes
+from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.reference_encoder import (
     ReferenceEncodeService,
     TensorReferenceEncodeHook,
@@ -487,7 +488,7 @@ def create_preprocessing_executor(
     ref_audio_cache: bool = True,
     ref_audio_cache_max_items: int = 8192,
     ref_audio_cache_max_bytes: int = 64 * 1024 * 1024,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     for name, value in (
         ("ref_audio_cache_max_items", ref_audio_cache_max_items),
         ("ref_audio_cache_max_bytes", ref_audio_cache_max_bytes),

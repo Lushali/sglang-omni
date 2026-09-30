@@ -978,7 +978,10 @@ def create_preprocessing_executor(
     video_min_pixels: int | None = None,
     video_max_pixels: int | None = None,
     video_total_pixels: int | None = None,
-) -> SimpleScheduler | ThreadedSimpleScheduler:
+) -> (
+    SimpleScheduler[StagePayload, StagePayload]
+    | ThreadedSimpleScheduler[StagePayload, StagePayload]
+):
     preprocessor = Qwen3OmniPreprocessor(
         model_path=model_path,
         max_seq_len=max_seq_len,
@@ -997,20 +1000,22 @@ def create_preprocessing_executor(
     if max_concurrency <= 1:
         from sglang_omni.scheduling.simple_scheduler import SimpleScheduler
 
-        return SimpleScheduler(_preprocess)
+        return SimpleScheduler[StagePayload, StagePayload](_preprocess)
     else:
         pass
 
     from sglang_omni.scheduling.threaded_simple_scheduler import ThreadedSimpleScheduler
 
-    return ThreadedSimpleScheduler(_preprocess, max_concurrency=max_concurrency)
+    return ThreadedSimpleScheduler[StagePayload, StagePayload](
+        _preprocess, max_concurrency=max_concurrency
+    )
 
 
 def create_aggregate_executor(
     *,
     device: str | None = None,
     gpu_id: int | None = None,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     # note (lennox): identity stage placed on GPU for colocation only;
     # it does not touch the device.
     del device, gpu_id
@@ -1028,7 +1033,7 @@ def create_image_encoder_executor(
     device: str | None = None,
     gpu_id: int | None = None,
     dtype: str | None = None,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     from sglang_omni.scheduling.simple_scheduler import SimpleScheduler
     from sglang_omni.utils.device import resolve_concrete_device
 
@@ -1104,7 +1109,7 @@ def create_audio_encoder_executor(
     gpu_id: int | None = None,
     dtype: str | None = None,
     enable_layer_cuda_graph: bool = False,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     from sglang_omni.scheduling.simple_scheduler import SimpleScheduler
     from sglang_omni.utils.device import resolve_concrete_device
 

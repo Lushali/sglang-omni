@@ -184,7 +184,7 @@ class AudarReferenceEncodeHook(TensorReferenceEncodeHook[ReferenceInput]):
         return item.source_kind != "path" or reference_key(item) == key.input_key
 
 
-def create_preprocessing_executor() -> SimpleScheduler:
+def create_preprocessing_executor() -> SimpleScheduler[StagePayload, StagePayload]:
     return SimpleScheduler(
         lambda payload: store_state(payload, build_audar_state(payload))
     )
@@ -199,7 +199,7 @@ def create_reference_encoder_executor(
     cache_max_items: int = 256,
     cache_max_bytes: int = 64 * 1024 * 1024,
     max_concurrency: int = 8,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     from sglang_omni.utils.device import resolve_concrete_device
 
     device = str(resolve_concrete_device(device, gpu_id))
@@ -262,7 +262,7 @@ def create_tts_engine_executor(
     model_revision: str = "main",
     n_ctx: int = 4096,
     n_gpu_layers: int = -1,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     try:
         from llama_cpp import LLAMA_SPLIT_MODE_NONE, Llama
     except ImportError as exc:
@@ -369,7 +369,7 @@ def create_vocoder_executor(
     gpu_id: int | None = None,
     codec_model: str = DEFAULT_CODEC_MODEL,
     codec_revision: str = "main",
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     from sglang_omni.utils.device import resolve_concrete_device
 
     device = str(resolve_concrete_device(device, gpu_id))
@@ -404,7 +404,7 @@ def create_vocoder_executor(
             pass
         return payload
 
-    return SimpleScheduler(_decode)
+    return SimpleScheduler[StagePayload, StagePayload](_decode)
 
 
 def load_state(payload: StagePayload) -> AudarTTSState:

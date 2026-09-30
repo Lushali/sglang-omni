@@ -421,7 +421,7 @@ def create_preprocessing_executor(
     max_generate_length: int = 500,
     num_steps: int = 4,
     max_concurrency: int = 8,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     _root, config, tokenizer, context_length = load_model_metadata(model_path)
     from dots_tts.utils.tokenizer import (
         AUDIO_COMP_SPAN_TOKEN,
@@ -458,7 +458,7 @@ def create_reference_encode_executor(
     max_concurrency: int = 8,
     max_batch_size: int = 1,
     max_batch_wait_ms: float = 4.0,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     from sglang_omni.utils.device import resolve_concrete_device
 
     concrete_device = resolve_concrete_device(device, gpu_id)

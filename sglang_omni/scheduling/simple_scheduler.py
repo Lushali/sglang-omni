@@ -16,10 +16,12 @@ import logging
 import queue as _queue_mod
 import threading
 import time
-from typing import Awaitable, Callable, Protocol
+from collections.abc import Coroutine, Sequence
+from typing import Awaitable, Callable, Generic, Protocol
 
 from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.message import IncomingMessage, OutgoingMessage
+from sglang_omni.scheduling.threaded_simple_scheduler import ComputeInput, ComputeResult
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +30,7 @@ class RequestArrivalHook(Protocol):
     def __call__(self, payload: StagePayload) -> None: ...
 
 
-class SimpleScheduler:
+class SimpleScheduler(Generic[ComputeInput, ComputeResult]):
     """Process requests one at a time via a callable.
 
     Supports sync and async callables for ``new_request`` messages only.
@@ -38,9 +40,18 @@ class SimpleScheduler:
 
     def __init__(
         self,
-        compute_fn: Callable,
+        compute_fn: Callable[
+            [ComputeInput], ComputeResult | Coroutine[None, None, ComputeResult]
+        ],
         *,
-        batch_compute_fn: Callable | None = None,
+        batch_compute_fn: (
+            Callable[
+                [list[ComputeInput]],
+                Sequence[ComputeResult]
+                | Coroutine[None, None, Sequence[ComputeResult]],
+            ]
+            | None
+        ) = None,
         max_batch_size: int = 1,
         max_batch_wait_ms: int = 0,
         batch_wait_when_idle: bool = True,
@@ -265,10 +276,10 @@ class SimpleScheduler:
             self.emit_result(msg.request_id, result, self.outbox)
 
     @staticmethod
-    async def await_result(result: Awaitable[object]) -> object:
+    async def await_result(result: Awaitable[ComputeResult]) -> ComputeResult:
         return await result
 
-    def run_compute_in_thread(self, payload: object) -> object:
+    def run_compute_in_thread(self, payload: ComputeInput) -> ComputeResult:
         result = self.fn(payload)
         if inspect.isawaitable(result):
             result = asyncio.run(self.await_result(result))

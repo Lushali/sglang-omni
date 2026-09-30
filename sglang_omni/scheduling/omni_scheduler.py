@@ -25,7 +25,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import wait as wait_futures
 from dataclasses import dataclass
 from itertools import islice
-from typing import TYPE_CHECKING, Callable, Generic, TypedDict
+from typing import TYPE_CHECKING, Callable, Generic
 
 import torch
 from sglang.srt.configs.model_config import ModelConfig
@@ -52,6 +52,7 @@ from sglang.srt.runtime_context import get_model, get_serving
 from sglang.srt.server_args import ServerArgs
 from sglang.srt.session.session_controller import SessionController
 from sglang.srt.utils import broadcast_pyobj
+from typing_extensions import TypedDict
 
 from sglang_omni.admission import QueueFullError
 from sglang_omni.model_runner.base import ModelRunner, PendingStep
@@ -242,6 +243,39 @@ class NoOpGrammarManager:
 _REQUEST_BUILD_ADMISSION_WAIT_S = 0.002
 
 
+class OmniSchedulerArguments(TypedDict, Generic[RequestDataT], total=False):
+    tp_worker: ModelWorker | MlxTpModelWorker
+    tree_cache: BasePrefixCache
+    req_to_token_pool: ReqToTokenPool
+    token_to_kv_pool_allocator: BaseTokenToKVPoolAllocator
+    server_args: ServerArgs
+    model_config: ModelConfig
+    model_runner: ModelRunner[RequestDataT] | None
+    request_builder: (
+        Callable[[StagePayload], RequestDataT | DeferredAdmission[RequestDataT]] | None
+    )
+    session_adapter: ARSessionAdapter | None
+    result_adapter: Callable[[RequestDataT], StagePayload] | None
+    stream_output_builder: StreamOutputBuilder[RequestDataT] | None
+    stream_chunk_handler: (
+        Callable[[RequestDataT | SGLangARRequestData, StreamItem], None] | None
+    )
+    stream_done_handler: Callable[[RequestDataT | SGLangARRequestData], None] | None
+    abort_callback: Callable[[str], None] | None
+    request_finished_callback: Callable[[str], None] | None
+    enable_overlap: bool
+    enable_async_decode: bool
+    async_decode_min_batch_size: int
+    prefill_coalesce_requests: int
+    prefill_coalesce_wait_ms: float
+    prefill_coalesce_when_idle: bool
+    prefill_coalesce_requires_pending_builds: bool
+    prefill_coalesce_after_builds_during_decode: bool
+    request_build_max_workers: int
+    request_build_max_pending: int | None
+    shutdown_callback: Callable[[], None] | None
+
+
 class OmniScheduler(Generic[RequestDataT]):
     """Stage-facing scheduler for AR stages.
 
@@ -275,10 +309,14 @@ class OmniScheduler(Generic[RequestDataT]):
             | None
         ) = None,
         session_adapter: ARSessionAdapter | None = None,
-        result_adapter: Callable | None = None,
+        result_adapter: Callable[[RequestDataT], StagePayload] | None = None,
         stream_output_builder: StreamOutputBuilder[RequestDataT] | None = None,
-        stream_chunk_handler: Callable | None = None,
-        stream_done_handler: Callable | None = None,
+        stream_chunk_handler: (
+            Callable[[RequestDataT | SGLangARRequestData, StreamItem], None] | None
+        ) = None,
+        stream_done_handler: (
+            Callable[[RequestDataT | SGLangARRequestData], None] | None
+        ) = None,
         abort_callback: Callable[[str], None] | None = None,
         request_finished_callback: Callable[[str], None] | None = None,
         enable_overlap: bool = False,

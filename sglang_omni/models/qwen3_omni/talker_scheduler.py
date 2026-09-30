@@ -8,6 +8,7 @@ from collections import deque
 
 from sglang.srt.managers.schedule_batch import ScheduleBatch
 from sglang.srt.server_args import ServerArgs
+from typing_extensions import Unpack
 
 from sglang_omni.models.qwen3_omni.config import (
     ENABLE_TALKER_START_TOPOLOGY,
@@ -16,7 +17,7 @@ from sglang_omni.models.qwen3_omni.config import (
 )
 from sglang_omni.pipeline.stage.stream_queue import StreamItem
 from sglang_omni.proto.request import StagePayload
-from sglang_omni.scheduling.omni_scheduler import OmniScheduler
+from sglang_omni.scheduling.omni_scheduler import OmniScheduler, OmniSchedulerArguments
 from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
 from sglang_omni.vendor.sglang.server_args import override_server_args
 
@@ -60,7 +61,7 @@ class QwenTalkerScheduler(OmniScheduler[SGLangARRequestData]):
         partial_start_min_chunks: int = MIN_PARTIAL_START_CHUNKS,
         im_end_token_id: int | None = None,
         enable_talker_start_topology: bool | None = None,
-        **kwargs: object,
+        **kwargs: Unpack[OmniSchedulerArguments[SGLangARRequestData]],
     ) -> None:
         super().__init__(*args, **kwargs)
         if partial_start_min_chunks < MIN_PARTIAL_START_CHUNKS:

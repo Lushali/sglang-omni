@@ -254,7 +254,7 @@ def create_preprocessing_executor(
     num_codebooks: int = 8,
     codebook_size: int = 1026,
     max_concurrency: int = 16,
-) -> ThreadedSimpleScheduler:
+) -> ThreadedSimpleScheduler[StagePayload, StagePayload]:
     """CPU stage: text tokenize + optional ref-audio file IO.
 
     Builds the full prompt + delays the codes when the client supplied
@@ -447,7 +447,7 @@ def create_audio_encoder_executor(
     gpu_id: int | None = None,
     dtype: str = "bfloat16",
     num_codebooks: int = 8,
-) -> SimpleScheduler:
+) -> SimpleScheduler[StagePayload, StagePayload]:
     """GPU stage: codec-encode raw ref audio → delayed codes + prompt assembly.
 
     No-op when preprocessing already produced ``reference_codes_delayed`` (the
