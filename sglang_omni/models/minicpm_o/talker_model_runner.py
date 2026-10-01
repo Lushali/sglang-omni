@@ -17,13 +17,12 @@ from sglang_omni.scheduling.sglang_backend.request_data import (
     SGLangARRequestData,
     session_prefill_rows,
 )
+from sglang_omni.scheduling.types import SchedulerRequest
 
 if TYPE_CHECKING:
     from sglang.srt.layers.logits_processor import LogitsProcessorOutput
     from sglang.srt.managers.schedule_batch import ScheduleBatch
     from sglang.srt.model_executor.forward_batch_info import ForwardBatch
-
-    from sglang_omni.scheduling.types import SchedulerRequest
 else:
     pass
 
