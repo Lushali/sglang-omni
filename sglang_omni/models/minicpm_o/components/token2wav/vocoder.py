@@ -5,8 +5,9 @@
 
 from __future__ import annotations
 
+import io
+from dataclasses import dataclass
 from functools import lru_cache
-from io import BytesIO
 from pathlib import Path
 
 import numpy as np
@@ -31,8 +32,19 @@ from sglang_omni.models.minicpm_o.components.token2wav.speech_tokenizer import (
     S3TokenizerV2,
 )
 
-SpeakerPrompt = tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+
+@dataclass(kw_only=True, frozen=True)
+class SpeakerPrompt:
+    """Prompt tokens, their lengths, the speaker embedding, and the prompt mel."""
+
+    prompt_tokens: torch.Tensor
+    prompt_token_lengths: torch.Tensor
+    speaker_embedding: torch.Tensor
+    prompt_mel: torch.Tensor
+
+
 StreamCaches = tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]
+
 FLOW_TYPES = {
     "!new:cosyvoice2.flow.flow.CausalMaskedDiffWithXvec": CausalMaskedDiffWithXvec,
     "!new:cosyvoice2.transformer.upsample_encoder_v2.UpsampleConformerEncoderV2": UpsampleConformerEncoderV2,
@@ -124,7 +136,7 @@ class Token2Wav(torch.nn.Module):
             onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
         )
         options.intra_op_num_threads = 1
-        self.spk_model = onnxruntime.InferenceSession(
+        self.speaker_model = onnxruntime.InferenceSession(
             str(model_path / "campplus.onnx"),
             sess_options=options,
             providers=["CPUExecutionProvider"],
@@ -134,8 +146,23 @@ class Token2Wav(torch.nn.Module):
             self.flow.to(dtype)
         else:
             pass
+        flow_weights = torch.load(
+            model_path / "flow.pt", map_location="cpu", weights_only=True
+        )
+        checkpoint_speaker_projection = "spk_embed_affine_layer."
         self.flow.load_state_dict(
-            torch.load(model_path / "flow.pt", map_location="cpu", weights_only=True),
+            {
+                (
+                    key.replace(
+                        checkpoint_speaker_projection,
+                        "speaker_embedding_projection.",
+                        1,
+                    )
+                    if key.startswith(checkpoint_speaker_projection)
+                    else key
+                ): value
+                for key, value in flow_weights.items()
+            },
             strict=True,
         )
         self.flow.to(device).eval()
@@ -148,7 +175,6 @@ class Token2Wav(torch.nn.Module):
             strict=True,
         )
         self.hift.to(device).eval()
-        self.cache: SpeakerPrompt | None = None
         self.mel_cache_len = 8
         self.source_cache_len = self.mel_cache_len * 480
         self.speech_window = torch.from_numpy(np.hamming(2 * self.source_cache_len)).to(
@@ -156,7 +182,7 @@ class Token2Wav(torch.nn.Module):
         )
 
     @torch.inference_mode()
-    def prepare_prompt(self, source: str | BytesIO) -> SpeakerPrompt:
+    def prepare_prompt(self, source: str | io.BytesIO) -> SpeakerPrompt:
         audio, sample_rate = torchaudio.load(source)
         if sample_rate != 16000:
             speech = torchaudio.transforms.Resample(sample_rate, 16000)(audio)
@@ -165,16 +191,24 @@ class Token2Wav(torch.nn.Module):
         # note (MayDomine): tokenizer/voice embedding use channel zero; mel uses mono.
         speech = speech[0]
         mel = whisper.log_mel_spectrogram(speech, n_mels=128).unsqueeze(0)
-        lengths = torch.tensor([mel.shape[2]], dtype=torch.int32, device=self.device)
-        tokens, token_lengths = self.audio_tokenizer(mel.to(self.device), lengths)
-        features = kaldi.fbank(
+        mel_lengths = torch.tensor(
+            [mel.shape[2]], dtype=torch.int32, device=self.device
+        )
+        prompt_tokens, prompt_token_lengths = self.audio_tokenizer(
+            mel.to(self.device), mel_lengths
+        )
+        fbank_features = kaldi.fbank(
             speech.unsqueeze(0), num_mel_bins=80, dither=0, sample_frequency=16000
         )
-        features = features - features.mean(dim=0, keepdim=True)
-        embedding = torch.tensor(
-            self.spk_model.run(
+        fbank_features = fbank_features - fbank_features.mean(dim=0, keepdim=True)
+        speaker_embedding = torch.tensor(
+            self.speaker_model.run(
                 None,
-                {self.spk_model.get_inputs()[0].name: features.unsqueeze(0).numpy()},
+                {
+                    self.speaker_model.get_inputs()[0]
+                    .name: fbank_features.unsqueeze(0)
+                    .numpy()
+                },
             )[0],
             device=self.device,
         )
@@ -186,15 +220,27 @@ class Token2Wav(torch.nn.Module):
         prompt_mel = prompt_mel_spectrogram(audio).transpose(1, 2).to(self.device)
         prompt_mel = torch.nn.functional.pad(
             prompt_mel,
-            (0, 0, 0, tokens.shape[1] * self.flow.up_rate - prompt_mel.shape[1]),
+            (
+                0,
+                0,
+                0,
+                prompt_tokens.shape[1] * self.flow.up_rate - prompt_mel.shape[1],
+            ),
             mode="replicate",
         )
-        return tokens, token_lengths, embedding, prompt_mel
+        return SpeakerPrompt(
+            prompt_tokens=prompt_tokens,
+            prompt_token_lengths=prompt_token_lengths,
+            speaker_embedding=speaker_embedding,
+            prompt_mel=prompt_mel,
+        )
 
     @torch.inference_mode()
     def open_stream(self, prompt: SpeakerPrompt) -> StreamCaches:
         """Return the flow and HiFT caches that start a streaming decode."""
-        prompt_speech_tokens, _, speaker_embedding, prompt_mels = prompt
+        prompt_speech_tokens = prompt.prompt_tokens
+        speaker_embedding = prompt.speaker_embedding
+        prompt_mels = prompt.prompt_mel
         right_pad_speech_tokens = torch.full(
             (1, 3),
             4218,
@@ -226,7 +272,8 @@ class Token2Wav(torch.nn.Module):
         last_chunk: bool = False,
     ) -> tuple[bytes, StreamCaches]:
         """Decode one token chunk; the caller owns the caches and receives new ones."""
-        _, _, speaker_embedding, prompt_mels = prompt
+        speaker_embedding = prompt.speaker_embedding
+        prompt_mels = prompt.prompt_mel
         flow_cache, hift_cache = caches
         tokens = torch.tensor(
             [generated_speech_tokens], dtype=torch.int32, device=self.device
