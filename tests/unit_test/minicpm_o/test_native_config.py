@@ -155,15 +155,16 @@ def stub_stage_models(monkeypatch: pytest.MonkeyPatch) -> SessionHooks:
     [
         ("", 2, 4 << 30, 3, 3),
         (
-            "max_sessions: 64\nspeech_state_bytes_per_session: 1024\n",
+            "max_sessions: 64\nspeech_state_bytes_per_session: 1024\nstages:\n"
+            "  talker:\n    engine:\n      max_running_requests: 3\n",
             64,
             65536,
             65,
-            65,
+            3,
         ),
     ],
 )
-def test_duplex_yaml_session_limits(
+def test_duplex_yaml_builds_session_stages(
     settings: str,
     sessions: int,
     state_bytes: int,
@@ -182,7 +183,10 @@ def test_duplex_yaml_session_limits(
     config = ConfigManager.from_file(str(config_path)).config
     native_stages.MiniCPMOCode2Wav.return_value.default_prompt_wav = str(reference_path)
     perception = native_stages.create_perception_scheduler(
-        config.model_path, device="cpu", **config.stage_factory_kwargs("perception")
+        config.model_path,
+        device="cpu",
+        dtype="float32",
+        **config.stage_factory_kwargs("perception"),
     )
     speech = native_stages.create_speech_scheduler(
         config.model_path, device="cpu", **config.stage_factory_kwargs("speech")
@@ -192,29 +196,29 @@ def test_duplex_yaml_session_limits(
         assert scheduler.max_concurrency == 1
     assert speech.max_state_bytes == state_bytes
     assert build_realtime_deployment(Mock(), config).max_connections == sessions
-    assert config.stage_factory_kwargs("thinker")["server_args_overrides"] == {
-        "max_running_requests": thinker
-    }
-    assert config.stage_factory_kwargs("talker")["server_args_overrides"] == {
-        "max_running_requests": talker
-    }
-
-
-def test_duplex_engine_override_wins(tmp_path: Path) -> None:
-    config_path = tmp_path / "duplex.yaml"
-    config_path.write_text(
-        "config_cls: MiniCPMODuplexPipelineConfig\nmodel_path: unused\n"
-        "max_sessions: 8\nstages:\n"
-        "  talker:\n    engine:\n      max_running_requests: 3\n"
+    for stage_name, factory, expected in (
+        ("thinker", native_stages.create_thinker_scheduler, thinker),
+        ("talker", native_stages.create_talker_scheduler, talker),
+    ):
+        kwargs = apply_typed_stage_kwargs(
+            factory,
+            config.stage_factory_kwargs(stage_name),
+            resolve_stage_typed_kwargs(config.stage_named(stage_name)),
+            stage_name=stage_name,
+        )
+        assert kwargs["server_args_overrides"]["max_running_requests"] == expected
+    for encoder in (
+        native_stages.MiniCPMOAudioEncoder,
+        native_stages.MiniCPMOImageEncoder,
+    ):
+        encoder.assert_called_once_with("unused", device="cpu", dtype="float32")
+    assert (
+        native_stages.PerceptionHooks.call_args.kwargs["image_encoder"]
+        is native_stages.MiniCPMOImageEncoder.return_value
     )
-    config = ConfigManager.from_file(str(config_path)).config
-    kwargs = apply_typed_stage_kwargs(
-        native_stages.create_talker_scheduler,
-        config.stage_factory_kwargs("talker"),
-        resolve_stage_typed_kwargs(config.stage_named("talker")),
-        stage_name="talker",
-    )
-    assert kwargs["server_args_overrides"]["max_running_requests"] == 3
+    processor_factory = native_stages.PerceptionHooks.call_args.args[1]
+    assert processor_factory() is not processor_factory()
+    native_stages.AutoProcessor.from_pretrained.assert_called_once()
 
 
 @pytest.mark.parametrize("context_length", [None, 32768])
@@ -272,30 +276,3 @@ def test_duplex_deployment_grants_images_by_slice_count() -> None:
     assert capabilities.max_image_bytes == 512 * 1024
     assert capabilities.image_frames_per_unit == (4, 3, 2, 2, 1, 1, 1, 1, 1)
     assert capabilities.default_max_slice_nums == 1
-
-
-def test_perception_encoders_share_stage_device(
-    tmp_path: Path, stub_stage_models: SessionHooks
-) -> None:
-    reference = tmp_path / "reference.wav"
-    reference.write_bytes(b"reference")
-    native_stages.create_perception_scheduler(
-        "checkpoint",
-        device="cpu",
-        dtype="float32",
-        reference_audio=str(reference),
-        max_open_sessions=2,
-    )
-    for encoder in (
-        native_stages.MiniCPMOAudioEncoder,
-        native_stages.MiniCPMOImageEncoder,
-    ):
-        encoder.assert_called_once_with("checkpoint", device="cpu", dtype="float32")
-    assert (
-        native_stages.PerceptionHooks.call_args.kwargs["image_encoder"]
-        is native_stages.MiniCPMOImageEncoder.return_value
-    )
-    processor_factory = native_stages.PerceptionHooks.call_args.args[1]
-    first, second = processor_factory(), processor_factory()
-    native_stages.AutoProcessor.from_pretrained.assert_called_once()
-    assert first is not second

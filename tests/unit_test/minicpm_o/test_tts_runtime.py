@@ -2,7 +2,6 @@
 """Vocoder sessions: shared per-voice stream caches, turn resets and failed opens."""
 
 from types import SimpleNamespace
-from unittest.mock import Mock
 
 import pytest
 import torch
@@ -51,11 +50,15 @@ class FakeCode2Wav:
         return f"bytes:{reference.hex()}", reference
 
     def prepare_references(self, references: list[bytes]) -> list[tuple]:
+        if b"invalid" in references:
+            raise ValueError("invalid audio")
+        else:
+            pass
         self.prepared.extend(references)
         return [(torch.zeros(4), torch.zeros(4), torch.ones(8), torch.zeros(1, 6, 80))]
 
 
-def test_voice_caches_are_shared_and_handed_over_on_close() -> None:
+def test_voice_cache_lifecycle() -> None:
     code2wav = FakeCode2Wav()
     runtime = MiniCPMOVocoderRuntime(code2wav)
 
@@ -79,6 +82,8 @@ def test_voice_caches_are_shared_and_handed_over_on_close() -> None:
     assert runtime.held("b").bytes == own + shared
     runtime.close_session("b")
     runtime.close_session("c")
+    with pytest.raises(ValueError, match="invalid audio"):
+        runtime.open_session("d", reference_audio=b"invalid")
     assert not runtime.speakers and not runtime.sessions
 
 
@@ -98,14 +103,3 @@ def test_turn_reset_restores_untouched_prompt_caches() -> None:
 
     runtime.synthesize("a", [], is_turn_start=False, end_of_turn=True)
     assert state.caches[0]["estimator_attention_cache"].sum() == 0
-
-
-def test_invalid_reference_fails_open_without_state() -> None:
-    code2wav = Mock()
-    code2wav.resolve_reference_key.return_value = ("bytes:bad", b"invalid audio")
-    code2wav.prepare_references.side_effect = ValueError("invalid audio")
-    runtime = MiniCPMOVocoderRuntime(code2wav)
-    with pytest.raises(ValueError, match="invalid audio"):
-        runtime.open_session("voice", reference_audio=b"invalid audio")
-    code2wav.prepare_references.assert_called_once_with([b"invalid audio"])
-    assert not runtime.sessions and not runtime.speakers

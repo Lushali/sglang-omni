@@ -122,27 +122,32 @@ def test_frame_rejections_are_nonfatal(
         assert websocket.receive_json()["type"] == "session.updated"
 
 
-def test_image_capability_is_granted_over_http_and_session() -> None:
-    image_format = {
-        "types": ["image/jpeg", "image/png"],
-        "max_bytes": 100,
-        "max_frames_per_unit": 1,
-        "max_slice_nums": 1,
-    }
+@pytest.mark.parametrize("modalities", [("audio",), ("audio", "image")])
+def test_image_grant_follows_capabilities(modalities: tuple[str, ...]) -> None:
     client = build_test_client(
         ScriptedAdapter(),
-        capabilities=Capabilities(
-            input_modalities=("audio", "image"), max_image_bytes=100
-        ),
+        capabilities=Capabilities(input_modalities=modalities, max_image_bytes=100),
     )
-    assert (
-        client.get("/v1/realtime/capabilities").json()["input_image_format"]
-        == image_format
-    )
+    advertised = client.get("/v1/realtime/capabilities").json()
     with client.websocket_connect("/v1/realtime") as websocket:
-        granted = open_session(websocket)["session"]["sglang"]["granted"]
-    assert granted["input_modalities"] == ["audio", "image"]
-    assert granted["input_image_format"] == image_format
+        events = [websocket.receive_json()]
+        send_event(websocket, "session.update", session={})
+        events.append(websocket.receive_json())
+        append_audio(websocket, b"\0" * UNIT_BYTES, 0)
+        events.extend(receive_until(websocket, "sglang.unit.done"))
+    granted = events[1]["session"]["sglang"]["granted"]
+    assert granted["input_modalities"] == list(modalities)
+    if "image" in modalities:
+        image_format = {
+            "types": ["image/jpeg", "image/png"],
+            "max_bytes": 100,
+            "max_frames_per_unit": 1,
+            "max_slice_nums": 1,
+        }
+        assert advertised["input_image_format"] == image_format
+        assert granted["input_image_format"] == image_format
+    else:
+        assert "image" not in json.dumps(events)
 
 
 @pytest.mark.asyncio
@@ -166,20 +171,6 @@ async def test_adapter_payload_preserves_audio_and_bundles_image(
         2,
         True,
     )
-
-
-def test_audio_only_session_events_carry_no_image_fields() -> None:
-    with build_test_client(ScriptedAdapter()).websocket_connect(
-        "/v1/realtime"
-    ) as websocket:
-        events = [websocket.receive_json()]
-        send_event(websocket, "session.update", session={})
-        events.append(websocket.receive_json())
-        append_audio(websocket, b"\0" * UNIT_BYTES, 0)
-        events.extend(receive_until(websocket, "sglang.unit.done"))
-    granted = events[1]["session"]["sglang"]["granted"]
-    assert granted["input_modalities"] == ["audio"]
-    assert "image" not in json.dumps(events)
 
 
 def test_clear_drops_frames_and_moves_frame_origin() -> None:

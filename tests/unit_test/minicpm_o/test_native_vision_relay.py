@@ -24,10 +24,7 @@ from sglang_omni.models.minicpm_o.native_thinker_model_runner import (
     MiniCPMOThinkerModelRunner,
 )
 from sglang_omni.models.minicpm_o.session_adapters import ThinkerAdapter
-from sglang_omni.models.minicpm_o.special_tokens import (
-    REQUIRED_SPECIAL_TOKENS,
-    MiniCPMOSpecialTokenIds,
-)
+from sglang_omni.models.minicpm_o.special_tokens import REQUIRED_SPECIAL_TOKENS
 from sglang_omni.proto.request import OmniRequest, StagePayload
 from sglang_omni.proto.session import SessionIdentity, TimedChunk
 from sglang_omni.scheduling.sglang_backend.ar_session import ARSessionBridge
@@ -70,42 +67,29 @@ def hooks(perception: MiniCPMOPerceptionState) -> PerceptionHooks:
     return hooks
 
 
-def sampling_tokenizer() -> Mock:
-    tokenizer = Mock(unk_token_id=0, bad_token_ids=[7, 8, 94])
-    tokenizer.convert_tokens_to_ids.side_effect = dict(
-        zip(REQUIRED_SPECIAL_TOKENS, range(100, 116))
-    ).__getitem__
-    return tokenizer
-
-
-def sampler_state(
-    special: MiniCPMOSpecialTokenIds, **overrides: int
-) -> DuplexSamplerState:
-    return DuplexSamplerState(
-        special_tokens=special,
-        forbidden_token_index=build_forbidden_token_index(
-            special, 128, torch.device("cpu")
-        ),
-        temperature=0.7,
-        top_k=1,
-        top_p=0.8,
-        repetition_penalty=1.0,
-        listen_prob_scale=1.0,
-        greedy=True,
-        **{"max_new_tokens": 20, "repetition_window_size": 512, **overrides},
-    )
-
-
 def unit_payload(data: PerceptionStepPlan | None = None) -> StagePayload:
     return StagePayload(
         "unit", OmniRequest(None, params=MiniCPMODuplexSampling().model_dump()), data
     )
 
 
-@pytest.mark.parametrize("use_runner", [True, False])
-def test_checkpoint_bad_tokens_are_not_sampled(use_runner: bool) -> None:
-    """Both duplex initialization paths retain the checkpoint sampling mask."""
-    tokenizer = sampling_tokenizer()
+@pytest.mark.parametrize(
+    ("use_runner", "overrides", "closes"),
+    [
+        (True, {}, False),
+        (False, {}, False),
+        (False, {"max_new_tokens": 5, "generation_step": 4}, True),
+        (False, {"max_new_tokens": 6, "generation_step": 4}, False),
+    ],
+)
+def test_duplex_sample_masks_bad_tokens_and_closes_at_budget(
+    use_runner: bool, overrides: dict[str, int], closes: bool
+) -> None:
+    """Both init paths keep the checkpoint mask; the token budget closes the chunk."""
+    tokenizer = Mock(unk_token_id=0, bad_token_ids=[7, 8, 94])
+    tokenizer.convert_tokens_to_ids.side_effect = dict(
+        zip(REQUIRED_SPECIAL_TOKENS, range(100, 116))
+    ).__getitem__
     if use_runner:
         runner = MiniCPMOThinkerModelRunner.__new__(MiniCPMOThinkerModelRunner)
         runner.special_tokens = None
@@ -118,14 +102,20 @@ def test_checkpoint_bad_tokens_are_not_sampled(use_runner: bool) -> None:
     logits[7] = 100.0
     logits[special.tts_pad] = 99.0
     logits[42] = 0.0
-    assert duplex_sample(logits, sampler_state(special)) == 42
-
-
-@pytest.mark.parametrize(("max_new_tokens", "closes"), [(5, True), (6, False)])
-def test_unit_token_budget_closes_the_chunk(max_new_tokens: int, closes: bool) -> None:
-    special = ThinkerAdapter(sampling_tokenizer(), 128).special
-    state = sampler_state(special, max_new_tokens=max_new_tokens, generation_step=4)
-    assert (duplex_sample(torch.zeros(128), state) == special.chunk_eos) is closes
+    state = DuplexSamplerState(
+        special_tokens=special,
+        forbidden_token_index=build_forbidden_token_index(
+            special, 128, torch.device("cpu")
+        ),
+        temperature=0.7,
+        top_k=1,
+        top_p=0.8,
+        repetition_penalty=1.0,
+        listen_prob_scale=1.0,
+        greedy=True,
+        **{"max_new_tokens": 20, "repetition_window_size": 512, **overrides},
+    )
+    assert duplex_sample(logits, state) == (special.chunk_eos if closes else 42)
 
 
 @pytest.mark.parametrize(
