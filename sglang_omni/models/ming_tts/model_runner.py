@@ -91,7 +91,7 @@ class MingTTSModelRunner(ModelRunner):
     model: MingTTSSGLangModel
 
     def __init__(
-        self, tp_worker: ModelWorker, output_processor: SGLangOutputProcessor | None
+        self, tp_worker: ModelWorker, output_processor: SGLangOutputProcessor
     ) -> None:
         super().__init__(tp_worker, output_processor)
         self.tp_rank = int(tp_worker.tp_rank)

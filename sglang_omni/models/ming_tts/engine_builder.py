@@ -259,7 +259,7 @@ class MingTtsEngineBuilder(TtsEngineBuilder["MingTTSSGLangRequestData"]):
     def make_model_runner(
         self,
         model_worker: ModelWorker | MlxTpModelWorker,
-        output_proc: SGLangOutputProcessor | None,
+        output_proc: SGLangOutputProcessor,
     ) -> MingTTSModelRunner:
         from sglang_omni.models.ming_tts.model_runner import MingTTSModelRunner
 

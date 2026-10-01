@@ -20,13 +20,13 @@ from sglang_omni.models.qwen3_omni.payload_types import (
     StreamState,
     ThinkerOutput,
 )
-from sglang_omni.models.qwen3_omni.pending_text_queue import (
-    PendingTextTensorQueue,
-    coerce_pending_text_queue,
-)
 from sglang_omni.pipeline.stage.stream_queue import StreamItem
 from sglang_omni.proto import OmniRequest, StagePayload
 from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.pending_text_queue import (
+    PendingTextTensorQueue,
+    coerce_pending_text_queue,
+)
 from sglang_omni.scheduling.sglang_backend import SGLangARRequestData
 from sglang_omni.scheduling.types import ARRequestData, RequestOutput
 

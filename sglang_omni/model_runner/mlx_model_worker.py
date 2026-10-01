@@ -63,7 +63,7 @@ class MlxSchedulerModelRunner(ModelRunner):
     def __init__(
         self,
         tp_worker: MlxTpModelWorker,
-        output_processor: SGLangOutputProcessor | None,
+        output_processor: SGLangOutputProcessor,
     ) -> None:
         super().__init__(tp_worker, output_processor)
         import mlx.core as mx

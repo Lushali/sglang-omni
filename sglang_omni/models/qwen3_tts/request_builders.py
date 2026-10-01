@@ -18,7 +18,6 @@ import numpy as np
 import numpy.typing as npt
 import torch
 
-from sglang_omni.models.qwen3_omni.pending_text_queue import PendingTextTensorQueue
 from sglang_omni.models.qwen3_tts.payload_types import Qwen3TTSState
 from sglang_omni.models.qwen3_tts.reference_encoder_cuda_graph import (
     DEFAULT_QWEN3_TTS_REFERENCE_ENCODER_BUCKET_FRAMES,
@@ -35,6 +34,7 @@ from sglang_omni.sampling.seed import (
     new_random_sampling_seed,
 )
 from sglang_omni.scheduling.message import OutgoingMessage
+from sglang_omni.scheduling.pending_text_queue import PendingTextTensorQueue
 from sglang_omni.scheduling.reference_encoder import (
     KeyedReferenceEncodeHook,
     ReferenceEncodeService,

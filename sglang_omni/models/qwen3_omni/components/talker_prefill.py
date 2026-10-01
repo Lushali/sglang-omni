@@ -17,13 +17,13 @@ from safetensors import safe_open
 
 from sglang_omni.models.qwen3_omni.components.talker_input import build_prefill_input
 from sglang_omni.models.qwen3_omni.payload_types import Qwen3OmniPipelineState
-from sglang_omni.models.qwen3_omni.pending_text_queue import (
-    PendingTextTensorQueue,
-    coerce_pending_text_queue,
-)
 from sglang_omni.models.weight_loader import resolve_model_path
 from sglang_omni.pipeline.stage.stream_queue import StreamItem
 from sglang_omni.proto import StagePayload
+from sglang_omni.scheduling.pending_text_queue import (
+    PendingTextTensorQueue,
+    coerce_pending_text_queue,
+)
 
 if TYPE_CHECKING:
     from sglang_omni.models.qwen3_omni.components.talker import Qwen3OmniTalker

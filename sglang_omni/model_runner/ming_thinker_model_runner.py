@@ -32,7 +32,7 @@ class MingThinkerModelRunner(ModelRunner):
     """Inject Ming image/audio embeddings into thinker prefill requests."""
 
     def __init__(
-        self, tp_worker: ModelWorker, output_processor: SGLangOutputProcessor | None
+        self, tp_worker: ModelWorker, output_processor: SGLangOutputProcessor
     ) -> None:
         super().__init__(tp_worker, output_processor)
 
