@@ -1,23 +1,36 @@
 # Full-duplex audio examples
 
-Run commands from the repository root. The native audio route uses `/v1/realtime` with `session.update`, `input_audio_buffer.append`, `sglang.input_audio.end`, and `session.close`. Wait for `sglang.input_audio.drained` before closing after input EOS.
+Run commands from the repository root.
 
 ## MiniCPM-o
 
-Set `model_path` in `minicpmo.yaml` to a prepared MiniCPM-o 4.5 checkpoint, then run:
+Download the checkpoint and start the server:
 
 ```bash
-sgl-omni serve --config examples/full_duplex/minicpmo.yaml --enable-realtime
+hf download openbmb/MiniCPM-o-4_5 --local-dir models/MiniCPM-o-4_5
+
+sgl-omni serve --config examples/full_duplex/minicpmo.yaml \
+  --model-path models/MiniCPM-o-4_5 --enable-realtime
 ```
 
-`minicpmo.yaml` samples the thinker the way the MiniCPM-o demo does. Regression and parity recordings need repeatable output, so launch those servers from `minicpmo-parity.yaml` instead; it differs only in `sampling.greedy: true` and `sampling.top_k: 100`, the values every existing golden recording used.
+The server accepts live voice and video conversations on `/v1/realtime`. See [docs/cookbook/minicpm_o.md](../../docs/cookbook/minicpm_o.md) for a client example and the per-session settings, and [playground/realtime](../../playground/realtime/README.md) for a browser page.
 
-The `MiniCPMODuplexPipelineConfig` is also available as the `session` model variant. The existing `text` and `speech` variants keep their ordinary request pipelines. An optional top-level `reference_audio` path supplies the reference for both perception and speech; the default is the checkpoint's `assets/HT_ref_audio.wav`. Set `max_sessions` and `speech_state_bytes_per_session` in `minicpmo.yaml` to adjust session capacity and the speech memory budget per session (defaults: 2 and 2 GiB). Perception and speech each process one unit at a time. The thinker and talker engines run with `max_running_requests = max_sessions + 1`, reserving one slot for retained KV; an explicit `engine` override takes precedence.
+Two configs are provided:
 
-The native path accepts mono PCM16 at 16 kHz and emits 24 kHz audio and text over `/v1/realtime`. It processes one-second units with session-resident encoder, thinker KV, sampler history, TTS, and vocoder state. Empty input EOS reaches the speech stage to flush pending audio without an additional thinker request.
+| Config | Use it for |
+|---|---|
+| `minicpmo.yaml` | Normal serving; replies are sampled the way the MiniCPM-o demo samples them |
+| `minicpmo-parity.yaml` | Repeatable output for regression and parity recordings; it differs only in greedy sampling and `top_k: 100` |
 
-This integration uses the current shared native protocol: open, append, and close. It does not expose the historical epoch/cancel or `sglang.microturn.done` events. Image frames ride the same units; see "Native duplex video and HD slices" in [docs/cookbook/minicpm_o.md](../../docs/cookbook/minicpm_o.md).
+Settings you may want to change in the config:
 
-The thinker defaults to 8192 tokens; optionally set `stages.thinker.engine.context_length` up to the checkpoint's `max_position_embeddings` (40960 for MiniCPM-o 4.5), with KV storage approximately 144 KiB/token, or 4.5 GiB per full 32k session.
+| Setting | Default | Meaning |
+|---|---|---|
+| `max_sessions` | 2 | Conversations served at the same time |
+| `reference_audio` | checkpoint default | Voice used when a session sends no reference |
+| `speech_state_bytes_per_session` | 2 GiB | Memory the speech stage may hold per conversation |
+| `stages.thinker.engine.context_length` | 8192 | Tokens of history one conversation can hold, up to 40960 |
+| `sampling.*` | see file | Default sampling for sessions that do not set their own |
+| `vision.*` | see file | Limits on camera frames per unit (1 s of audio) |
 
-When accumulated history plus a new unit exceeds the effective input limit, the server emits a fatal `context_exhausted` error naming the thinker context length, then closes the session; it does not truncate history or continue with later units. The effective limit can be lower than the configured context length due to KV capacity.
+A longer context needs more GPU memory: about 4.5 GiB for one conversation at 32768 tokens. When a conversation fills its context, the server sends a `context_exhausted` error and closes that session.

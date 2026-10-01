@@ -69,7 +69,7 @@ The reference must be sent as a base64 audio data URI; paths and HTTP URLs are n
 
 ## Full-duplex conversation
 
-Open a WebSocket to `/v1/realtime`, send microphone audio as it is captured, and play the audio that comes back. The model decides when to speak.
+Open a WebSocket to `/v1/realtime`, send microphone audio as it is captured, and play the audio that comes back. The model works in units of one second: after each second of audio it decides whether to keep listening or to speak, and a spoken unit carries up to one second of reply.
 
 | | Format |
 |---|---|
@@ -200,8 +200,8 @@ The reference must be a PCM16 WAV file, mono or stereo, 8 to 48 kHz, at most 30 
 | `repetition_penalty` | 1.05 | 1 or more | Discourage repeated text |
 | `repetition_window_size` | 512 | 1 or more | How many recent tokens the penalty looks at |
 | `listen_prob_scale` | 1.0 | 0 or more | Above 1 makes the model listen more and speak less |
-| `force_listen_count` | 3 | 0 or more | Seconds the model only listens at the start of a session |
-| `max_new_tokens_per_unit` | 20 | 1 or more | Most text tokens produced per second of conversation |
+| `force_listen_count` | 3 | 0 or more | Units (3 = the first 3 s) in which the model only listens at the start of a session |
+| `max_new_tokens_per_unit` | 20 | 1 or more | Most text tokens produced in one unit (1 s) |
 | `talker_temperature` | 0.8 | 0 to 2 | Randomness of the voice |
 | `talker_repetition_penalty` | 1.05 | 1 or more | Discourage repeated sounds in the voice |
 
@@ -209,7 +209,7 @@ Fields you leave out keep the server defaults, which come from the `sampling` se
 
 ### Camera frames
 
-Send JPEG or PNG frames while audio is flowing, and the model sees them together with the audio of the same second:
+Send JPEG or PNG frames while audio is flowing, and the model sees them together with the audio of the same unit:
 
 ```json
 {
@@ -220,7 +220,7 @@ Send JPEG or PNG frames while audio is flowing, and the model sees them together
 }
 ```
 
-`t_ms` is the frame's time on the audio timeline, counted from the first audio sample. A frame is at most 512 KiB and 4096 × 4096 pixels. By default a session accepts up to 4 frames per second of audio; a frame whose second has already been processed is rejected.
+`t_ms` is the frame's time on the audio timeline, counted from the first audio sample. A frame is at most 512 KiB and 4096 × 4096 pixels. By default a session accepts up to 4 frames per unit (1 s of audio); a frame whose unit has already been processed is rejected.
 
 For more detail in each frame, ask for HD slicing before the first audio packet:
 
@@ -232,7 +232,7 @@ For more detail in each frame, ask for HD slicing before the first audio packet:
 }
 ```
 
-A higher slice count lowers the number of frames accepted per second. The reply to `session.update` reports the limit in `sglang.granted.input_image_format.max_frames_per_unit`.
+A higher slice count lowers the number of frames accepted per unit. The reply to `session.update` reports the limit in `sglang.granted.input_image_format.max_frames_per_unit`.
 
 ### Server limits
 
@@ -243,7 +243,7 @@ These are set in `examples/full_duplex/minicpmo.yaml`:
 | `max_sessions` | 2 | Conversations served at the same time |
 | `stages.thinker.engine.context_length` | 8192 | Tokens of history one conversation can hold |
 | `reference_audio` | checkpoint default | Voice used when a session sends no reference |
-| `vision.max_frames_per_unit` | 4 | Frames accepted per second of audio |
+| `vision.max_frames_per_unit` | 4 | Frames accepted per unit (1 s of audio) |
 | `vision.max_slice_nums_limit` | 9 | Highest slice count a session may request |
 
 When a conversation fills its context, the server sends a `context_exhausted` error and closes the session. Start a new session to continue.
