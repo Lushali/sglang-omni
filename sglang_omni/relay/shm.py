@@ -222,7 +222,7 @@ class ShmRelay(Relay):
         self,
         metadata: Mapping[str, object] | ShmPutMetadata,
         dest_tensor: torch.Tensor,
-        request_id: str = None,
+        request_id: str | None = None,
     ) -> ShmGetOperation:
         # Note: metadata validation is implicit here based on usage in test
         return ShmGetOperation(metadata=metadata, dest_tensor=dest_tensor)

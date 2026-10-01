@@ -134,7 +134,7 @@ class Relay(ABC):
         self,
         metadata: dict[str, object],
         dest_tensor: torch.Tensor,
-        request_id: str = None,
+        request_id: str | None = None,
     ) -> RelayOperation:
         """
         Asynchronously retrieves data into dest_tensor using provided metadata.

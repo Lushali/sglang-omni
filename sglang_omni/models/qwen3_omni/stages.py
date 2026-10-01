@@ -432,7 +432,7 @@ def trace_encoder_cache(
 
 def lookup_cached_encoder_output(
     *,
-    request: EncoderRequestData | None,
+    request: EncoderRequestData,
     request_id: str,
     stage_name: str,
     cache: StageOutputCache | None,
@@ -466,7 +466,7 @@ def lookup_cached_encoder_output(
 
 def store_cached_encoder_output(
     *,
-    request: EncoderRequestData | None,
+    request: EncoderRequestData,
     request_id: str,
     stage_name: str,
     cache: StageOutputCache | None,

@@ -34,8 +34,8 @@ class SGLangARRequestData(ARRequestData):
     input_embeds_are_projected: bool = False
     stage_payload: StagePayload | None = None
     talker_model_inputs: dict[str, object] = field(default_factory=dict)
-    pending_feedback_queue: collections.deque[torch.Tensor] | list[torch.Tensor] = (
-        field(default_factory=collections.deque)
+    pending_feedback_queue: collections.deque[torch.Tensor] = field(
+        default_factory=collections.deque
     )
     pending_text_queue: (
         collections.deque[int]

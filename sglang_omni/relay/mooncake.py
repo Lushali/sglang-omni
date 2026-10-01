@@ -507,7 +507,7 @@ class MooncakeRelay(Relay):
         self,
         metadata: Mapping[str, object],
         dest_tensor: torch.Tensor,
-        request_id: str = None,
+        request_id: str | None = None,
     ) -> GetOperation:
         """
         Asynchronously receive tensor via Mooncake using memory pool.

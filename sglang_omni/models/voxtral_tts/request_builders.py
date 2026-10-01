@@ -28,8 +28,8 @@ class VoxtralSGLangRequestData(SGLangARRequestData):
     voice_embedding: torch.Tensor | None = None
     audio_token_id: int = 24
     output_codes: list[torch.Tensor] = field(default_factory=list)
-    pending_feedback_queue: collections.deque[torch.Tensor] | list[torch.Tensor] = (
-        field(default_factory=collections.deque)
+    pending_feedback_queue: collections.deque[torch.Tensor] = field(
+        default_factory=collections.deque
     )
 
 
