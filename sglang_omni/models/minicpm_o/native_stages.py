@@ -252,7 +252,7 @@ def create_speech_scheduler(
         reference_workers=1,
         prompt_cache_capacity=max_open_sessions,
     )
-    runtime = MiniCPMOVocoderRuntime(codec.token2wav)
+    runtime = MiniCPMOVocoderRuntime(codec)
     return SessionScheduler(
         SpeechHooks(runtime, Path(codec.default_prompt_wav).read_bytes()),
         max_open_sessions=max_open_sessions,

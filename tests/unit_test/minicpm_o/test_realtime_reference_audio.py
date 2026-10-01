@@ -78,11 +78,12 @@ def test_speech_reference_precedence_is_per_session() -> None:
     ] == [b"output", b"input", b"default"]
 
 
-def test_reference_prompt_uses_memory_stream() -> None:
-    token2wav = Mock()
-    token2wav.prepare_prompt.side_effect = ValueError("invalid audio")
-    runtime = MiniCPMOVocoderRuntime(token2wav)
+def test_invalid_reference_fails_open_without_state() -> None:
+    code2wav = Mock()
+    code2wav.resolve_reference_key.return_value = ("bytes:bad", b"invalid audio")
+    code2wav.prepare_references.side_effect = ValueError("invalid audio")
+    runtime = MiniCPMOVocoderRuntime(code2wav)
     with pytest.raises(ValueError, match="invalid audio"):
         runtime.open_session("voice", prompt_wav=b"invalid audio")
-    stream = token2wav.prepare_prompt.call_args.args[0]
-    assert stream.read() == b"invalid audio"
+    code2wav.prepare_references.assert_called_once_with([b"invalid audio"])
+    assert not runtime.sessions and not runtime.speakers
