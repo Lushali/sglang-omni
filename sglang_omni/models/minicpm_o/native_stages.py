@@ -43,8 +43,8 @@ class PerceptionHooks(SessionHooks):
         tokenizer: PreTrainedTokenizerBase,
         processor_factory: ProcessorFactory,
         audio_encoder: MiniCPMOAudioEncoder,
-        reference_audio: bytes | None = None,
-        image_encoder: MiniCPMOImageEncoder | None = None,
+        reference_audio: bytes,
+        image_encoder: MiniCPMOImageEncoder,
     ) -> None:
         self.tokenizer = tokenizer
         self.processor_factory = processor_factory
@@ -189,9 +189,7 @@ def create_perception_scheduler(
     dtype: str = "bfloat16",
     reference_audio: str | None = None,
     max_open_sessions: int,
-    **kwargs: JsonValue,
 ) -> SessionScheduler:
-    """Build perception; extra factory options follow the stage loader contract."""
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     device = str(resolve_concrete_device(device, gpu_id))
     encoder = MiniCPMOAudioEncoder(model_path, device=device, dtype=dtype)
@@ -237,13 +235,10 @@ def create_speech_scheduler(
     *,
     device: str | None = None,
     gpu_id: int | None = None,
-    dtype: str = "bfloat16",
     reference_audio: str | None = None,
     max_open_sessions: int,
     max_state_bytes: int,
-    **kwargs: JsonValue,
 ) -> SessionScheduler:
-    """Build speech; dtype and extra options follow the stage loader contract."""
     device = str(resolve_concrete_device(device, gpu_id))
     # note (Junnan Li): Sessions stream one reference each, so the batched-offline options stay off.
     codec = MiniCPMOCode2Wav(

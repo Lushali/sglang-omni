@@ -27,6 +27,7 @@ def state() -> MiniCPMOPerceptionState:
         tokenizer=tokenizer,
         processor=Mock(),
         audio_encoder=Mock(),
+        image_encoder=Mock(),
         max_slice_nums=1,
     )
 

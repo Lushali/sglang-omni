@@ -50,7 +50,9 @@ def test_perception_reference_does_not_replace_default(
         "sglang_omni.models.minicpm_o.native_stages.MiniCPMOPerceptionState.open",
         state_open,
     )
-    hooks = PerceptionHooks(Mock(), Mock(), Mock(), reference_audio=b"default")
+    hooks = PerceptionHooks(
+        Mock(), Mock(), Mock(), reference_audio=b"default", image_encoder=Mock()
+    )
     hooks.open(
         SessionIdentity("custom"),
         OmniRequest(

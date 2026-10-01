@@ -213,20 +213,16 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
         offline_outputs = {
             request.request_id: outputs[request.request_id]
             for request in scheduler_output.requests
-            if not self.is_duplex_request(request) and request.request_id in outputs
+            if not self.is_duplex_request(request)
         }
         if offline_outputs:
             super().post_process_outputs(result, scheduler_output, offline_outputs)
         else:
             pass
         for sched_req in scheduler_output.requests:
-            req_output = outputs.get(sched_req.request_id)
+            req_output = outputs[sched_req.request_id]
             data = sched_req.data
             if isinstance(data, DuplexUnitRequestData):
-                if req_output is None or req_output.data is None:
-                    continue
-                else:
-                    pass
                 sampled = int(req_output.data)
                 special = self.special_for_data(data)
                 pending = data.pending_unit_token

@@ -40,7 +40,11 @@ def perception() -> MiniCPMOPerceptionState:
         zip(REQUIRED_SPECIAL_TOKENS, range(1, 17))
     ).__getitem__
     state = MiniCPMOPerceptionState(
-        tokenizer=tokenizer, processor=Mock(), audio_encoder=Mock(), max_slice_nums=1
+        tokenizer=tokenizer,
+        processor=Mock(),
+        audio_encoder=Mock(),
+        image_encoder=Mock(),
+        max_slice_nums=1,
     )
     state.encode_audio = Mock(return_value=torch.full((10, 4), 9.0))
     state.encode_image = Mock(return_value=torch.full((64, 4), 6.0))
@@ -88,7 +92,13 @@ def test_append_and_thinker_splice(
     first_unit: bool,
 ) -> None:
     identity = SessionIdentity("vision")
-    hooks = PerceptionHooks(perception.tokenizer, Mock(), perception.audio_encoder)
+    hooks = PerceptionHooks(
+        perception.tokenizer,
+        Mock(),
+        perception.audio_encoder,
+        reference_audio=b"",
+        image_encoder=Mock(),
+    )
     hooks.states[identity] = perception
     pcm = np.arange(16000, dtype="<i2").tobytes()
     chunk = TimedChunk(
@@ -183,7 +193,13 @@ def test_image_audio_commit_atomically(
 
 
 def test_empty_eos_does_not_encode(perception: MiniCPMOPerceptionState) -> None:
-    hooks = PerceptionHooks(perception.tokenizer, Mock(), perception.audio_encoder)
+    hooks = PerceptionHooks(
+        perception.tokenizer,
+        Mock(),
+        perception.audio_encoder,
+        reference_audio=b"",
+        image_encoder=Mock(),
+    )
     payload = StagePayload(
         "unit", OmniRequest(None, params=MiniCPMODuplexSampling().model_dump()), None
     )
@@ -205,7 +221,13 @@ def test_undecodable_frame_is_dropped_and_siblings_kept(
     perception: MiniCPMOPerceptionState, error: Exception
 ) -> None:
     identity = SessionIdentity("vision")
-    hooks = PerceptionHooks(perception.tokenizer, Mock(), perception.audio_encoder)
+    hooks = PerceptionHooks(
+        perception.tokenizer,
+        Mock(),
+        perception.audio_encoder,
+        reference_audio=b"",
+        image_encoder=Mock(),
+    )
     hooks.states[identity] = perception
     first = torch.full((64, 4), 3.0)
     last = torch.full((64, 4), 7.0)

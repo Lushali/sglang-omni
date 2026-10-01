@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from io import BytesIO
 from typing import Literal, Protocol, TypedDict
@@ -39,15 +38,17 @@ class ImageFeatureBatch(TypedDict):
     tgt_sizes: list[torch.Tensor]
 
 
-class StreamingMelProcessor(Protocol):
-    def get_config(self) -> Mapping[str, object]:
-        pass
+class StreamingConfig(TypedDict):
+    effective_first_chunk_ms: float
+
+
+class ProcessorAudioFeatures(TypedDict):
+    audio_features: torch.Tensor
+    audio_feature_lens: list[torch.Tensor]
 
 
 class StreamingAudioProcessor(Protocol):
     """The checkpoint processor's streaming surface used by one session."""
-
-    _streaming_mel_processor: StreamingMelProcessor
 
     def set_streaming_mode(
         self,
@@ -70,14 +71,17 @@ class StreamingAudioProcessor(Protocol):
     def get_streaming_chunk_size(self) -> int:
         pass
 
+    def get_streaming_config(self) -> StreamingConfig:
+        pass
+
     def process_audio(
         self, audio: np.ndarray, *, sampling_rate: int
-    ) -> Mapping[str, object]:
+    ) -> ProcessorAudioFeatures:
         pass
 
     def process_audio_streaming(
         self, audio: np.ndarray, *, reset: bool, return_batch_feature: bool
-    ) -> Mapping[str, object]:
+    ) -> ProcessorAudioFeatures:
         pass
 
 
@@ -108,21 +112,12 @@ class AudioFeatureBatch:
     audio_feature_lens: torch.Tensor
 
 
-def audio_feature_batch(processor_output: Mapping[str, object]) -> AudioFeatureBatch:
-    features = processor_output["audio_features"]
-    lengths = processor_output["audio_feature_lens"]
-    if not isinstance(features, torch.Tensor):
-        raise TypeError("processor audio_features must be a tensor")
-    else:
-        pass
-    if isinstance(lengths, list | tuple):
-        lengths = torch.cat([torch.as_tensor(length).reshape(-1) for length in lengths])
-    elif not isinstance(lengths, torch.Tensor):
-        raise TypeError("processor audio_feature_lens must be a tensor or list")
-    else:
-        pass
+def audio_feature_batch(processor_output: ProcessorAudioFeatures) -> AudioFeatureBatch:
     return AudioFeatureBatch(
-        audio_features=features, audio_feature_lens=lengths.reshape(-1)
+        audio_features=processor_output["audio_features"],
+        audio_feature_lens=torch.cat(
+            [length.reshape(-1) for length in processor_output["audio_feature_lens"]]
+        ),
     )
 
 
@@ -134,7 +129,7 @@ class MiniCPMOPerceptionState:
     processor: StreamingAudioProcessor
     audio_encoder: MiniCPMOAudioEncoder
     max_slice_nums: int
-    image_encoder: ImageEncoder | None = None
+    image_encoder: ImageEncoder
     audio_buffer: np.ndarray = field(
         default_factory=lambda: np.zeros(0, dtype=np.float32)
     )
@@ -155,8 +150,8 @@ class MiniCPMOPerceptionState:
         processor: StreamingAudioProcessor,
         audio_encoder: MiniCPMOAudioEncoder,
         prompt: str,
-        reference_audio: bytes | None,
-        image_encoder: ImageEncoder | None = None,
+        reference_audio: bytes,
+        image_encoder: ImageEncoder,
         max_slice_nums: int,
     ) -> MiniCPMOPerceptionState:
         processor.set_streaming_mode(
@@ -182,35 +177,29 @@ class MiniCPMOPerceptionState:
         )
         im_end_ids = list(tokenizer.encode("<|im_end|>", add_special_tokens=False))
         state.prefix_token_ids = list(prompt_ids)
-        if reference_audio is None:
-            state.prefix_token_ids.extend(im_end_ids)
-            state.prefix_schema = [("tok", len(prompt_ids) + len(im_end_ids))]
-        else:
-            state.prefix_token_ids.append(
-                tokenizer.convert_tokens_to_ids("<|audio_start|>")
-            )
-            reference_waveform, _ = AudioMediaIO(target_sr=SAMPLE_RATE).load_bytes(
-                reference_audio
-            )
-            waveform = np.asarray(reference_waveform, dtype=np.float32).reshape(-1)
-            batch = audio_feature_batch(
-                processor.process_audio(waveform, sampling_rate=SAMPLE_RATE)
-            )
-            state.prefix_embeds = audio_encoder(
-                audio_features=batch.audio_features,
-                audio_feature_lens=batch.audio_feature_lens,
-            )["audio_embeds"]
-            count = int(state.prefix_embeds.shape[0])
-            state.prefix_token_ids.extend([tokenizer.unk_token_id] * count)
-            state.prefix_token_ids.append(
-                tokenizer.convert_tokens_to_ids("<|audio_end|>")
-            )
-            state.prefix_token_ids.extend(im_end_ids)
-            state.prefix_schema = [
-                ("tok", len(prompt_ids) + 1),
-                ("audio", count),
-                ("tok", 1 + len(im_end_ids)),
-            ]
+        state.prefix_token_ids.append(
+            tokenizer.convert_tokens_to_ids("<|audio_start|>")
+        )
+        reference_waveform, _ = AudioMediaIO(target_sr=SAMPLE_RATE).load_bytes(
+            reference_audio
+        )
+        waveform = np.asarray(reference_waveform, dtype=np.float32).reshape(-1)
+        batch = audio_feature_batch(
+            processor.process_audio(waveform, sampling_rate=SAMPLE_RATE)
+        )
+        state.prefix_embeds = audio_encoder(
+            audio_features=batch.audio_features,
+            audio_feature_lens=batch.audio_feature_lens,
+        )["audio_embeds"]
+        count = int(state.prefix_embeds.shape[0])
+        state.prefix_token_ids.extend([tokenizer.unk_token_id] * count)
+        state.prefix_token_ids.append(tokenizer.convert_tokens_to_ids("<|audio_end|>"))
+        state.prefix_token_ids.extend(im_end_ids)
+        state.prefix_schema = [
+            ("tok", len(prompt_ids) + 1),
+            ("audio", count),
+            ("tok", 1 + len(im_end_ids)),
+        ]
         return state
 
     def close(self) -> None:
@@ -264,10 +253,9 @@ class MiniCPMOPerceptionState:
             suffix_extra_frames=2,
         )
         if self.audio_chunk_idx == 0:
-            config = (
-                self.processor._streaming_mel_processor.get_config()
-            )  # noqa: leading-underscore - checkpoint processor attribute
-            consumed_ms = int(config.get("effective_first_chunk_ms", FIRST_CHUNK_MS))
+            consumed_ms = int(
+                self.processor.get_streaming_config()["effective_first_chunk_ms"]
+            )
             consumed_samples = consumed_ms * SAMPLE_RATE // 1000
         else:
             consumed_samples = need_samples
@@ -286,7 +274,6 @@ class MiniCPMOPerceptionState:
         processed = self.processor.process_image(
             [frame], max_slice_nums=self.max_slice_nums
         )
-        assert self.image_encoder is not None
         image_embeds = self.image_encoder(
             pixel_values=processed["pixel_values"][0],
             tgt_sizes=processed["tgt_sizes"][0],

@@ -114,28 +114,24 @@ class MiniCPMOVocoderRuntime:
         end_of_turn: bool = False,
     ) -> np.ndarray | None:
         state = self.sessions[session_id]
-        try:
-            if codec_tokens:
-                state.has_pending_turn = True
-            else:
-                pass
-            if not state.has_pending_turn:
-                waveform = None
-            else:
-                waveform = self.decode_audio_tokens(
-                    state,
-                    codec_tokens,
-                    force_flush=turn_start,
-                    is_last_chunk=end_of_turn,
-                )
-            if end_of_turn:
-                self.reset_turn_state(state)
-            else:
-                pass
-            return waveform
-        except Exception:
+        if codec_tokens:
+            state.has_pending_turn = True
+        else:
+            pass
+        if not state.has_pending_turn:
+            waveform = None
+        else:
+            waveform = self.decode_audio_tokens(
+                state,
+                codec_tokens,
+                force_flush=turn_start,
+                is_last_chunk=end_of_turn,
+            )
+        if end_of_turn:
             self.reset_turn_state(state)
-            raise
+        else:
+            pass
+        return waveform
 
     def close_session(self, session_id: str) -> None:
         speaker = self.sessions.pop(session_id).speaker
