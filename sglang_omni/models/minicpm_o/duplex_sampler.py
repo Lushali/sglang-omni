@@ -115,7 +115,7 @@ def duplex_sample(logits: torch.Tensor, state: DuplexSamplerState) -> int:
                 if penalty != 1.0:
                     for token_id in set(state.generated_history[-512:]):
                         if 0 <= int(token_id) < row.numel():
-                            # note (Junnan Li): Repetition scaling is deliberately sign-insensitive.
+                            # note (Junnan Li): Matches the checkpoint sampler, which ignores the logit sign.
                             if penalty > 1.0:
                                 row[int(token_id)] /= penalty
                             else:

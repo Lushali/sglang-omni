@@ -9,8 +9,7 @@ MAX_REFERENCE_AUDIO_SECONDS = 30
 
 
 def normalize_reference_wav(audio: bytes) -> bytes:
-    # Note (Junnan Li): Streamed WAV writers leave the size fields as placeholders,
-    # so the samples actually present decide the length, not the header.
+    # note (Junnan Li): Streamed WAV writers leave placeholder sizes, so the samples decide the length.
     try:
         with wave.open(io.BytesIO(audio), "rb") as reference:
             rate = reference.getframerate()
@@ -29,8 +28,7 @@ def normalize_reference_wav(audio: bytes) -> bytes:
         raise ValueError("reference audio must be nonempty and at most 30 seconds")
     else:
         pass
-    # Note (Junnan Li): Canonical chunks keep downstream WAV readers on the
-    # validated format.
+    # note (Junnan Li): Rewrite the header so its sizes match the validated samples.
     normalized = io.BytesIO()
     with wave.open(normalized, "wb") as reference:
         reference.setparams((channels, width, rate, frames, "NONE", "not compressed"))

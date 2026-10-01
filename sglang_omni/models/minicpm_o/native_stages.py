@@ -73,8 +73,7 @@ class PerceptionHooks(SessionHooks):
         else:
             state = self.states[context.session_identity]
             if isinstance(chunk.payload, dict):
-                # Note (Junnan Li): Frames are client data acknowledged before decoding;
-                # an undecodable frame is dropped so the unit still runs on the rest.
+                # note (Junnan Li): Frames are acked before decoding, so a bad frame is dropped, not fatal.
                 image_embeds = []
                 for image in chunk.payload["images"]:
                     try:
@@ -198,8 +197,7 @@ def create_perception_scheduler(
     encoder = MiniCPMOAudioEncoder(model_path, device=device, dtype=dtype)
     image_encoder = MiniCPMOImageEncoder(model_path, device=device, dtype=dtype)
     processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
-    # Note (Junnan Li): Loading the processor takes ~0.6 s; a session's only own state is the streaming
-    # mel processor, which set_streaming_mode replaces on the shallow copy at open.
+    # note (Junnan Li): Loaded once (~0.6 s); each session's shallow copy gets its own streaming mel processor.
     hooks = PerceptionHooks(
         tokenizer,
         lambda: copy.copy(processor),
@@ -247,7 +245,7 @@ def create_speech_scheduler(
 ) -> SessionScheduler:
     """Build speech; dtype and extra options follow the stage loader contract."""
     device = str(resolve_concrete_device(device, gpu_id))
-    # Note (Junnan Li): Sessions stream one reference each, so the batched-offline options stay off.
+    # note (Junnan Li): Sessions stream one reference each, so the batched-offline options stay off.
     codec = MiniCPMOCode2Wav(
         model_path,
         device=device,

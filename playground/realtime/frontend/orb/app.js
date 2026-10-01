@@ -1,7 +1,4 @@
 // Voice page for a native full-duplex /v1/realtime session, proxied by playground/realtime/app.py.
-// Protocol handling lives in session.js, audio I/O in worklet.js and camera capture
-// in camera.js (all shared byte-for-byte with tools/realtime_web_demo); orb.js draws
-// the orb from the live microphone and playback levels.
 import { DuplexSession } from "./session.js";
 import { Camera } from "./camera.js";
 import { Orb } from "./orb.js";
@@ -304,9 +301,7 @@ function rmsOf(samples) {
   return samples.length ? Math.sqrt(energy / samples.length) : 0;
 }
 
-// Models that stream a frame every few tens of ms (PersonaPlex: 80 ms) are hurt by
-// every network hiccup, so they get a deeper, adaptive jitter buffer and gentler
-// catch-up; models that answer in 1 s units keep the fixed defaults.
+// Sub-second streaming units stall on every network hiccup, so they get a deeper adaptive jitter buffer.
 const STREAMING_UNIT_MS = 500;
 const STREAMING_PLAYBACK = { jitterMs: 400, maxJitterMs: 900, maxMs: 3500, keepMs: 2200, catchUp: { slow: 0.5, fast: 1.0, skip: 2.0, slowRate: 1.06, fastRate: 1.12 } };
 

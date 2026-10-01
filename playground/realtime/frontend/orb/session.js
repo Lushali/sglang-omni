@@ -6,26 +6,17 @@ export const DEFAULT_INPUT_RATE = 16000;
 export const PACKET_MS = 80;
 const MAX_UNITS_SHOWN = 200;
 
-// Camera input protocol (vision-input-design-20260926/DESIGN.md section 1). Every
-// wire name the page uses for images lives in this block, so a server-side
-// rename is a one-line change here. The client never asks for images: the
-// server declares them in session.updated and the page follows.
+// Image wire names; the server declares image input in session.updated and the page follows.
 export const IMAGE = {
-  // Camera is on only if session.sglang.granted[GRANTED_FIELD] includes MODALITY.
   GRANTED_FIELD: "input_modalities",
   MODALITY: "image",
-  // session.sglang.granted[FORMAT_FIELD] = {types, max_bytes, max_per_unit}.
   FORMAT_FIELD: "input_image_format",
-  // {type: FRAME_EVENT, event_id, [PAYLOAD_FIELD]: "<base64>", sglang: {[TIME_FIELD]: ms}}; nothing else (strict schema).
   FRAME_EVENT: "sglang.input_image.append",
   PAYLOAD_FIELD: "image",
   TIME_FIELD: "t_ms",
-  // Ack {type: ACK_EVENT, unit_id, event_id}; rejections are non-fatal error events whose
-  // error.event_id is the frame's (invalid_state, buffer_overflow, not_supported).
   ACK_EVENT: "sglang.input_image.accepted",
 };
-// Used for any field the grant leaves out. Short side 448 px: the model rescales
-// to about 448x448 area, so a smaller frame would only be upscaled.
+// The model rescales frames to about 448x448, so a smaller short side would only be upscaled.
 export const IMAGE_DEFAULTS = { types: ["image/jpeg"], max_bytes: 512 * 1024, max_per_unit: 1, max_short_side: 448 };
 
 export function bytesToBase64(bytes) {

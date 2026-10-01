@@ -54,8 +54,7 @@ class MiniCPMOVocoderSessionState:
 
     def held(self) -> ResourceUsage:
         size = estimate_cache_bytes((self.caches, self.token2wav_buffer))
-        # note (Junnan Li): The voice's earliest open session carries the shared caches; the
-        # prompt itself lives in the code2wav reference cache.
+        # note (Junnan Li): Shared caches are charged once, to the voice's earliest open session.
         if self.speaker.session_ids[0] == self.session_id:
             size += estimate_cache_bytes(self.speaker.base_caches)
         else:

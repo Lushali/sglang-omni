@@ -67,7 +67,7 @@ class Capabilities:
     max_image_bytes: int = 512 * 1024
     sampling_parameters: tuple[str, ...] = ()
     supports_reference_audio: bool = False
-    # Frame cap per unit, indexed by the session's max_slice_nums minus one.
+    # note (Junnan Li): Frame cap per unit, indexed by the session's max_slice_nums minus one.
     image_frames_per_unit: tuple[int, ...] = (1,)
     default_max_slice_nums: int = 1
 

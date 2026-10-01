@@ -201,8 +201,7 @@ def vocode_code2wav_payloads(
         f"minicpm_code2wav_batch size={len(payloads)} "
         f"max_codec_tokens={max(len(token_ids) for token_ids in codec_tokens)}"
     )
-    # An empty codec sequence (a turn with no speech) has nothing to vocode;
-    # model.vocode rejects empty rows, so batch only the voiced ones.
+    # note (Junnan Li): model.vocode rejects empty rows, which turns without speech produce.
     voiced = [index for index, tokens in enumerate(codec_tokens) if tokens]
     voiced_waveforms = model.vocode(
         [codec_tokens[index] for index in voiced],

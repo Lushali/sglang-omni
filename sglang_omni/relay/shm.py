@@ -38,8 +38,7 @@ def shm_create_from_tensor(tensor: torch.Tensor) -> _shm.SharedMemory:
     t_np = tensor.numpy().reshape(-1)
     size = t_np.nbytes
 
-    # Note (Junnan Li): SharedMemory rejects size 0; an empty tensor still needs a
-    # block so the receiver's metadata and copy stay uniform.
+    # note (Junnan Li): SharedMemory rejects size 0, and the receiver expects a block for every tensor.
     shm = _shm.SharedMemory(create=True, size=max(size, 1))
     shm_view = np.ndarray(t_np.shape, dtype=t_np.dtype, buffer=shm.buf)
     shm_view[:] = t_np[:]

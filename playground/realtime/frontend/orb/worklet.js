@@ -152,9 +152,7 @@ class PlaybackProcessor extends AudioWorkletProcessor {
     this.stretch = null;
   }
 
-  // --- catch-up: accelerate (WSOLA time-stretch, pitch preserved) or skip ---
-  // Backlog beyond the jitter target is played faster; a large backlog is
-  // skipped outright because seconds-old speech is stale in a duplex talk.
+  // Seconds-old speech is stale in a duplex talk, so a large backlog is skipped instead of stretched.
   catchUpRate() {
     const { slow, fast, skip, slowRate, fastRate } = this.catchUp;
     const backlog = (this.queuedSamples - this.target) / sampleRate;

@@ -232,7 +232,6 @@ class MiniCPMOPerceptionState:
                 )
                 + estimate_cache_bytes(self.prefix_embeds)
             )
-            # note (Junnan Li): Count the live processor even when every buffer is empty.
             return ResourceUsage(slots={"perception": 1}, bytes=max(size, 1))
 
     def encode_audio(self, pcm: np.ndarray) -> torch.Tensor:
@@ -265,10 +264,9 @@ class MiniCPMOPerceptionState:
             suffix_extra_frames=2,
         )
         if self.audio_chunk_idx == 0:
-            # note (Junnan Li): The checkpoint processor owns this private attribute.
             config = (
                 self.processor._streaming_mel_processor.get_config()
-            )  # noqa: leading-underscore
+            )  # noqa: leading-underscore - checkpoint processor attribute
             consumed_ms = int(config.get("effective_first_chunk_ms", FIRST_CHUNK_MS))
             consumed_samples = consumed_ms * SAMPLE_RATE // 1000
         else:

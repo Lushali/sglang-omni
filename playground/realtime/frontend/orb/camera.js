@@ -1,9 +1,4 @@
-// Camera capture for the realtime pages: a live preview plus on-demand grabs
-// scaled so the short side is maxShortSide. session.js decides when to grab.
-//
-// Bandwidth: a 448 px (short side, 597x448 from a 4:3 camera) JPEG at quality
-// 0.7 is about 30-50 KB, so one frame per 1 s unit adds about 40 KB/s (~55 KB/s
-// as base64 JSON) next to the 32 KB/s of 16 kHz PCM16 audio (~43 KB/s as base64).
+// Camera preview and on-demand grabs; a 448 px JPEG per 1 s unit adds about 40 KB/s next to 32 KB/s of audio.
 import { bytesToBase64 } from "./session.js";
 
 export const CAMERA_CONSTRAINTS = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 5 } };

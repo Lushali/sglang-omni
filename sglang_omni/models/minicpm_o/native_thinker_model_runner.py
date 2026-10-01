@@ -81,7 +81,6 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
             ]
             attach_omni_prefill_inputs(
                 forward_batch,
-                # note (Junnan Li): The text-only wrapper accepts projected embeddings directly.
                 OmniPrefillInputs(input_embeds=torch.cat(rows, dim=0)),
             )
             return None
@@ -197,13 +196,11 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
     def requested_capture_hidden_mode_prefill(
         self, schedule_batch: ScheduleBatch, requests: list[SchedulerRequest]
     ) -> CaptureHiddenMode:
-        """Capture talker conditioning; batch parameters follow the runner interface."""
         return CaptureHiddenMode.FULL
 
     def requested_capture_hidden_mode_decode(
         self, schedule_batch: ScheduleBatch, requests: list[SchedulerRequest]
     ) -> CaptureHiddenMode:
-        """Capture talker conditioning; batch parameters follow the runner interface."""
         return CaptureHiddenMode.FULL
 
     def post_process_outputs(
