@@ -18,6 +18,10 @@ from sglang.srt.server_args import ServerArgs
 from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.qwen3_tts import CAPABILITIES, request_builders
 from sglang_omni.models.qwen3_tts import stages as qwen3_stages
+from sglang_omni.models.qwen3_tts.config import (
+    load_qwen3_tts_checkpoint_config,
+    normalize_qwen3_tts_model_type,
+)
 from sglang_omni.models.qwen3_tts.model_runner import Qwen3TTSModelRunner
 from sglang_omni.models.qwen3_tts.reference_encoder_cuda_graph import (
     DEFAULT_QWEN3_TTS_REFERENCE_ENCODER_BUCKET_FRAMES,
@@ -143,6 +147,7 @@ class Qwen3TtsEngineBuilder(TtsEngineBuilder[Qwen3TTSSGLangRequestData]):
     supports_breakable_prefill_cuda_graph = (
         CAPABILITIES.supports_breakable_prefill_cuda_graph
     )
+    supports_full_prefill_cuda_graph = CAPABILITIES.supports_full_prefill_cuda_graph
 
     def __init__(
         self,
@@ -169,6 +174,10 @@ class Qwen3TtsEngineBuilder(TtsEngineBuilder[Qwen3TTSSGLangRequestData]):
         self.stream_output_builder: (
             StreamOutputBuilder[Qwen3TTSSGLangRequestData] | None
         ) = None
+        # note (luojiaxuan): the factory assigns this before generation_defaults
+        # runs, but Qwen3TTSPipelineConfig.generation_admission_defaults builds a
+        # bare builder just to read the admission keys, so it needs a value.
+        self.checkpoint_dir: str = ""
 
     def resolve_checkpoint(self, model_path: str) -> str:
         qwen3_stages.apply_qwen_tts_transformers_compatibility_patches()
@@ -192,7 +201,7 @@ class Qwen3TtsEngineBuilder(TtsEngineBuilder[Qwen3TTSSGLangRequestData]):
     ) -> GenerationDefaults:
         # note(ratish): the decode graph ladder follows the running bound, so it
         # is not set here.
-        return {
+        defaults: GenerationDefaults = {
             "max_running_requests": 64,
             "max_queued_requests": 64,
             "dtype": dtype,
@@ -208,6 +217,24 @@ class Qwen3TtsEngineBuilder(TtsEngineBuilder[Qwen3TTSSGLangRequestData]):
             "cuda_graph_backend_prefill": CudaGraphBackend.BREAKABLE,
             "cuda_graph_bs_prefill": list(QWEN3_TTS_PREFILL_CUDA_GRAPH_BS),
         }
+        if (
+            self.checkpoint_dir
+            and normalize_qwen3_tts_model_type(
+                load_qwen3_tts_checkpoint_config(self.checkpoint_dir).get(
+                    "tts_model_type"
+                )
+            )
+            == "custom_voice"
+        ):
+            # note (luojiaxuan): a CustomVoice prompt is a few dozen tokens, so
+            # the breakable graph's per-layer segments are launch-bound, and the
+            # full graph replays the same prefill in a fraction of the time.
+            # Base prefills also carry reference audio, so they keep the
+            # breakable graph until the full one is measured on them.
+            defaults["cuda_graph_backend_prefill"] = CudaGraphBackend.FULL
+        else:
+            pass
+        return defaults
 
     def before_memory_pool(
         self,

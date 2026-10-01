@@ -103,6 +103,7 @@ class SpeechPrompt(TypedDict):
 
 class SpeechRequestUpdates(TypedDict, total=False):
     response_format: str
+    stream: bool
     task_type: str
     language: str
     ref_audio: str
@@ -316,18 +317,20 @@ class SpeechRequestValidator:
         self.validate_input_text(request.input)
         updates: SpeechRequestUpdates = {}
         response_format = normalize_response_format(request.response_format)
-        if request.stream and response_format != "pcm":
+        stream = request.stream or request.stream_format == "sse"
+        if stream and response_format != "pcm":
             raise bad_request(
                 "stream=true requires response_format='pcm'",
                 param="response_format",
             )
         else:
             pass
-        if not request.stream:
+        if not stream:
             self.validate_encoder_dependency(response_format)
         else:
             pass
         updates["response_format"] = response_format
+        updates["stream"] = stream
 
         if not TTS_SPEED_MIN <= float(request.speed) <= TTS_SPEED_MAX:
             raise bad_request(
@@ -721,9 +724,15 @@ class SpeechRequestValidator:
                 "stream is not supported for batch speech requests",
                 param=f"items.{index}.stream",
             )
+        elif item_payload.get("stream_format") == "sse":
+            raise bad_request(
+                "stream is not supported for batch speech requests",
+                param=f"items.{index}.stream_format",
+            )
         else:
             pass
         payload.pop("stream", None)
+        payload.pop("stream_format", None)
         try:
             return CreateSpeechRequest.model_validate(payload)
         except ValidationError as exc:

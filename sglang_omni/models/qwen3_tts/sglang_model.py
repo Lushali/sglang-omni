@@ -1076,6 +1076,23 @@ class Qwen3TTSTalker(Qwen3TTSPromptBuilderMixin, nn.Module):
         self.predictor_embedding_buffer = torch.empty(
             max_batch_size, hidden_size, device=device, dtype=dtype
         )
+        projection = self.code_predictor.small_to_mtp_projection
+        if projection is None:
+            self.predictor_projected_embeddings = None
+            self.predictor_projected_buffer = None
+        else:
+            # note (ratish): the projection of an embedding row is that row of the
+            # projected table; the last codebook feeds no predictor step, so has none.
+            self.predictor_projected_embeddings = torch.empty(
+                config.num_code_groups - 2,
+                config.code_predictor_config.vocab_size,
+                projection.out_features,
+                device=device,
+                dtype=dtype,
+            )
+            self.predictor_projected_buffer = torch.empty(
+                max_batch_size, projection.out_features, device=device, dtype=dtype
+            )
         self.sub_batch_size = 0
         self.sub_temperature_tensor = torch.full(
             (max_batch_size,), 0.9, device=device, dtype=torch.float32
@@ -1733,6 +1750,11 @@ class Qwen3TTSTalker(Qwen3TTSPromptBuilderMixin, nn.Module):
         else:
             pass
         use_fused_embedding = embedding_buffer is not None and layer0_codes.is_cuda
+        projected_tables = self.predictor_projected_embeddings
+        if projected_tables is None:
+            projected_buffer = None
+        else:
+            projected_buffer = self.predictor_projected_buffer[:batch_size]
 
         for pos in range(seq_len):
             layer0_code = layer0_codes[:, pos : pos + 1]
@@ -1780,6 +1802,10 @@ class Qwen3TTSTalker(Qwen3TTSPromptBuilderMixin, nn.Module):
                 )
                 pos_codes[:, layer_idx + 1].copy_(next_code)
                 codec_embedding = self.code_predictor.model.codec_embedding[layer_idx]
+                has_next_step = layer_idx < num_groups - 2
+                should_gather_projection = (
+                    projected_tables is not None and has_next_step
+                )
                 fused_embedding = (
                     use_fused_embedding
                     and embedding_buffer.dtype == predictor_dtype
@@ -1788,6 +1814,14 @@ class Qwen3TTSTalker(Qwen3TTSPromptBuilderMixin, nn.Module):
                         codec_embedding.weight,
                         embedding_buffer,
                         pos_summed,
+                        projected_weight=(
+                            projected_tables[layer_idx]
+                            if should_gather_projection
+                            else None
+                        ),
+                        projected=(
+                            projected_buffer if should_gather_projection else None
+                        ),
                     )
                 )
                 if fused_embedding:
@@ -1797,8 +1831,17 @@ class Qwen3TTSTalker(Qwen3TTSPromptBuilderMixin, nn.Module):
                         dtype=predictor_dtype
                     )
                     pos_summed.add_(new_embed[:, 0, :])
-                new_predictor_embed = self.code_predictor.project_input(new_embed)
-                if layer_idx < num_groups - 2:
+                if has_next_step:
+                    if projected_tables is None:
+                        new_predictor_embed = self.code_predictor.project_input(
+                            new_embed
+                        )
+                    elif fused_embedding:
+                        new_predictor_embed = projected_buffer.unsqueeze(1)
+                    else:
+                        new_predictor_embed = torch.nn.functional.embedding(
+                            next_code.unsqueeze(1), projected_tables[layer_idx]
+                        )
                     last_hidden = self.predictor_forward_tokens(
                         token_embeds=new_predictor_embed,
                         batch_size=batch_size,
@@ -2195,6 +2238,20 @@ class Qwen3TTSTalker(Qwen3TTSPromptBuilderMixin, nn.Module):
                     weight_loader(param, loaded_weight)
             else:
                 pass
+        self.post_load_weights()
+
+    @torch.no_grad()
+    def post_load_weights(self) -> None:
+        """Rebuild the projected codec tables; the loaders call this after every
+        weight load."""
+        if self.predictor_projected_embeddings is None:
+            pass
+        else:
+            for table, embedding in zip(
+                self.predictor_projected_embeddings,
+                self.code_predictor.model.codec_embedding,
+            ):
+                table.copy_(self.code_predictor.project_input(embedding.weight))
 
 
 EntryClass = Qwen3TTSTalker

@@ -114,6 +114,7 @@ class ModelCapabilitiesLog(TypedDict):
     cuda_graph: bool
     torch_compile: bool
     breakable_prefill_cuda_graph: bool
+    full_prefill_cuda_graph: bool
 
 
 class PipelineUvicornServer(uvicorn.Server):
@@ -289,6 +290,7 @@ def model_capabilities_log_summary(
         "breakable_prefill_cuda_graph": (
             capabilities.supports_breakable_prefill_cuda_graph
         ),
+        "full_prefill_cuda_graph": capabilities.supports_full_prefill_cuda_graph,
     }
 
 

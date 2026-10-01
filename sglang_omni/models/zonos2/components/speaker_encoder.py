@@ -46,7 +46,7 @@ class Qwen3SpeakerEmbedding(nn.Module):
     F_MIN = 0.0
     F_MAX = 12_000.0
 
-    def __init__(self, device: str = "cuda", compile_forward: bool = False):
+    def __init__(self, device: str, compile_forward: bool = False) -> None:
         super().__init__()
         self.device = device
         self.compile_forward = compile_forward
@@ -264,7 +264,7 @@ class SpeakerEncoder(TensorReferenceEncodeHook[Zonos2RefInput]):
 
     def __init__(
         self,
-        device: str = "cuda",
+        device: str,
         cache_max_items: int = 256,
         compile_forward: bool = False,
     ):

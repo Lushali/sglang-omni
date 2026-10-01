@@ -69,7 +69,8 @@ def get_vocoder(device: str) -> Zonos2DACVocoder:
 def decode_to_pcm(
     audio_codes: torch.Tensor,
     eos_frame: int | None = None,
-    device: str = "cuda",
+    *,
+    device: str,
 ) -> torch.Tensor:
     """Decode delayed ``[T, 9]`` AR codes to 1-D float32 PCM @ 44.1 kHz.
 
@@ -88,7 +89,8 @@ def decode_to_pcm(
 def decode_batch(
     audio_codes_list: list[torch.Tensor],
     eos_frames: list[int | None],
-    device: str = "cuda",
+    *,
+    device: str,
 ) -> list[torch.Tensor]:
     """Batched analogue of ``decode_to_pcm``: one DAC forward for many items.
 
@@ -224,7 +226,7 @@ class Zonos2StreamingVocoderScheduler(StreamingVocoderBase[Zonos2StreamState, No
     def __init__(
         self,
         *,
-        device: str = "cuda",
+        device: str,
         compute_fn: (
             Callable[
                 [StagePayload],

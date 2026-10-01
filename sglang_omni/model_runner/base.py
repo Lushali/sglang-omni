@@ -52,7 +52,11 @@ if TYPE_CHECKING:
         torch.Tensor
         | tuple[torch.Tensor, torch.Tensor | None]
         | tuple[
-            list[SchedulerRequest], torch.Tensor, int, torch.Tensor, torch.cuda.Event
+            list[SchedulerRequest],
+            torch.Tensor,
+            int,
+            torch.Tensor,
+            torch.cuda.Event | torch.xpu.Event,
         ]
         | DotsFlowLaunchBuf
         | None

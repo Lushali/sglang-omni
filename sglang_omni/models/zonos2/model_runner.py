@@ -68,7 +68,7 @@ class Zonos2ModelRunner(ModelRunner):
         # Side stream for the lagged resolve D2H: gated by a launch event so the
         # copy waits only for codes(N), not the next forward queued on the main
         # stream -> the host resolve overlaps forward(N+1).
-        self.copy_stream: torch.cuda.Stream | None = None
+        self.copy_stream: torch.cuda.Stream | torch.xpu.Stream | None = None
         # Per-request sampler (preserves the ZH-CER fix): per-request
         # temperature/top_k/top_p/min_p/repetition_penalty, no requests[0]
         # broadcast. Opt-in torch.compile fuses its elementwise launches.
@@ -310,9 +310,10 @@ class Zonos2ModelRunner(ModelRunner):
             dim=1,
         )
         packed = torch.cat((codes, meta), dim=1)  # [B, n+2] int64
-        ev = torch.cuda.Event()
-        ev.record()
-        return (requests, packed, n, next_ids.clone(), ev)
+        device_module = torch.get_device_module(packed.device)
+        codes_ready_event = device_module.Event()
+        codes_ready_event.record(device_module.current_stream(packed.device))
+        return (requests, packed, n, next_ids.clone(), codes_ready_event)
 
     def collect_resolve(self, launch_buf, result) -> None:
         # Host half (runs lagged under async, overlapping the next decode forward):
@@ -324,7 +325,7 @@ class Zonos2ModelRunner(ModelRunner):
             return
         else:
             pass
-        requests, packed, n, next_ids_snap, ev = launch_buf
+        requests, packed, n, next_ids_snap, codes_ready_event = launch_buf
         if result is not None:
             result.next_token_ids = next_ids_snap
         else:
@@ -333,12 +334,13 @@ class Zonos2ModelRunner(ModelRunner):
         # as codes(N) is ready (event recorded before the next forward was queued)
         # and runs on a separate stream, so this no longer whole-stream-syncs on
         # forward(N+1). One D2H of the packed [B, n+2] snapshot.
+        device_module = torch.get_device_module(packed.device)
         if self.copy_stream is None:
-            self.copy_stream = torch.cuda.Stream(device=packed.device)
+            self.copy_stream = device_module.Stream(device=packed.device)
         else:
             pass
-        self.copy_stream.wait_event(ev)
-        with torch.cuda.stream(self.copy_stream):
+        self.copy_stream.wait_event(codes_ready_event)
+        with device_module.stream(self.copy_stream):
             packed_cpu = packed.to("cpu", non_blocking=True)
         self.copy_stream.synchronize()
         codes_cpu = packed_cpu[:, :n]
