@@ -139,20 +139,15 @@ class MiniCPMOVocoderRuntime:
             raise
 
     def close_session(self, session_id: str) -> None:
-        state = self.sessions.pop(session_id, None)
-        if state is None:
-            return
+        speaker = self.sessions.pop(session_id).speaker
+        speaker.session_ids.remove(session_id)
+        if not speaker.session_ids:
+            self.speakers.pop(speaker.key)
         else:
-            speaker = state.speaker
-            speaker.session_ids.remove(session_id)
-            if not speaker.session_ids:
-                del self.speakers[speaker.key]
-            else:
-                pass
+            pass
 
     def held(self, session_id: str) -> ResourceUsage:
-        state = self.sessions.get(session_id)
-        return ResourceUsage() if state is None else state.held()
+        return self.sessions[session_id].held()
 
     def decode_audio_tokens(
         self,

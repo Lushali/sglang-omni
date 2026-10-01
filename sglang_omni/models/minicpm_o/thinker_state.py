@@ -20,11 +20,11 @@ class MiniCPMOThinkerSessionState:
     generated_history: list[int] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DuplexUnitRequestData(SGLangARRequestData):
     """One bounded generated unit appended to an SGLang streaming session."""
 
-    thinker_state: MiniCPMOThinkerSessionState | None = None
+    thinker_state: MiniCPMOThinkerSessionState
     prefill_schema: list[tuple[Literal["tok", "audio", "image"], int]] = field(
         default_factory=list
     )

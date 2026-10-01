@@ -53,10 +53,18 @@ def test_perception_reference_does_not_replace_default(
     hooks = PerceptionHooks(Mock(), Mock(), Mock(), reference_audio=b"default")
     hooks.open(
         SessionIdentity("custom"),
-        OmniRequest(None, params={"reference_audio": b"custom", "max_slice_nums": 1}),
+        OmniRequest(
+            None,
+            params={
+                "instructions": "",
+                "reference_audio": b"custom",
+                "max_slice_nums": 1,
+            },
+        ),
     )
     hooks.open(
-        SessionIdentity("default"), OmniRequest(None, params={"max_slice_nums": 1})
+        SessionIdentity("default"),
+        OmniRequest(None, params={"instructions": "", "max_slice_nums": 1}),
     )
     assert [call.kwargs["reference_audio"] for call in state_open.call_args_list] == [
         b"custom",

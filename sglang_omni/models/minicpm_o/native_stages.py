@@ -58,7 +58,7 @@ class PerceptionHooks(SessionHooks):
             tokenizer=self.tokenizer,
             processor=self.processor_factory(),
             audio_encoder=self.audio_encoder,
-            prompt=request.params.get("instructions", ""),
+            prompt=request.params["instructions"],
             reference_audio=request.params.get("reference_audio")
             or self.reference_audio,
             image_encoder=self.image_encoder,

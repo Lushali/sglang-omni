@@ -144,12 +144,6 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
             )
         else:
             logits = logits_output.next_token_logits
-            if logits is None or logits.ndim != 2 or logits.shape[0] != len(requests):
-                raise RuntimeError(
-                    "duplex thinker requires logits shaped [batch, vocab]"
-                )
-            else:
-                pass
             original_logits = logits.clone()
             if len(duplex_indices) == len(requests):
                 result = torch.empty(
@@ -167,10 +161,6 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
             for index in duplex_indices:
                 data = requests[index].data
                 session = data.thinker_state
-                if session is None:
-                    raise RuntimeError("duplex request lost its thinker session state")
-                else:
-                    pass
                 sampling = data.sampling
                 special = self.special_for_data(data)
                 if self.forbidden_index is None:
@@ -182,7 +172,7 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
                 sampler_state = DuplexSamplerState(
                     special_tokens=special,
                     forbidden_index=self.forbidden_index,
-                    generation_step=int(data.generation_steps),
+                    generation_step=data.generation_steps,
                     force_listen_count=1 if data.forced_listen else 0,
                     force_listen_counter=0,
                     generated_history=session.generated_history,
@@ -196,7 +186,7 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
                 )
                 token = duplex_sample(original_logits[index], sampler_state)
                 session.current_turn_ended = sampler_state.current_turn_ended
-                if data.forced_listen and int(data.generation_steps) == 0:
+                if data.forced_listen and data.generation_steps == 0:
                     session.force_listen_counter += 1
                 else:
                     pass
@@ -242,17 +232,12 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
                     pass
                 sampled = int(req_output.data)
                 special = self.special_for_data(data)
-                hidden = last_hidden(req_output.extra)
                 pending = data.pending_unit_token
-                if pending is not None and int(data.generation_steps) >= 2:
-                    if hidden is None:
-                        raise RuntimeError(
-                            "duplex speech conditioning requires thinker hidden state"
-                        )
-                    else:
-                        pass
+                if pending is not None and data.generation_steps >= 2:
+                    hidden = req_output.extra["hidden_states"]
+                    hidden = hidden.reshape(-1, hidden.shape[-1])[-1].detach().clone()
                     data.unit_pairs.append(
-                        (pending, hidden, pending == special.turn_eos)
+                        (pending, hidden.to("cpu"), pending == special.turn_eos)
                     )
                     if len(data.unit_pairs) > 20:
                         del data.unit_pairs[:-20]
@@ -265,54 +250,20 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
                     continue
                 else:
                     pass
-                if int(data.generation_steps) > 0:
+                if data.generation_steps > 0:
                     data.generated_unit_ids.append(sampled)
                 else:
                     pass
                 data.pending_unit_token = sampled
-                state = data.thinker_state
-                if state is not None:
-                    if sampled == special.turn_eos:
-                        state.current_turn_ended = True
-                    elif sampled not in special.chunk_terminators:
-                        state.current_turn_ended = False
-                    else:
-                        pass
+                if sampled == special.turn_eos:
+                    data.thinker_state.current_turn_ended = True
+                elif sampled not in special.chunk_terminators:
+                    data.thinker_state.current_turn_ended = False
                 else:
                     pass
                 continue
             else:
                 pass
-
-
-def last_hidden(
-    extra: dict[str, torch.Tensor | dict[str, torch.Tensor]] | None,
-) -> torch.Tensor | None:
-    if not isinstance(extra, dict):
-        return None
-    else:
-        hidden = extra.get("hidden_states")
-        if isinstance(hidden, dict):
-            hidden = next(
-                (
-                    value
-                    for value in reversed(list(hidden.values()))
-                    if torch.is_tensor(value)
-                ),
-                None,
-            )
-        else:
-            pass
-        if not torch.is_tensor(hidden):
-            return None
-        else:
-            while hidden.ndim > 1 and hidden.shape[0] == 1:
-                hidden = hidden[0]
-            if hidden.ndim == 2:
-                hidden = hidden[-1]
-            else:
-                pass
-            return hidden.detach().clone().to("cpu")
 
 
 __all__ = [

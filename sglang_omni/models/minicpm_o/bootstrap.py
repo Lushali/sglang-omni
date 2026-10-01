@@ -34,6 +34,7 @@ def create_talker_scheduler(
     from sglang_omni.models.minicpm_o.talker_request import (
         make_talker_scheduler_adapters,
     )
+    from sglang_omni.models.minicpm_o.talker_session import TalkerAdapter
     from sglang_omni.scheduling.bootstrap import (
         create_sglang_infrastructure,
         init_sglang_cuda_graphs,
@@ -92,8 +93,6 @@ def create_talker_scheduler(
         tts_bos_token_id=tokenizer.convert_tokens_to_ids("<|tts_bos|>"),
         tts_eos_token_id=tokenizer.convert_tokens_to_ids("<|tts_eos|>"),
     )
-
-    from sglang_omni.models.minicpm_o.talker_session import TalkerAdapter
 
     return OmniScheduler(
         tp_worker=model_worker,
