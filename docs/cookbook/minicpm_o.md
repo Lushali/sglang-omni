@@ -241,11 +241,10 @@ These are set in `examples/full_duplex/minicpmo.yaml`:
 | Setting | Default | Meaning |
 |---|---|---|
 | `max_sessions` | 2 | Conversations served at the same time |
-| `stages.thinker.engine.context_length` | 8192 | Tokens of history one conversation can hold |
 | `reference_audio` | checkpoint default | Voice used when a session sends no reference |
 | `vision.max_frames_per_unit` | 4 | Frames accepted per unit (1 s of audio) |
 | `vision.max_slice_nums_limit` | 9 | Highest slice count a session may request |
 
-When a conversation fills its context, the server sends a `context_exhausted` error and closes the session. Start a new session to continue.
+One conversation can hold 8192 tokens of history, which is the model's limit. When a conversation fills it, the server sends a `context_exhausted` error and closes the session. Start a new session to continue.
 
 For repeatable output, start the server from `examples/full_duplex/minicpmo-parity.yaml`, which uses greedy sampling.

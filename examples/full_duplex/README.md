@@ -29,8 +29,7 @@ Settings you may want to change in the config:
 | `max_sessions` | 2 | Conversations served at the same time |
 | `reference_audio` | checkpoint default | Voice used when a session sends no reference |
 | `speech_state_bytes_per_session` | 2 GiB | Memory the speech stage may hold per conversation |
-| `stages.thinker.engine.context_length` | 8192 | Tokens of history one conversation can hold, up to 40960 |
 | `sampling.*` | see file | Default sampling for sessions that do not set their own |
 | `vision.*` | see file | Limits on camera frames per unit (1 s of audio) |
 
-A longer context needs more GPU memory: about 4.5 GiB for one conversation at 32768 tokens. When a conversation fills its context, the server sends a `context_exhausted` error and closes that session.
+One conversation can hold 8192 tokens of history, which is the model's limit. When a conversation fills it, the server sends a `context_exhausted` error and closes that session.
