@@ -16,9 +16,9 @@ from typing import TYPE_CHECKING, TypeAlias
 import torch
 
 from sglang_omni.platforms import current_platform
-from sglang_omni.vendor.sglang.core import ForwardBatch
 
 if TYPE_CHECKING:
+    from sglang.srt.model_executor.forward_batch_info import ForwardBatch
     from sglang.srt.models.qwen3_moe import Qwen3MoeAttention
     from sglang.srt.models.qwen3_vl_moe import Qwen3MoeLLMModel
 else:

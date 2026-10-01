@@ -7,12 +7,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from numpy.typing import ArrayLike
-
 from sglang_omni.scheduling.pipeline_state import DeclarativeStateBase, wire
 
 if TYPE_CHECKING:
     import torch
+    from numpy.typing import ArrayLike
 else:
     pass
 
