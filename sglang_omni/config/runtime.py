@@ -175,7 +175,7 @@ def resolve_factory_signature_args(
     factory: Callable[..., object],
     args: Mapping[str, object],
     *,
-    defaults: Mapping[str, object],
+    defaults: Mapping[str, str | int | float | None],
     require_gpu_id: bool = False,
     stage_name: str | None = None,
 ) -> dict[str, object]:

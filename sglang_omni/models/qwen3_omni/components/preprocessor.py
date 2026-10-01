@@ -9,7 +9,7 @@ import json
 import logging
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import TypedDict, TypeGuard
+from typing import Literal, TypedDict, TypeGuard
 
 import torch
 import xxhash
@@ -57,6 +57,15 @@ class VideoProcessorKwargs(TypedDict, total=False):
     seconds_per_chunk: float
     position_id_per_seconds: float
     device: str
+
+
+class MediaPlaceholderPart(TypedDict):
+    type: Literal["image", "video", "audio"]
+
+
+class TextContentPart(TypedDict):
+    type: Literal["text"]
+    text: object
 
 
 class ProcessorKwargs(TypedDict, total=False):
@@ -322,7 +331,7 @@ class Qwen3OmniPreprocessor:
 
             # Only inject placeholders into the last user message
             if i == len(messages) - 1 and role == "user":
-                content_parts: list[dict[str, object]] = []
+                content_parts: list[MediaPlaceholderPart | TextContentPart] = []
                 # Placeholders come BEFORE text (Qwen3-Omni format)
                 for _ in range(num_images):
                     content_parts.append({"type": "image"})
