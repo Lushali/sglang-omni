@@ -16,6 +16,7 @@ from sglang_omni.models.nemotron_voicechat.codec import RVQVAEDecoder
 from sglang_omni.models.nemotron_voicechat.conformer import (
     SAMPLES_PER_FRAME,
     AudioPerception,
+    GraphPerception,
     StreamingPerception,
 )
 from sglang_omni.models.nemotron_voicechat.cuda_graph import capture_cuda_graph
@@ -27,80 +28,6 @@ from sglang_omni.scheduling.session import SessionContext, SessionHooks
 PCM16_SAMPLE_BYTES = 2
 PCM16_INPUT_SCALE = 32768.0
 PCM16_OUTPUT_SCALE = 32767
-
-
-class GraphPerception(StreamingPerception):
-    """Replay only after causal cache shapes have reached their fixed bounds."""
-
-    def __init__(self, perception: AudioPerception) -> None:
-        super().__init__(perception)
-        self.graph: torch.cuda.CUDAGraph | None = None
-        self.graph_input: torch.Tensor | None = None
-        self.graph_output: torch.Tensor | None = None
-
-    def state_buffers(self) -> list[torch.Tensor]:
-        return [
-            self.sample_buffer,
-            self.preemphasis_carry,
-            *self.sub_caches,
-            *self.key_caches,
-            *self.value_caches,
-            *self.conv_caches,
-        ]
-
-    @torch.inference_mode()
-    def push(self, samples: torch.Tensor) -> torch.Tensor:
-        if self.device.type != "cuda" or len(self.key_caches[0]) < self.max_keys:
-            return super().push(samples)
-        else:
-            pass
-        if self.graph is None:
-            original_buffers = self.state_buffers()
-            saved_values = [buffer.clone() for buffer in original_buffers]
-            original_sample_buffer = self.sample_buffer
-            original_preemphasis_carry = self.preemphasis_carry
-            original_sub_caches = self.sub_caches.copy()
-            original_key_caches = self.key_caches.copy()
-            original_value_caches = self.value_caches.copy()
-            original_conv_caches = self.conv_caches.copy()
-
-            def restore_buffer_references() -> None:
-                self.sample_buffer = original_sample_buffer
-                self.preemphasis_carry = original_preemphasis_carry
-                self.sub_caches = original_sub_caches.copy()
-                self.key_caches = original_key_caches.copy()
-                self.value_caches = original_value_caches.copy()
-                self.conv_caches = original_conv_caches.copy()
-
-            self.graph_input = samples.to(device=self.device, dtype=self.dtype).clone()
-
-            def restore_state() -> None:
-                for buffer, saved_value in zip(
-                    original_buffers, saved_values, strict=True
-                ):
-                    buffer.copy_(saved_value)
-                restore_buffer_references()
-
-            def forward() -> torch.Tensor:
-                output = super(GraphPerception, self).push(self.graph_input)
-                # Keep captured cache addresses fixed across subsequent replays.
-                for target, value in zip(
-                    original_buffers, self.state_buffers(), strict=True
-                ):
-                    target.copy_(value)
-                return output
-
-            self.graph, self.graph_output = capture_cuda_graph(
-                forward, self.device, restore_state=restore_state
-            )
-            restore_buffer_references()
-        else:
-            pass
-
-        assert self.graph_input is not None and self.graph_output is not None
-        self.graph_input.copy_(samples)
-        self.graph.replay()
-        return self.graph_output
 
 
 @dataclass(kw_only=True)
