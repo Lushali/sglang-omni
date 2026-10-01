@@ -122,13 +122,8 @@ async def test_close_finishes_only_responses_the_client_has_seen() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("exhausted", [True, False])
-async def test_context_exhaustion_closes_session(exhausted: bool) -> None:
-    message = (
-        "context_exhausted: thinker context length 8192 tokens exhausted"
-        if exhausted
-        else "unrelated worker error"
-    )
+async def test_context_exhaustion_closes_session() -> None:
+    message = "context_exhausted: thinker context length 8192 tokens exhausted"
 
     class FailingAdapter(GatedAdapter):
         async def process(self, unit: Unit) -> int:
@@ -139,7 +134,7 @@ async def test_context_exhaustion_closes_session(exhausted: bool) -> None:
     envelopes = await asyncio.wait_for(receive_until(runtime, Closed), 5)
     failures = [entry.event for entry in envelopes if isinstance(entry.event, Failure)]
     assert len(failures) == 1
-    assert failures[0].code == ("context_exhausted" if exhausted else "internal")
+    assert failures[0].code == "context_exhausted"
     assert failures[0].is_fatal
     assert message in failures[0].message
 

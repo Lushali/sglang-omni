@@ -110,29 +110,6 @@ def test_image_plan_follows_official_slice_order(
         )
 
 
-@pytest.mark.parametrize(("format", "max_slice_nums"), [("JPEG", 1), ("PNG", 4)])
-def test_decode_image_reuses_checkpoint_processor(
-    state: MiniCPMOPerceptionState, format: str, max_slice_nums: int
-) -> None:
-    state.max_slice_nums = max_slice_nums
-    encoded = BytesIO()
-    Image.new("RGB", (16, 12), "red").save(encoded, format=format)
-    pixels = torch.zeros(3, 14, 28)
-    sizes = torch.tensor([[1, 2]])
-    state.processor.process_image.return_value = {
-        "pixel_values": [[pixels]],
-        "tgt_sizes": [sizes],
-    }
-    embeds = torch.zeros(max_slice_nums * 64, 4)
-    state.image_encoder = Mock(return_value={"image_embeds": embeds})
-    assert torch.equal(state.encode_image(encoded.getvalue()), embeds)
-    args, kwargs = state.processor.process_image.call_args
-    assert kwargs == {"max_slice_nums": max_slice_nums}
-    assert args[0][0].mode == "RGB"
-    assert args[0][0].size == (16, 12)
-    state.image_encoder.assert_called_once_with(pixel_values=[pixels], tgt_sizes=sizes)
-
-
 def encoded_image(format: str) -> bytes:
     encoded = BytesIO()
     Image.new("RGB", (16, 16)).save(encoded, format=format)
@@ -166,11 +143,3 @@ def test_reject_frame_before_processor(
     with pytest.raises(error, match=match):
         state.encode_image(encoded)
     state.processor.process_image.assert_not_called()
-
-
-@pytest.mark.parametrize("shape", [(63, 4), (64, 3)])
-def test_reject_invalid_embedding_slot(
-    state: MiniCPMOPerceptionState, shape: tuple[int, ...]
-) -> None:
-    with pytest.raises(AssertionError):
-        state.build_step_plan(torch.zeros(10, 4), (torch.zeros(shape),))

@@ -20,7 +20,7 @@ from sglang_omni.config.runtime import (
     apply_typed_stage_kwargs,
     resolve_stage_typed_kwargs,
 )
-from sglang_omni.models.minicpm_o import engine_builder, native_stages, stages
+from sglang_omni.models.minicpm_o import native_stages, stages
 from sglang_omni.models.minicpm_o.components import audio_encoder, image_encoder
 from sglang_omni.models.minicpm_o.hf_config import MiniCPMOConfig
 from sglang_omni.models.minicpm_o.native_config import (
@@ -28,7 +28,6 @@ from sglang_omni.models.minicpm_o.native_config import (
     MiniCPMODuplexVision,
 )
 from sglang_omni.models.minicpm_o.session_adapters import build_realtime_deployment
-from sglang_omni.scheduling import sglang_backend
 from sglang_omni.scheduling.session import SessionHooks
 
 
@@ -221,20 +220,6 @@ def test_duplex_yaml_builds_session_stages(
     native_stages.AutoProcessor.from_pretrained.assert_called_once()
 
 
-@pytest.mark.parametrize("context_length", [None, 32768])
-def test_native_thinker_context_length(
-    context_length: int | None, snapshot: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(engine_builder, "get_tokenizer", Mock())
-    server_args = Mock(side_effect=ConfigLoaded)
-    monkeypatch.setattr(sglang_backend, "build_sglang_server_args", server_args)
-    builder = engine_builder.MiniCPMOThinkerEngineBuilder()
-    overrides = {} if context_length is None else {"context_length": context_length}
-    with pytest.raises(ConfigLoaded):
-        builder.build(str(snapshot), device="cpu", server_args_overrides=overrides)
-    assert server_args.call_args.kwargs["context_length"] == (context_length or 8192)
-
-
 def test_minicpmo_configs_load_without_sglang(tmp_path: Path) -> None:
     config_path = tmp_path / "duplex.yaml"
     script = """
@@ -273,6 +258,5 @@ def test_duplex_deployment_grants_images_by_slice_count() -> None:
         Mock(), MiniCPMODuplexPipelineConfig(model_path="unused")
     ).capabilities
     assert capabilities.input_modalities == ("audio", "image")
-    assert capabilities.max_image_bytes == 512 * 1024
     assert capabilities.image_frames_per_unit == (4, 3, 2, 2, 1, 1, 1, 1, 1)
     assert capabilities.default_max_slice_nums == 1

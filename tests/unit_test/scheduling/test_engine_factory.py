@@ -97,6 +97,7 @@ def test_tts_engine_builder_hook_contract_is_narrow() -> None:
 
 def test_context_length_override_is_capability_gated() -> None:
     from sglang_omni.models.arkasr.engine_builder import ArkasrEngineBuilder
+    from sglang_omni.models.minicpm_o.engine_builder import MiniCPMOThinkerEngineBuilder
     from sglang_omni.models.moss_tts.engine_builder import MossTtsEngineBuilder
     from sglang_omni.models.moss_tts_local.engine_builder import (
         MossTtsLocalEngineBuilder,
@@ -107,6 +108,7 @@ def test_context_length_override_is_capability_gated() -> None:
     assert ArkasrEngineBuilder.supports_context_length_override is False
     assert MossTtsEngineBuilder.supports_context_length_override is True
     assert MossTtsLocalEngineBuilder.supports_context_length_override is True
+    assert MiniCPMOThinkerEngineBuilder.supports_context_length_override is True
 
 
 @pytest.mark.parametrize(

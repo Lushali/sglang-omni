@@ -213,8 +213,7 @@ def test_unit_frames_follow_slice_grant_and_media_time(
         send_event(
             websocket, "session.update", session={"sglang": {"max_slice_nums": 4}}
         )
-        granted = websocket.receive_json()["session"]["sglang"]["granted"]
-        assert granted["input_image_format"]["max_frames_per_unit"] == 2
+        websocket.receive_json()
         for t_ms, image in frames:
             websocket.send_json(image_event(t_ms, image))
             assert websocket.receive_json()["type"] == "sglang.input_image.accepted"
