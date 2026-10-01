@@ -266,7 +266,7 @@ class SessionRuntime:
                 raise ProtocolError("invalid_state", "frame unit already cut")
             elif (
                 len(self.pending_frames.get(unit_index, ()))
-                >= self.granted["input_image_format"]["max_per_unit"]
+                >= self.granted["input_image_format"]["max_frames_per_unit"]
             ):
                 raise ProtocolError("buffer_overflow", "unit frame count exceeds limit")
             elif pending_unit_offset > pending_units + MAX_FRAME_LOOKAHEAD_UNITS:

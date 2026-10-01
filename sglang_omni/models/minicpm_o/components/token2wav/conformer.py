@@ -105,14 +105,14 @@ class PreLookaheadLayer(nn.Module):
         self,
         inputs: torch.Tensor,
         state: ConvState | None = None,
-        last_chunk: bool = True,
+        is_last_chunk: bool = True,
     ) -> tuple[torch.Tensor, ConvState | None]:
         outputs = inputs.transpose(1, 2)
         if state is None:
             outputs = outputs.contiguous()
         else:
             pass
-        if last_chunk:
+        if is_last_chunk:
             outputs = F.pad(outputs, (0, self.pre_lookahead_len))
         else:
             pass
@@ -220,9 +220,9 @@ class UpsampleConformerEncoderV2(torch.nn.Module):
         self,
         xs: torch.Tensor,
         xs_lens: torch.Tensor,
-        last_chunk: bool = True,
+        is_last_chunk: bool = True,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        xs, masks, _ = self.run_stages(xs, xs_lens, None, last_chunk)
+        xs, masks, _ = self.run_stages(xs, xs_lens, None, is_last_chunk)
         return xs, masks
 
     def run_stages(
@@ -230,7 +230,7 @@ class UpsampleConformerEncoderV2(torch.nn.Module):
         xs: torch.Tensor,
         xs_lens: torch.Tensor,
         state: ConformerState | None,
-        last_chunk: bool,
+        is_last_chunk: bool,
     ) -> tuple[torch.Tensor, torch.Tensor, ConformerState | None]:
         attention = state.attention if state is not None else ()
         history_length = (
@@ -256,7 +256,7 @@ class UpsampleConformerEncoderV2(torch.nn.Module):
                 pass
             if stage == 0:
                 xs, lookahead_state = self.pre_lookahead_layer(
-                    xs, lookahead_state, last_chunk
+                    xs, lookahead_state, is_last_chunk
                 )
                 if state is None:
                     xs = xs * masks.transpose(1, 2).to(xs)
@@ -324,12 +324,12 @@ class UpsampleConformerEncoderV2(torch.nn.Module):
     def forward_chunk(
         self,
         xs: torch.Tensor,
-        last_chunk: bool = False,
+        is_last_chunk: bool = False,
         state: ConformerState | None = None,
     ) -> tuple[torch.Tensor, ConformerState]:
         state = ConformerState() if state is None else state
         lengths = torch.full((xs.shape[0],), xs.shape[1], device=xs.device)
-        xs, _, next_state = self.run_stages(xs, lengths, state, last_chunk)
+        xs, _, next_state = self.run_stages(xs, lengths, state, is_last_chunk)
         assert next_state is not None
         return xs, next_state
 

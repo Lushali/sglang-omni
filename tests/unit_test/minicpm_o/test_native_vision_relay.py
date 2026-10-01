@@ -14,8 +14,8 @@ from sglang_omni.models.minicpm_o.components.streaming_perception import (
 )
 from sglang_omni.models.minicpm_o.duplex_sampler import (
     DuplexSamplerState,
+    build_forbidden_token_index,
     duplex_sample,
-    forbidden_token_index,
 )
 from sglang_omni.models.minicpm_o.native_config import MiniCPMODuplexSampling
 from sglang_omni.models.minicpm_o.native_stages import PerceptionHooks
@@ -61,7 +61,7 @@ def test_checkpoint_bad_tokens_are_not_sampled(use_runner: bool) -> None:
     if use_runner:
         runner = MiniCPMOThinkerModelRunner.__new__(MiniCPMOThinkerModelRunner)
         runner.special_tokens = None
-        special = runner.special_for_data(
+        special = runner.resolve_special_tokens(
             SimpleNamespace(req=Mock(tokenizer=tokenizer))
         )
     else:
@@ -72,7 +72,9 @@ def test_checkpoint_bad_tokens_are_not_sampled(use_runner: bool) -> None:
     logits[42] = 0.0
     state = DuplexSamplerState(
         special_tokens=special,
-        forbidden_index=forbidden_token_index(special, 128, torch.device("cpu")),
+        forbidden_token_index=build_forbidden_token_index(
+            special, 128, torch.device("cpu")
+        ),
         temperature=0.7,
         top_k=1,
         top_p=0.8,
@@ -95,7 +97,9 @@ def test_unit_token_budget_closes_the_chunk(max_new_tokens: int, closes: bool) -
     logits = torch.zeros(128)
     state = DuplexSamplerState(
         special_tokens=special,
-        forbidden_index=forbidden_token_index(special, 128, torch.device("cpu")),
+        forbidden_token_index=build_forbidden_token_index(
+            special, 128, torch.device("cpu")
+        ),
         temperature=0.7,
         top_k=1,
         top_p=0.8,
@@ -145,9 +149,8 @@ def test_append_and_thinker_splice(
         perception.encode_image.assert_not_called()
     adapter = ThinkerAdapter(perception.tokenizer, 100)
     adapter.open(identity, payload.request)
-    adapter.states[identity].prefix_pending = first_unit
+    adapter.states[identity].is_prefix_pending = first_unit
     request = adapter.build(identity, chunk, payload)
-    assert request.prefill_schema == payload.data["prefill_schema"]
     assert len(request.unit_embedding_spans) == (2 if has_image else 1)
     prefix_length = 0 if first_unit else 1
     for actual, planned in zip(

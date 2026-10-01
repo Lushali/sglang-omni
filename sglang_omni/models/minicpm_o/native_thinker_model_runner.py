@@ -16,8 +16,8 @@ from sglang_omni.model_runner.prefill_inputs import (
 )
 from sglang_omni.models.minicpm_o.duplex_sampler import (
     DuplexSamplerState,
+    build_forbidden_token_index,
     duplex_sample,
-    forbidden_token_index,
 )
 from sglang_omni.models.minicpm_o.special_tokens import (
     MiniCPMOSpecialTokenIds,
@@ -44,7 +44,7 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
     ) -> None:
         super().__init__(tp_worker, output_processor)
         self.special_tokens: MiniCPMOSpecialTokenIds | None = None
-        self.forbidden_index: torch.Tensor | None = None
+        self.forbidden_token_index: torch.Tensor | None = None
 
     @staticmethod
     def is_duplex_request(request: SchedulerRequest) -> bool:
@@ -115,7 +115,9 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
         # note (Junnan Li): Lookahead would sample before repetition history advances.
         return False
 
-    def special_for_data(self, data: DuplexUnitRequestData) -> MiniCPMOSpecialTokenIds:
+    def resolve_special_tokens(
+        self, data: DuplexUnitRequestData
+    ) -> MiniCPMOSpecialTokenIds:
         if self.special_tokens is None:
             self.special_tokens = resolve_special_token_ids(
                 data.req.tokenizer,
@@ -159,23 +161,25 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
 
             for index in duplex_indices:
                 data = requests[index].data
-                session = data.thinker_state
+                thinker_state = data.thinker_state
                 sampling = data.sampling
-                special = self.special_for_data(data)
-                if self.forbidden_index is None:
-                    self.forbidden_index = forbidden_token_index(
-                        special, original_logits.shape[-1], original_logits.device
+                special_tokens = self.resolve_special_tokens(data)
+                if self.forbidden_token_index is None:
+                    self.forbidden_token_index = build_forbidden_token_index(
+                        special_tokens,
+                        original_logits.shape[-1],
+                        original_logits.device,
                     )
                 else:
                     pass
                 sampler_state = DuplexSamplerState(
-                    special_tokens=special,
-                    forbidden_index=self.forbidden_index,
+                    special_tokens=special_tokens,
+                    forbidden_token_index=self.forbidden_token_index,
                     generation_step=data.generation_steps,
-                    force_listen_count=1 if data.forced_listen else 0,
+                    force_listen_count=1 if data.is_listen_forced else 0,
                     force_listen_counter=0,
-                    generated_history=session.generated_history,
-                    current_turn_ended=session.current_turn_ended,
+                    generated_history=thinker_state.generated_history,
+                    is_turn_ended=thinker_state.is_turn_ended,
                     temperature=sampling.temperature,
                     top_k=sampling.top_k,
                     top_p=sampling.top_p,
@@ -185,13 +189,13 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
                     max_new_tokens=sampling.max_new_tokens_per_unit,
                     repetition_window_size=sampling.repetition_window_size,
                 )
-                token = duplex_sample(original_logits[index], sampler_state)
-                session.current_turn_ended = sampler_state.current_turn_ended
-                if data.forced_listen and data.generation_steps == 0:
-                    session.force_listen_counter += 1
+                token_id = duplex_sample(original_logits[index], sampler_state)
+                thinker_state.is_turn_ended = sampler_state.is_turn_ended
+                if data.is_listen_forced and data.generation_steps == 0:
+                    thinker_state.force_listen_counter += 1
                 else:
                     pass
-                result[index] = token
+                result[index] = token_id
             return result
 
     # note (Junnan Li): FULL capture must match decode graphs and retain talker conditioning.
@@ -221,35 +225,43 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
             super().post_process_outputs(result, scheduler_output, offline_outputs)
         else:
             pass
-        for sched_req in scheduler_output.requests:
-            req_output = outputs[sched_req.request_id]
-            data = sched_req.data
+        for scheduler_request in scheduler_output.requests:
+            request_output = outputs[scheduler_request.request_id]
+            data = scheduler_request.data
             if isinstance(data, DuplexUnitRequestData):
-                sampled = int(req_output.data)
-                special = self.special_for_data(data)
-                pending = data.pending_unit_token
-                if pending is not None and data.generation_steps >= 2:
-                    hidden = req_output.extra["hidden_states"]
-                    hidden = hidden.reshape(-1, hidden.shape[-1])[-1].detach().clone()
-                    data.unit_pairs.append(
-                        (pending, hidden.to("cpu"), pending == special.turn_eos)
+                sampled_token_id = int(request_output.data)
+                special_tokens = self.resolve_special_tokens(data)
+                pending_token_id = data.pending_unit_token
+                if pending_token_id is not None and data.generation_steps >= 2:
+                    hidden_state = request_output.extra["hidden_states"]
+                    hidden_state = (
+                        hidden_state.reshape(-1, hidden_state.shape[-1])[-1]
+                        .detach()
+                        .clone()
+                    )
+                    data.talker_conditions.append(
+                        (
+                            pending_token_id,
+                            hidden_state.to("cpu"),
+                            pending_token_id == special_tokens.turn_eos,
+                        )
                     )
                 else:
                     pass
-                if sampled in special.chunk_terminators:
+                if sampled_token_id in special_tokens.chunk_terminators:
                     data.pending_unit_token = None
                     continue
                 else:
                     pass
                 if data.generation_steps > 0:
-                    data.generated_unit_ids.append(sampled)
+                    data.generated_unit_ids.append(sampled_token_id)
                 else:
                     pass
-                data.pending_unit_token = sampled
-                if sampled == special.turn_eos:
-                    data.thinker_state.current_turn_ended = True
-                elif sampled not in special.chunk_terminators:
-                    data.thinker_state.current_turn_ended = False
+                data.pending_unit_token = sampled_token_id
+                if sampled_token_id == special_tokens.turn_eos:
+                    data.thinker_state.is_turn_ended = True
+                elif sampled_token_id not in special_tokens.chunk_terminators:
+                    data.thinker_state.is_turn_ended = False
                 else:
                     pass
                 continue

@@ -30,13 +30,13 @@ TALKER_TOKENS_PER_UNIT = CODEC_CHUNK_SIZE + 1
 
 @dataclass(kw_only=True)
 class TalkerSessionState:
-    reset_pending: bool = False
-    turn_start: bool = True
+    is_reset_pending: bool = False
+    is_turn_start: bool = True
 
 
 @dataclass(kw_only=True)
 class TalkerUnitRequestData(SGLangARRequestData):
-    state: TalkerSessionState
+    pass
 
 
 class TalkerAdapter(ARSessionAdapter):
@@ -58,23 +58,28 @@ class TalkerAdapter(ARSessionAdapter):
         payload: StagePayload,
     ) -> ARSessionPreparation:
         state = self.states[session_identity]
-        reset = state.reset_pending
-        if reset:
-            state.turn_start = True
-            state.reset_pending = False
+        should_reset_history = state.is_reset_pending
+        if should_reset_history:
+            state.is_turn_start = True
+            state.is_reset_pending = False
         else:
             pass
-        result = payload.data
-        result["codec_tokens"] = []
-        result["speech_turn_start"] = state.turn_start
-        end = result["end_of_turn"] or chunk.eos
-        result["end_of_turn"] = end
-        bypass = not result["pairs"] or (result["is_listen"] and not end)
-        if bypass and end:
-            state.reset_pending = True
+        thinker_result = payload.data
+        thinker_result["codec_tokens"] = []
+        thinker_result["speech_turn_start"] = state.is_turn_start
+        is_turn_end = thinker_result["end_of_turn"] or chunk.eos
+        thinker_result["end_of_turn"] = is_turn_end
+        should_bypass_generation = not thinker_result["talker_conditions"] or (
+            thinker_result["is_listen"] and not is_turn_end
+        )
+        if should_bypass_generation and is_turn_end:
+            state.is_reset_pending = True
         else:
             pass
-        return ARSessionPreparation(reset_history=reset, bypass_generation=bypass)
+        return ARSessionPreparation(
+            reset_history=should_reset_history,
+            bypass_generation=should_bypass_generation,
+        )
 
     def build(
         self,
@@ -83,20 +88,27 @@ class TalkerAdapter(ARSessionAdapter):
         payload: StagePayload,
     ) -> TalkerUnitRequestData:
         state = self.states[session_identity]
-        pairs = payload.data["pairs"]
-        condition = build_tts_condition(
-            torch.tensor([pair[0] for pair in pairs], dtype=torch.long),
-            torch.stack([torch.as_tensor(pair[1]) for pair in pairs]),
+        talker_conditions = payload.data["talker_conditions"]
+        tts_condition = build_tts_condition(
+            torch.tensor(
+                [token_id for token_id, _, _ in talker_conditions], dtype=torch.long
+            ),
+            torch.stack(
+                [
+                    torch.as_tensor(hidden_state)
+                    for _, hidden_state, _ in talker_conditions
+                ]
+            ),
             text_embedding=self.model.emb_text,
             semantic_projector=self.model.projector_semantic,
             boundary_tokens=(self.model.audio_bos_token_id,),
             normalize_projected_hidden=self.model.normalize_projected_hidden,
         )
-        sampling = SamplingParams(
+        sampling_params = SamplingParams(
             max_new_tokens=TALKER_TOKENS_PER_UNIT,
             min_new_tokens=(
                 0
-                if state.turn_start or payload.data["end_of_turn"]
+                if state.is_turn_start or payload.data["end_of_turn"]
                 else TALKER_TOKENS_PER_UNIT
             ),
             temperature=payload.request.params["talker_temperature"],
@@ -105,14 +117,14 @@ class TalkerAdapter(ARSessionAdapter):
             repetition_penalty=1.0,
             stop_token_ids=[self.model.codec_eos_id],
         )
-        sampling.normalize(self.tokenizer)
-        sampling.verify(self.model.num_audio_tokens)
-        condition_rows = int(condition.shape[0])
+        sampling_params.normalize(self.tokenizer)
+        sampling_params.verify(self.model.num_audio_tokens)
+        condition_rows = int(tts_condition.shape[0])
         request = Req(
             rid=payload.request_id,
             origin_input_text="",
             origin_input_ids=[self.model.codec_eos_id] * condition_rows,
-            sampling_params=sampling,
+            sampling_params=sampling_params,
             eos_token_ids={self.model.codec_eos_id},
             vocab_size=self.model.num_audio_tokens,
         )
@@ -120,9 +132,8 @@ class TalkerAdapter(ARSessionAdapter):
         return TalkerUnitRequestData(
             req=request,
             stage_payload=payload,
-            state=state,
             unit_embedding_spans=[
-                EmbeddingSpan(start=0, end=condition_rows, input_embeds=condition)
+                EmbeddingSpan(start=0, end=condition_rows, input_embeds=tts_condition)
             ],
             max_new_tokens=TALKER_TOKENS_PER_UNIT,
             talker_model_inputs={
@@ -136,6 +147,6 @@ class TalkerAdapter(ARSessionAdapter):
         payload = request_data.stage_payload
         payload.data["codec_tokens"] = list(request_data.output_ids)
         state = self.states[session_identity]
-        state.turn_start = False
-        state.reset_pending = payload.data["end_of_turn"]
+        state.is_turn_start = False
+        state.is_reset_pending = payload.data["end_of_turn"]
         return payload

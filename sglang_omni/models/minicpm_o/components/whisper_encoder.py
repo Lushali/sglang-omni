@@ -16,8 +16,8 @@ from transformers.activations import ACT2FN
 class AudioAttentionState:
     """Read-only attention history; empty fields start cached attention."""
 
-    key: torch.Tensor | None = None
-    value: torch.Tensor | None = None
+    key_states: torch.Tensor | None = None
+    value_states: torch.Tensor | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -28,8 +28,8 @@ class AudioEncoderState:
 
     @property
     def past_length(self) -> int:
-        if self.layers and self.layers[0].key is not None:
-            return self.layers[0].key.shape[2]
+        if self.layers and self.layers[0].key_states is not None:
+            return self.layers[0].key_states.shape[2]
         else:
             return 0
 
@@ -38,7 +38,7 @@ class AudioEncoderState:
         return sum(
             tensor.numel() * tensor.element_size()
             for layer in self.layers
-            for tensor in (layer.key, layer.value)
+            for tensor in (layer.key_states, layer.value_states)
             if tensor is not None
         )
 
@@ -71,14 +71,16 @@ class MiniCPMWhisperEncoderAttention(nn.Module):
     ) -> tuple[torch.Tensor, AudioAttentionState | None]:
         query, key, value = self.qkv_proj(hidden_states).chunk(3, dim=-1)
         key, value = self.reshape_heads(key), self.reshape_heads(value)
-        if state is not None and state.key is not None:
-            assert state.value is not None
-            key = torch.cat((state.key, key), dim=2)
-            value = torch.cat((state.value, value), dim=2)
+        if state is not None and state.key_states is not None:
+            assert state.value_states is not None
+            key = torch.cat((state.key_states, key), dim=2)
+            value = torch.cat((state.value_states, value), dim=2)
         else:
             pass
         new_state = (
-            AudioAttentionState(key=key, value=value) if state is not None else None
+            AudioAttentionState(key_states=key, value_states=value)
+            if state is not None
+            else None
         )
         attn_output = F.scaled_dot_product_attention(
             self.reshape_heads(query),

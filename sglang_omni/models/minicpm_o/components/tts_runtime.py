@@ -25,8 +25,8 @@ OUTPUT_SAMPLE_RATE = 24000
 def clone_caches(caches: StreamCaches) -> StreamCaches:
     flow_cache, hift_cache = caches
     return (
-        {key: value.clone() for key, value in flow_cache.items()},
-        {key: value.clone() for key, value in hift_cache.items()},
+        {name: tensor.clone() for name, tensor in flow_cache.items()},
+        {name: tensor.clone() for name, tensor in hift_cache.items()},
     )
 
 
@@ -34,7 +34,7 @@ def clone_caches(caches: StreamCaches) -> StreamCaches:
 class SharedSpeaker:
     """Stream caches prefilled from one reference voice, shared by its open sessions."""
 
-    key: str
+    reference_key: str
     prompt: SpeakerPrompt
     # note (Junnan Li): Every turn decodes on a copy, so these caches are never written after prefill.
     base_caches: StreamCaches
@@ -46,14 +46,14 @@ class MiniCPMOVocoderSessionState:
     session_id: str
     speaker: SharedSpeaker
     caches: StreamCaches
-    pre_lookahead: int
-    token2wav_buffer: list[int] = field(
+    pre_lookahead_tokens: int
+    pending_codec_token_ids: list[int] = field(
         default_factory=lambda: [SILENCE_TOKEN_ID] * SILENCE_PREFIX_LENGTH
     )
     has_pending_turn: bool = False
 
     def held(self) -> ResourceUsage:
-        size = estimate_cache_bytes((self.caches, self.token2wav_buffer))
+        size = estimate_cache_bytes((self.caches, self.pending_codec_token_ids))
         # note (Junnan Li): Shared caches are charged once, to the voice's earliest open session.
         if self.speaker.session_ids[0] == self.session_id:
             size += estimate_cache_bytes(self.speaker.base_caches)
@@ -79,20 +79,22 @@ class MiniCPMOVocoderRuntime:
         self.speakers: dict[str, SharedSpeaker] = {}
 
     def open_session(
-        self, session_id: str, *, prompt_wav: bytes
+        self, session_id: str, *, reference_audio: bytes
     ) -> MiniCPMOVocoderSessionState:
         if session_id in self.sessions:
             raise ValueError(f"TTS session {session_id!r} is already open")
         else:
             pass
-        key, _ = self.code2wav.resolve_reference_key(prompt_wav)
-        speaker = self.speakers.get(key)
+        reference_key, _ = self.code2wav.resolve_reference_key(reference_audio)
+        speaker = self.speakers.get(reference_key)
         if speaker is None:
-            (prompt,) = self.code2wav.prepare_references([prompt_wav])
+            (prompt,) = self.code2wav.prepare_references([reference_audio])
             speaker = SharedSpeaker(
-                key=key, prompt=prompt, base_caches=self.token2wav.open_stream(prompt)
+                reference_key=reference_key,
+                prompt=prompt,
+                base_caches=self.token2wav.open_stream(prompt),
             )
-            self.speakers[key] = speaker
+            self.speakers[reference_key] = speaker
         else:
             pass
         speaker.session_ids.append(session_id)
@@ -100,7 +102,7 @@ class MiniCPMOVocoderRuntime:
             session_id=session_id,
             speaker=speaker,
             caches=clone_caches(speaker.base_caches),
-            pre_lookahead=self.token2wav.flow.pre_lookahead_len,
+            pre_lookahead_tokens=self.token2wav.flow.pre_lookahead_len,
         )
         self.sessions[session_id] = state
         return state
@@ -110,7 +112,7 @@ class MiniCPMOVocoderRuntime:
         session_id: str,
         codec_tokens: list[int],
         *,
-        turn_start: bool,
+        is_turn_start: bool,
         end_of_turn: bool = False,
     ) -> np.ndarray | None:
         state = self.sessions[session_id]
@@ -124,7 +126,7 @@ class MiniCPMOVocoderRuntime:
             waveform = self.decode_audio_tokens(
                 state,
                 codec_tokens,
-                force_flush=turn_start,
+                force_flush=is_turn_start,
                 is_last_chunk=end_of_turn,
             )
         if end_of_turn:
@@ -137,7 +139,7 @@ class MiniCPMOVocoderRuntime:
         speaker = self.sessions.pop(session_id).speaker
         speaker.session_ids.remove(session_id)
         if not speaker.session_ids:
-            self.speakers.pop(speaker.key)
+            self.speakers.pop(speaker.reference_key)
         else:
             pass
 
@@ -152,30 +154,38 @@ class MiniCPMOVocoderRuntime:
         force_flush: bool,
         is_last_chunk: bool,
     ) -> np.ndarray | None:
-        state.token2wav_buffer.extend(token_ids)
-        chunks: list[bytes] = []
-        minimum = state.pre_lookahead + 5
-        amount = self.codec_chunk_size + state.pre_lookahead
+        state.pending_codec_token_ids.extend(token_ids)
+        pcm_chunks: list[bytes] = []
+        minimum_flush_tokens = state.pre_lookahead_tokens + 5
+        window_tokens = self.codec_chunk_size + state.pre_lookahead_tokens
 
         if force_flush:
-            while len(state.token2wav_buffer) >= minimum:
-                current = min(amount, len(state.token2wav_buffer))
-                chunks.append(self.stream(state, state.token2wav_buffer[:current]))
-                consumed = min(self.codec_chunk_size, current - state.pre_lookahead)
-                del state.token2wav_buffer[:consumed]
+            while len(state.pending_codec_token_ids) >= minimum_flush_tokens:
+                window_length = min(window_tokens, len(state.pending_codec_token_ids))
+                pcm_chunks.append(
+                    self.stream(state, state.pending_codec_token_ids[:window_length])
+                )
+                consumed_tokens = min(
+                    self.codec_chunk_size, window_length - state.pre_lookahead_tokens
+                )
+                del state.pending_codec_token_ids[:consumed_tokens]
         else:
-            while len(state.token2wav_buffer) >= amount:
-                chunks.append(self.stream(state, state.token2wav_buffer[:amount]))
-                del state.token2wav_buffer[: self.codec_chunk_size]
+            while len(state.pending_codec_token_ids) >= window_tokens:
+                pcm_chunks.append(
+                    self.stream(state, state.pending_codec_token_ids[:window_tokens])
+                )
+                del state.pending_codec_token_ids[: self.codec_chunk_size]
 
-        if is_last_chunk and state.token2wav_buffer:
-            chunks.append(
-                self.stream(state, list(state.token2wav_buffer), last_chunk=True)
+        if is_last_chunk and state.pending_codec_token_ids:
+            pcm_chunks.append(
+                self.stream(
+                    state, list(state.pending_codec_token_ids), is_last_chunk=True
+                )
             )
-            state.token2wav_buffer.clear()
+            state.pending_codec_token_ids.clear()
         else:
             pass
-        pcm = b"".join(chunks)
+        pcm = b"".join(pcm_chunks)
         if not pcm:
             return None
         else:
@@ -191,16 +201,16 @@ class MiniCPMOVocoderRuntime:
         state: MiniCPMOVocoderSessionState,
         tokens: list[int],
         *,
-        last_chunk: bool = False,
+        is_last_chunk: bool = False,
     ) -> bytes:
         pcm, state.caches = self.token2wav.stream(
-            tokens, state.speaker.prompt, state.caches, last_chunk=last_chunk
+            tokens, state.speaker.prompt, state.caches, is_last_chunk=is_last_chunk
         )
         return pcm
 
     def reset_turn_state(self, state: MiniCPMOVocoderSessionState) -> None:
         state.has_pending_turn = False
-        state.token2wav_buffer = [SILENCE_TOKEN_ID] * SILENCE_PREFIX_LENGTH
+        state.pending_codec_token_ids = [SILENCE_TOKEN_ID] * SILENCE_PREFIX_LENGTH
         state.caches = clone_caches(state.speaker.base_caches)
 
 

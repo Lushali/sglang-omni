@@ -75,26 +75,26 @@ class PerceptionHooks(SessionHooks):
             if isinstance(chunk.payload, dict):
                 # note (Junnan Li): Frames are acked before decoding, so a bad frame is dropped, not fatal.
                 image_embeds = []
-                for image in chunk.payload["images"]:
+                for encoded_image in chunk.payload["images"]:
                     try:
-                        image_embeds.append(state.encode_image(image))
+                        image_embeds.append(state.encode_image(encoded_image))
                     except (OSError, ValueError, Image.DecompressionBombError) as exc:
                         logger.warning(
                             f"Dropping undecodable frame of unit {chunk.seq}: {exc}"
                         )
-                pcm = (
+                waveform = (
                     np.frombuffer(chunk.payload["pcm"], dtype="<i2").astype(np.float32)
                     / 32768.0
                 )
                 payload.data = state.build_step_plan(
-                    state.encode_audio(pcm), tuple(image_embeds)
+                    state.encode_audio(waveform), tuple(image_embeds)
                 )
             else:
-                pcm = (
+                waveform = (
                     np.frombuffer(chunk.payload, dtype="<i2").astype(np.float32)
                     / 32768.0
                 )
-                payload.data = state.build_step_plan(state.encode_audio(pcm))
+                payload.data = state.build_step_plan(state.encode_audio(waveform))
         return payload
 
     def close(self, session_identity: SessionIdentity) -> None:
@@ -111,16 +111,16 @@ class SpeechState:
 
 
 class SpeechHooks(SessionHooks):
-    def __init__(self, runtime: MiniCPMOVocoderRuntime, prompt_wav: bytes) -> None:
-        self.runtime, self.prompt_wav = runtime, prompt_wav
+    def __init__(self, runtime: MiniCPMOVocoderRuntime, reference_audio: bytes) -> None:
+        self.runtime, self.reference_audio = runtime, reference_audio
         self.states: dict[SessionIdentity, SpeechState] = {}
 
     def open(self, session_identity: SessionIdentity, request: OmniRequest) -> None:
         self.runtime.open_session(
             session_identity.id,
-            prompt_wav=request.params.get("tts_reference_audio")
+            reference_audio=request.params.get("tts_reference_audio")
             or request.params.get("reference_audio")
-            or self.prompt_wav,
+            or self.reference_audio,
         )
         self.states[session_identity] = SpeechState(session_identity.id)
 
@@ -128,20 +128,21 @@ class SpeechHooks(SessionHooks):
         self, chunk: TimedChunk, payload: StagePayload, context: SessionContext
     ) -> StagePayload:
         state = self.states[context.session_identity]
-        data = payload.data
+        talker_result = payload.data
         pcm = b""
         duration_ms = 0
-        pairs = data["pairs"]
-        end = data["end_of_turn"] or chunk.eos
-        if end or (not data["is_listen"] and pairs):
-            audio = self.runtime.synthesize(
+        is_turn_end = talker_result["end_of_turn"] or chunk.eos
+        if is_turn_end or (
+            not talker_result["is_listen"] and talker_result["talker_conditions"]
+        ):
+            waveform = self.runtime.synthesize(
                 state.session_id,
-                data["codec_tokens"],
-                turn_start=data["speech_turn_start"],
-                end_of_turn=end,
+                talker_result["codec_tokens"],
+                is_turn_start=talker_result["speech_turn_start"],
+                end_of_turn=is_turn_end,
             )
-            if audio is not None:
-                samples = np.asarray(audio, dtype=np.float32).reshape(-1)
+            if waveform is not None:
+                samples = np.asarray(waveform, dtype=np.float32).reshape(-1)
                 pcm = np.clip(samples * 32768, -32768, 32767).astype("<i2").tobytes()
                 duration_ms = len(samples) / 24
             else:
@@ -155,16 +156,15 @@ class SpeechHooks(SessionHooks):
                 duration_ms,
                 chunk.seq,
                 dict(
-                    text=data["text"],
+                    text=talker_result["text"],
                     pcm=pcm,
-                    end_of_turn=end,
+                    end_of_turn=is_turn_end,
                     is_listen=(
                         None
                         if chunk.eos and chunk.duration_ms == 0
-                        else data["is_listen"]
+                        else talker_result["is_listen"]
                     ),
-                    model_end_of_turn=data["end_of_turn"],
-                    prefill_schema=data.get("prefill_schema", []),
+                    model_end_of_turn=talker_result["end_of_turn"],
                 ),
                 eos=chunk.eos,
             )

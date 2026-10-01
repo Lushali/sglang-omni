@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
 
 import torch
 
@@ -14,8 +13,8 @@ from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestDa
 
 @dataclass
 class MiniCPMOThinkerSessionState:
-    current_turn_ended: bool = True
-    prefix_pending: bool = True
+    is_turn_ended: bool = True
+    is_prefix_pending: bool = True
     force_listen_counter: int = 0
     generated_history: list[int] = field(default_factory=list)
 
@@ -25,12 +24,12 @@ class DuplexUnitRequestData(SGLangARRequestData):
     """One bounded generated unit appended to an SGLang streaming session."""
 
     thinker_state: MiniCPMOThinkerSessionState
-    prefill_schema: list[tuple[Literal["tok", "audio", "image"], int]] = field(
+    # note (Junnan Li): Each entry is (token id, thinker hidden state, ends the turn).
+    talker_conditions: list[tuple[int, torch.Tensor, bool]] = field(
         default_factory=list
     )
-    unit_pairs: list[tuple[int, torch.Tensor, bool]] = field(default_factory=list)
     generated_unit_ids: list[int] = field(default_factory=list)
     pending_unit_token: int | None = None
-    forced_listen: bool = False
+    is_listen_forced: bool = False
     sampling: MiniCPMODuplexSampling = field(default_factory=MiniCPMODuplexSampling)
     enforce_request_limits: bool = True

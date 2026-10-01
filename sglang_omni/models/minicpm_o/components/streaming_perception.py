@@ -93,15 +93,14 @@ class EmbeddingSpanPlan(TypedDict):
     modality: Literal["audio", "image"]
     token_start: int
     token_end: int
-    embed_start: int
-    embed_end: int
+    embedding_start: int
+    embedding_end: int
 
 
 class PerceptionStepPlan(TypedDict):
     token_ids: list[int]
     input_embeds: torch.Tensor
     embedding_spans: list[EmbeddingSpanPlan]
-    prefill_schema: list[tuple[Literal["tok", "audio", "image"], int]]
 
 
 @dataclass(kw_only=True)
@@ -131,11 +130,11 @@ class MiniCPMOPerceptionState:
     audio_buffer: np.ndarray = field(
         default_factory=lambda: np.zeros(0, dtype=np.float32)
     )
-    audio_chunk_idx: int = 0
+    audio_chunk_index: int = 0
     audio_encoder_state: AudioEncoderState | None = None
     prefix_token_ids: list[int] = field(default_factory=list)
     prefix_embeds: torch.Tensor | None = None
-    prefix_schema: list[tuple[Literal["tok", "audio"], int]] = field(
+    prefix_schema: list[tuple[Literal["token", "audio"], int]] = field(
         default_factory=list
     )
     is_open: bool = True
@@ -194,9 +193,9 @@ class MiniCPMOPerceptionState:
         state.prefix_token_ids.append(tokenizer.convert_tokens_to_ids("<|audio_end|>"))
         state.prefix_token_ids.extend(im_end_ids)
         state.prefix_schema = [
-            ("tok", len(prompt_ids) + 1),
+            ("token", len(prompt_ids) + 1),
             ("audio", count),
-            ("tok", 1 + len(im_end_ids)),
+            ("token", 1 + len(im_end_ids)),
         ]
         return state
 
@@ -221,16 +220,18 @@ class MiniCPMOPerceptionState:
             )
             return ResourceUsage(slots={"perception": 1}, bytes=max(size, 1))
 
-    def encode_audio(self, pcm: np.ndarray) -> torch.Tensor:
+    def encode_audio(self, waveform: np.ndarray) -> torch.Tensor:
         need_samples = self.processor.get_streaming_chunk_size()
         # note (Junnan Li): The checkpoint front-pads the first chunk to 1035 ms so the encoder's CNN context is full.
-        if self.audio_chunk_idx == 0:
+        if self.audio_chunk_index == 0:
             first_chunk_samples = FIRST_CHUNK_MS * SAMPLE_RATE // 1000
-            padding = max(first_chunk_samples - self.audio_buffer.size - pcm.size, 0)
+            padding = max(
+                first_chunk_samples - self.audio_buffer.size - waveform.size, 0
+            )
         else:
             padding = 0
         self.audio_buffer = np.concatenate(
-            [np.zeros(padding, dtype=np.float32), self.audio_buffer, pcm]
+            [np.zeros(padding, dtype=np.float32), self.audio_buffer, waveform]
         )
         assert self.audio_buffer.size >= need_samples, (
             self.audio_buffer.size,
@@ -247,10 +248,10 @@ class MiniCPMOPerceptionState:
             audio_features=batch.audio_features,
             audio_feature_lens=batch.audio_feature_lens,
             state=self.audio_encoder_state,
-            prefix_extra_frames=0 if self.audio_chunk_idx == 0 else 2,
+            prefix_extra_frames=0 if self.audio_chunk_index == 0 else 2,
             suffix_extra_frames=2,
         )
-        if self.audio_chunk_idx == 0:
+        if self.audio_chunk_index == 0:
             consumed_ms = int(
                 self.processor.get_streaming_config()["effective_first_chunk_ms"]
             )
@@ -258,7 +259,7 @@ class MiniCPMOPerceptionState:
         else:
             consumed_samples = need_samples
         self.audio_buffer = self.audio_buffer[consumed_samples:].copy()
-        self.audio_chunk_idx += 1
+        self.audio_chunk_index += 1
         return audio_embeds
 
     def encode_image(self, encoded_image: bytes) -> torch.Tensor:
@@ -283,44 +284,50 @@ class MiniCPMOPerceptionState:
         self, audio_embeds: torch.Tensor, image_embeds: tuple[torch.Tensor, ...] = ()
     ) -> PerceptionStepPlan:
         token_ids: list[int] = []
-        embed_blocks: list[torch.Tensor] = []
+        embedding_blocks: list[torch.Tensor] = []
         spans: list[EmbeddingSpanPlan] = []
 
         def add_embeds(
-            values: torch.Tensor, modality: Literal["audio", "image"] = "audio"
+            embeddings: torch.Tensor, modality: Literal["audio", "image"] = "audio"
         ) -> None:
-            start = len(token_ids)
-            count = int(values.shape[0])
-            embed_start = sum(int(block.shape[0]) for block in embed_blocks)
-            token_ids.extend([self.tokenizer.unk_token_id] * count)
-            embed_blocks.append(values)
+            token_start = len(token_ids)
+            row_count = int(embeddings.shape[0])
+            embedding_start = sum(int(block.shape[0]) for block in embedding_blocks)
+            token_ids.extend([self.tokenizer.unk_token_id] * row_count)
+            embedding_blocks.append(embeddings)
             spans.append(
                 EmbeddingSpanPlan(
                     modality=modality,
-                    token_start=start,
-                    token_end=start + count,
-                    embed_start=embed_start,
-                    embed_end=embed_start + count,
+                    token_start=token_start,
+                    token_end=token_start + row_count,
+                    embedding_start=embedding_start,
+                    embedding_end=embedding_start + row_count,
                 )
             )
 
-        # note (Junnan Li): The system prefix is included in prefill but excluded from the unit schema.
-        if self.audio_chunk_idx == 1 and self.prefix_token_ids:
-            cursor = 0
-            embed_cursor = 0
-            for kind, count in self.prefix_schema:
-                if kind == "tok":
-                    token_ids.extend(self.prefix_token_ids[cursor : cursor + count])
+        if self.audio_chunk_index == 1 and self.prefix_token_ids:
+            token_cursor = 0
+            embedding_cursor = 0
+            for segment_kind, segment_length in self.prefix_schema:
+                if segment_kind == "token":
+                    token_ids.extend(
+                        self.prefix_token_ids[
+                            token_cursor : token_cursor + segment_length
+                        ]
+                    )
                 else:
                     assert self.prefix_embeds is not None
-                    add_embeds(self.prefix_embeds[embed_cursor : embed_cursor + count])
-                    embed_cursor += count
-                cursor += count
+                    add_embeds(
+                        self.prefix_embeds[
+                            embedding_cursor : embedding_cursor + segment_length
+                        ]
+                    )
+                    embedding_cursor += segment_length
+                token_cursor += segment_length
         else:
             pass
 
         token_ids.append(self.tokenizer.convert_tokens_to_ids("<unit>"))
-        schema: list[tuple[Literal["tok", "audio", "image"], int]] = [("tok", 1)]
         for frame_embeds in image_embeds:
             assert (
                 frame_embeds.ndim == 2
@@ -334,15 +341,11 @@ class MiniCPMOPerceptionState:
             ):
                 marker = "image" if slice_index == 0 else "slice"
                 token_ids.append(self.tokenizer.convert_tokens_to_ids(f"<{marker}>"))
-                schema[-1] = ("tok", schema[-1][1] + 1)
                 add_embeds(slice_embeds, "image")
                 token_ids.append(self.tokenizer.convert_tokens_to_ids(f"</{marker}>"))
-                schema.extend([("image", IMAGE_TOKENS), ("tok", 1)])
-        schema.append(("audio", int(audio_embeds.shape[0])))
         add_embeds(audio_embeds)
         return PerceptionStepPlan(
             token_ids=token_ids,
-            input_embeds=torch.cat(embed_blocks, dim=0),
+            input_embeds=torch.cat(embedding_blocks, dim=0),
             embedding_spans=spans,
-            prefill_schema=schema,
         )

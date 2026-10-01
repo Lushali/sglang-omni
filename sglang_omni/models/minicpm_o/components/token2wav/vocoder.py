@@ -272,7 +272,7 @@ class Token2Wav(torch.nn.Module):
         generated_speech_tokens: list[int],
         prompt: SpeakerPrompt,
         caches: StreamCaches,
-        last_chunk: bool = False,
+        is_last_chunk: bool = False,
     ) -> tuple[bytes, StreamCaches]:
         """Decode one token chunk; the caller owns the caches and receives new ones."""
         speaker_embedding = prompt.speaker_embedding
@@ -284,22 +284,24 @@ class Token2Wav(torch.nn.Module):
         with torch.amp.autocast(
             "cuda", dtype=self.dtype, enabled=self.dtype != torch.float32
         ):
-            chunk_mel, flow_cache = self.flow.inference_chunk(
-                token=tokens,
-                spk=speaker_embedding,
+            predicted_mel, flow_cache = self.flow.inference_chunk(
+                token_ids=tokens,
+                speaker_embeddings=speaker_embedding,
                 cache=flow_cache,
-                last_chunk=last_chunk,
+                is_last_chunk=is_last_chunk,
                 n_timesteps=self.n_timesteps,
             )
-        prompt_len = prompt_mels.shape[1]
+        prompt_mel_frames = prompt_mels.shape[1]
         if (
-            flow_cache["estimator_att_cache"].shape[4]
-            > prompt_len + FLOW_CACHE_TAIL_FRAMES
+            flow_cache["estimator_attention_cache"].shape[4]
+            > prompt_mel_frames + FLOW_CACHE_TAIL_FRAMES
         ):
-            flow_cache["estimator_att_cache"] = torch.cat(
+            flow_cache["estimator_attention_cache"] = torch.cat(
                 [
-                    flow_cache["estimator_att_cache"][:, :, :, :, :prompt_len],
-                    flow_cache["estimator_att_cache"][
+                    flow_cache["estimator_attention_cache"][
+                        :, :, :, :, :prompt_mel_frames
+                    ],
+                    flow_cache["estimator_attention_cache"][
                         :, :, :, :, -FLOW_CACHE_TAIL_FRAMES:
                     ],
                 ],
@@ -308,13 +310,15 @@ class Token2Wav(torch.nn.Module):
         else:
             pass
         if (
-            flow_cache["conformer_att_cache"].shape[3]
-            > prompt_len + FLOW_CACHE_TAIL_FRAMES
+            flow_cache["conformer_attention_cache"].shape[3]
+            > prompt_mel_frames + FLOW_CACHE_TAIL_FRAMES
         ):
-            flow_cache["conformer_att_cache"] = torch.cat(
+            flow_cache["conformer_attention_cache"] = torch.cat(
                 [
-                    flow_cache["conformer_att_cache"][:, :, :, :prompt_len, :],
-                    flow_cache["conformer_att_cache"][
+                    flow_cache["conformer_attention_cache"][
+                        :, :, :, :prompt_mel_frames, :
+                    ],
+                    flow_cache["conformer_attention_cache"][
                         :, :, :, -FLOW_CACHE_TAIL_FRAMES:, :
                     ],
                 ],
@@ -323,7 +327,7 @@ class Token2Wav(torch.nn.Module):
         else:
             pass
         hift_cache_speech = hift_cache["speech"]
-        mel = torch.concat([hift_cache["mel"], chunk_mel], dim=2)
+        mel = torch.concat([hift_cache["mel"], predicted_mel], dim=2)
         speech, source = self.hift(mel.float(), hift_cache["source"])
         if hift_cache_speech.shape[-1] > 0:
             overlap = min(
@@ -345,7 +349,7 @@ class Token2Wav(torch.nn.Module):
             source=source[:, :, -self.source_cache_len :].clone(),
             speech=speech[:, -self.source_cache_len :].clone(),
         )
-        if not last_chunk:
+        if not is_last_chunk:
             if is_first_chunk:
                 silence_padding = torch.zeros(
                     1, self.source_cache_len, device=speech.device
@@ -357,5 +361,5 @@ class Token2Wav(torch.nn.Module):
                 speech = speech[:, : -self.source_cache_len]
         else:
             pass
-        wav_np = np.clip(speech.cpu().numpy(), -1.0, 1.0)
-        return (wav_np * 32767.0).astype("<i2").tobytes(), (flow_cache, hift_cache)
+        waveform = np.clip(speech.cpu().numpy(), -1.0, 1.0)
+        return (waveform * 32767.0).astype("<i2").tobytes(), (flow_cache, hift_cache)

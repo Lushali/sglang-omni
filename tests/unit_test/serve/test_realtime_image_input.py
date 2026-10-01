@@ -161,7 +161,7 @@ def test_image_capability_is_granted_over_http_and_session() -> None:
     image_format = {
         "types": ["image/jpeg", "image/png"],
         "max_bytes": 100,
-        "max_per_unit": 1,
+        "max_frames_per_unit": 1,
         "max_slice_nums": 1,
     }
     client = build_test_client(
@@ -281,7 +281,7 @@ def test_unit_frames_follow_slice_grant_and_media_time(
             websocket, "session.update", session={"sglang": {"max_slice_nums": 4}}
         )
         granted = websocket.receive_json()["session"]["sglang"]["granted"]
-        assert granted["input_image_format"]["max_per_unit"] == 2
+        assert granted["input_image_format"]["max_frames_per_unit"] == 2
         for t_ms, image in frames:
             websocket.send_json(image_event(t_ms, image))
             assert websocket.receive_json()["type"] == "sglang.input_image.accepted"

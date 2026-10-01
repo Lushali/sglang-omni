@@ -17,7 +17,7 @@ export const IMAGE = {
   ACK_EVENT: "sglang.input_image.accepted",
 };
 // The model rescales frames to about 448x448, so a smaller short side would only be upscaled.
-export const IMAGE_DEFAULTS = { types: ["image/jpeg"], max_bytes: 512 * 1024, max_per_unit: 1, max_short_side: 448 };
+export const IMAGE_DEFAULTS = { types: ["image/jpeg"], max_bytes: 512 * 1024, max_frames_per_unit: 1, max_short_side: 448 };
 
 export function bytesToBase64(bytes) {
   let binary = "";

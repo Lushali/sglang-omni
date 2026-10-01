@@ -137,15 +137,18 @@ class CausalConditionalCFM(torch.nn.Module):
         mel_conditioning: torch.Tensor,
         n_timesteps: int = 10,
         temperature: float = 1.0,
-        cnn_cache: torch.Tensor | None = None,
-        att_cache: torch.Tensor | None = None,
+        convolution_cache: torch.Tensor | None = None,
+        attention_cache: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        offset = att_cache.shape[4] if att_cache is not None else 0
+        offset = attention_cache.shape[4] if attention_cache is not None else 0
         caches = (
             [{} for _ in range(n_timesteps)]
-            if att_cache is None
+            if attention_cache is None
             else [
-                {"cnn": cnn_cache[index], "attention": att_cache[index]}
+                {
+                    "convolution": convolution_cache[index],
+                    "attention": attention_cache[index],
+                }
                 for index in range(n_timesteps)
             ]
         )
@@ -161,7 +164,7 @@ class CausalConditionalCFM(torch.nn.Module):
         )
         return (
             result,
-            torch.stack([cache["cnn"] for cache in caches]),
+            torch.stack([cache["convolution"] for cache in caches]),
             torch.stack([cache["attention"] for cache in caches]),
         )
 
@@ -272,73 +275,81 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
     @torch.inference_mode()
     def setup_cache(
         self,
-        token: torch.Tensor,
-        mel: torch.Tensor,
-        spk: torch.Tensor,
+        token_ids: torch.Tensor,
+        prompt_mel: torch.Tensor,
+        speaker_embeddings: torch.Tensor,
         n_timesteps: int = 10,
     ) -> dict[str, torch.Tensor]:
-        assert (token.shape[1] - self.pre_lookahead_len) * self.up_rate == mel.shape[
-            1
-        ], (token.shape, mel.shape)
+        assert (
+            token_ids.shape[1] - self.pre_lookahead_len
+        ) * self.up_rate == prompt_mel.shape[1], (token_ids.shape, prompt_mel.shape)
         _, cache = self.inference_chunk(
-            token, spk, None, n_timesteps=n_timesteps, prompt_feat=mel
+            token_ids,
+            speaker_embeddings,
+            None,
+            n_timesteps=n_timesteps,
+            prompt_mel=prompt_mel,
         )
         return cache
 
     @torch.inference_mode()
     def inference_chunk(
         self,
-        token: torch.Tensor,
-        spk: torch.Tensor,
+        token_ids: torch.Tensor,
+        speaker_embeddings: torch.Tensor,
         cache: dict[str, torch.Tensor] | None,
-        last_chunk: bool = False,
+        is_last_chunk: bool = False,
         n_timesteps: int = 10,
-        prompt_feat: torch.Tensor | None = None,
+        prompt_mel: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
-        conformer_cnn_cache = (
-            cache["conformer_cnn_cache"] if cache is not None else None
+        conformer_convolution_cache = (
+            cache["conformer_convolution_cache"] if cache is not None else None
         )
-        conformer_att_cache = (
-            cache["conformer_att_cache"] if cache is not None else None
+        conformer_attention_cache = (
+            cache["conformer_attention_cache"] if cache is not None else None
         )
-        estimator_cnn_cache = (
-            cache["estimator_cnn_cache"] if cache is not None else None
+        estimator_convolution_cache = (
+            cache["estimator_convolution_cache"] if cache is not None else None
         )
-        estimator_att_cache = (
-            cache["estimator_att_cache"] if cache is not None else None
+        estimator_attention_cache = (
+            cache["estimator_attention_cache"] if cache is not None else None
         )
-        spk = F.normalize(spk, dim=1)
-        spk = self.speaker_embedding_projection(spk)
-        token = self.input_embedding(token)
+        speaker_embeddings = F.normalize(speaker_embeddings, dim=1)
+        speaker_embeddings = self.speaker_embedding_projection(speaker_embeddings)
+        embedded_tokens = self.input_embedding(token_ids)
         conformer_state = ConformerState.from_packed(
-            conformer_cnn_cache,
-            conformer_att_cache,
+            conformer_convolution_cache,
+            conformer_attention_cache,
             len(self.encoder.encoders),
             self.encoder.up_layer.stride,
         )
-        h, conformer_state = self.encoder.forward_chunk(
-            xs=token,
-            last_chunk=last_chunk,
+        hidden_states, conformer_state = self.encoder.forward_chunk(
+            xs=embedded_tokens,
+            is_last_chunk=is_last_chunk,
             state=conformer_state,
         )
-        conformer_cnn_cache, conformer_att_cache = conformer_state.to_packed(
-            self.encoder.up_layer.stride
+        conformer_convolution_cache, conformer_attention_cache = (
+            conformer_state.to_packed(self.encoder.up_layer.stride)
         )
-        h = self.encoder_proj(h)
-        cond = torch.zeros_like(h) if prompt_feat is None else prompt_feat
-        feat, estimator_cnn_cache, estimator_att_cache = self.decoder.forward_chunk(
-            mu=h.transpose(1, 2).contiguous(),
-            speaker_embeddings=spk,
-            mel_conditioning=cond.transpose(1, 2).contiguous(),
-            n_timesteps=n_timesteps,
-            temperature=1.0,
-            cnn_cache=estimator_cnn_cache,
-            att_cache=estimator_att_cache,
+        hidden_states = self.encoder_proj(hidden_states)
+        mel_conditioning = (
+            torch.zeros_like(hidden_states) if prompt_mel is None else prompt_mel
+        )
+        predicted_mel, estimator_convolution_cache, estimator_attention_cache = (
+            self.decoder.forward_chunk(
+                mu=hidden_states.transpose(1, 2).contiguous(),
+                speaker_embeddings=speaker_embeddings,
+                mel_conditioning=mel_conditioning.transpose(1, 2).contiguous(),
+                n_timesteps=n_timesteps,
+                temperature=1.0,
+                convolution_cache=estimator_convolution_cache,
+                attention_cache=estimator_attention_cache,
+            )
         )
         new_cache = {
-            "conformer_cnn_cache": conformer_cnn_cache,
-            "conformer_att_cache": conformer_att_cache,
-            "estimator_cnn_cache": estimator_cnn_cache,
-            "estimator_att_cache": estimator_att_cache,
+            "conformer_convolution_cache": conformer_convolution_cache,
+            "conformer_attention_cache": conformer_attention_cache,
+            "estimator_convolution_cache": estimator_convolution_cache,
+            "estimator_attention_cache": estimator_attention_cache,
         }
-        return (feat, new_cache)
+        return (predicted_mel, new_cache)

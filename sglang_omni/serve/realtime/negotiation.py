@@ -187,7 +187,7 @@ class SessionNegotiation:
             slice_count = candidate.get("sglang", {}).get(
                 "max_slice_nums", self.capabilities.default_max_slice_nums
             )
-            granted["input_image_format"]["max_per_unit"] = (
+            granted["input_image_format"]["max_frames_per_unit"] = (
                 self.capabilities.image_frames_per_unit[slice_count - 1]
             )
         else:

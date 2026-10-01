@@ -27,27 +27,27 @@ class ConformerState:
     @classmethod
     def from_packed(
         cls,
-        convolution: torch.Tensor | None,
-        attention: torch.Tensor | None,
+        packed_convolution: torch.Tensor | None,
+        packed_attention: torch.Tensor | None,
         num_blocks: int,
         stride: int,
     ) -> ConformerState:
         """Borrow read-only histories while retaining the packed tensor strides."""
-        if attention is None:
+        if packed_attention is None:
             return cls()
         else:
-            assert convolution is not None
-            history_length = attention.shape[3] // stride
+            assert packed_convolution is not None
+            history_length = packed_attention.shape[3] // stride
             return cls(
-                lookahead=ConvState(history=convolution[:, :, :2]),
-                upsample=ConvState(history=convolution[:, :, 2:]),
+                lookahead=ConvState(history=packed_convolution[:, :, :2]),
+                upsample=ConvState(history=packed_convolution[:, :, 2:]),
                 attention=tuple(
                     AttentionState(history=layer[:, :, :history_length])
-                    for layer in attention[:num_blocks]
+                    for layer in packed_attention[:num_blocks]
                 ),
                 up_attention=tuple(
                     AttentionState(history=layer[:, :, : history_length * stride])
-                    for layer in attention[num_blocks:]
+                    for layer in packed_attention[num_blocks:]
                 ),
             )
 

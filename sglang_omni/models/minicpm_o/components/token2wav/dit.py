@@ -331,8 +331,8 @@ class DiTBlock(nn.Module):
         x: torch.Tensor,
         timestep_embedding: torch.Tensor,
         attn_mask: torch.Tensor | None,
-        cnn_state: ConvBlockState | None = None,
-        att_cache: list[torch.Tensor] | None = None,
+        convolution_state: ConvBlockState | None = None,
+        attention_cache: list[torch.Tensor] | None = None,
     ) -> tuple[torch.Tensor, ConvBlockState | None]:
         (
             shift_msa,
@@ -346,10 +346,10 @@ class DiTBlock(nn.Module):
             gate_conv,
         ) = self.adaLN_modulation(timestep_embedding).chunk(9, dim=-1)
         x = x + gate_msa * self.attn(
-            modulate(self.norm1(x), shift_msa, scale_msa), attn_mask, att_cache
+            modulate(self.norm1(x), shift_msa, scale_msa), attn_mask, attention_cache
         )
         convolution, next_state = self.conv(
-            modulate(self.norm3(x), shift_conv, scale_conv), state=cnn_state
+            modulate(self.norm3(x), shift_conv, scale_conv), state=convolution_state
         )
         x = x + gate_conv * convolution
         x = x + gate_mlp * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
@@ -523,25 +523,38 @@ class DiT(nn.Module):
         cache: dict[str, torch.Tensor],
     ) -> torch.Tensor:
         """Run one chunk; an empty cache starts a stream and is filled in place."""
-        next_cnn: list[torch.Tensor] = []
+        next_convolution: list[torch.Tensor] = []
         next_attention: list[torch.Tensor] = []
         for index, block in enumerate(self.blocks):
             if cache:
-                first, second = cache["cnn"][index].split(
+                first, second = cache["convolution"][index].split(
                     (block.conv.in_channels, block.conv.out_channels), dim=1
                 )
-                cnn = ConvBlockState(
+                convolution_state = ConvBlockState(
                     first=ConvState(history=first), second=ConvState(history=second)
                 )
             else:
-                cnn = ConvBlockState()
+                convolution_state = ConvBlockState()
             attention = [cache["attention"][index]] if cache else []
-            x, cnn = block(x, timestep_embedding, attn_mask, cnn, attention)
-            assert cnn is not None
-            assert cnn.first.history is not None and cnn.second.history is not None
-            next_cnn.append(torch.cat((cnn.first.history, cnn.second.history), dim=1))
+            x, convolution_state = block(
+                x, timestep_embedding, attn_mask, convolution_state, attention
+            )
+            assert convolution_state is not None
+            assert (
+                convolution_state.first.history is not None
+                and convolution_state.second.history is not None
+            )
+            next_convolution.append(
+                torch.cat(
+                    (convolution_state.first.history, convolution_state.second.history),
+                    dim=1,
+                )
+            )
             next_attention.append(attention[0])
-        cache.update(cnn=torch.stack(next_cnn), attention=torch.stack(next_attention))
+        cache.update(
+            convolution=torch.stack(next_convolution),
+            attention=torch.stack(next_attention),
+        )
         return x
 
     def forward_packed(

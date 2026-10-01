@@ -135,7 +135,7 @@ class Capabilities:
             granted["input_image_format"] = dict(
                 types=["image/jpeg", "image/png"],
                 max_bytes=self.max_image_bytes,
-                max_per_unit=self.image_frames_per_unit[
+                max_frames_per_unit=self.image_frames_per_unit[
                     self.default_max_slice_nums - 1
                 ],
                 max_slice_nums=len(self.image_frames_per_unit),

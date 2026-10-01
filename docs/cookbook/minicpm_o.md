@@ -116,6 +116,6 @@ Before the first audio packet, a session can request HD slicing:
 }
 ```
 
-Each frame is encoded as one 64-embedding overview tile plus, when slicing, up to `max_slice_nums` 64-embedding crops; the processor picks the actual grid from the image size. The per-unit frame cap therefore shrinks as the slice count grows, and `sglang.granted.input_image_format` reports the negotiated `max_per_unit` together with the deployment's `max_slice_nums` limit. Extra frames are rejected before vision encoding. The setting is frozen once the session opens.
+Each frame is encoded as one 64-embedding overview tile plus, when slicing, up to `max_slice_nums` 64-embedding crops; the processor picks the actual grid from the image size. The per-unit frame cap therefore shrinks as the slice count grows, and `sglang.granted.input_image_format` reports the negotiated `max_frames_per_unit` together with the deployment's `max_slice_nums` limit. Extra frames are rejected before vision encoding. The setting is frozen once the session opens.
 
 The limits and the default slice count come from the `vision` section of the pipeline config (see `examples/full_duplex/minicpmo.yaml`): `max_frames_per_unit`, `max_tiles_per_unit`, the session default `max_slice_nums` and the highest value a session may request, `max_slice_nums_limit`. These bound per-unit vision work, not the session context, which images, audio, prompt and generated tokens all consume.

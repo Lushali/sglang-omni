@@ -60,7 +60,9 @@ class ThinkerAdapter(ARSessionAdapter):
     def finish_input(
         self, session_identity: SessionIdentity, payload: StagePayload
     ) -> StagePayload:
-        payload.data = dict(pairs=[], text="", is_listen=True, end_of_turn=True)
+        payload.data = dict(
+            talker_conditions=[], text="", is_listen=True, end_of_turn=True
+        )
         return payload
 
     def build(
@@ -71,14 +73,14 @@ class ThinkerAdapter(ARSessionAdapter):
     ) -> DuplexUnitRequestData:
         state = self.states[session_identity]
         plan: PerceptionStepPlan = payload.data
-        prefix = [] if state.prefix_pending else [self.special.unit_end]
-        ids = [*prefix, *plan["token_ids"]]
+        prefix = [] if state.is_prefix_pending else [self.special.unit_end]
+        token_ids = [*prefix, *plan["token_ids"]]
         spans = [
             EmbeddingSpan(
                 start=span["token_start"] + len(prefix),
                 end=span["token_end"] + len(prefix),
                 input_embeds=plan["input_embeds"][
-                    span["embed_start"] : span["embed_end"]
+                    span["embedding_start"] : span["embedding_end"]
                 ],
             )
             for span in plan["embedding_spans"]
@@ -89,7 +91,7 @@ class ThinkerAdapter(ARSessionAdapter):
                 for key in MiniCPMODuplexSampling.model_fields
             }
         )
-        params = SamplingParams(
+        sampling_params = SamplingParams(
             max_new_tokens=sampling.max_new_tokens_per_unit,
             temperature=1.0,
             top_p=1.0,
@@ -99,39 +101,43 @@ class ThinkerAdapter(ARSessionAdapter):
             no_stop_trim=True,
             skip_special_tokens=False,
         )
-        params.normalize(self.tokenizer)
-        req = Req(
-            payload.request_id, "", array("q", ids), params, vocab_size=self.vocab_size
+        sampling_params.normalize(self.tokenizer)
+        adapter_request = Req(
+            payload.request_id,
+            "",
+            array("q", token_ids),
+            sampling_params,
+            vocab_size=self.vocab_size,
         )
-        req.tokenizer = self.tokenizer
-        req.return_hidden_states = True
+        adapter_request.tokenizer = self.tokenizer
+        adapter_request.return_hidden_states = True
         return DuplexUnitRequestData(
-            req=req,
-            input_ids=torch.tensor(ids),
+            req=adapter_request,
+            input_ids=torch.tensor(token_ids),
             max_new_tokens=sampling.max_new_tokens_per_unit,
             stage_payload=payload,
             thinker_state=state,
             unit_embedding_spans=spans,
             sampling=sampling,
-            forced_listen=state.force_listen_counter < sampling.force_listen_count,
-            prefill_schema=plan["prefill_schema"],
+            is_listen_forced=state.force_listen_counter < sampling.force_listen_count,
         )
 
     def result(
         self, session_identity: SessionIdentity, data: DuplexUnitRequestData
     ) -> StagePayload:
         state = self.states[session_identity]
-        state.prefix_pending = False
-        ids = [int(i) for i in data.output_ids]
+        state.is_prefix_pending = False
+        output_token_ids = [int(token_id) for token_id in data.output_ids]
         data.stage_payload.data = dict(
-            pairs=data.unit_pairs,
-            prefill_schema=data.prefill_schema,
+            talker_conditions=data.talker_conditions,
             text=self.tokenizer.decode(
                 data.generated_unit_ids, skip_special_tokens=True
             ),
-            is_listen=bool(ids and ids[0] == self.special.listen),
-            end_of_turn=self.special.turn_eos in ids
-            or any(pair[2] for pair in data.unit_pairs),
+            is_listen=bool(
+                output_token_ids and output_token_ids[0] == self.special.listen
+            ),
+            end_of_turn=self.special.turn_eos in output_token_ids
+            or any(ends_turn for _, _, ends_turn in data.talker_conditions),
         )
         return data.stage_payload
 

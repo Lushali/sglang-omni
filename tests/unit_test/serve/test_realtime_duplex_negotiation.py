@@ -244,7 +244,7 @@ def test_image_frame_grant_follows_slice_setting(slices: int, frames: int) -> No
     _, granted = negotiation.negotiate(
         {}, "CREATED", {"sglang": {"max_slice_nums": slices}}
     )
-    assert granted["input_image_format"]["max_per_unit"] == frames
+    assert granted["input_image_format"]["max_frames_per_unit"] == frames
 
 
 def test_slice_setting_beyond_deployment_is_rejected() -> None:

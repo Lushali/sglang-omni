@@ -32,7 +32,7 @@ class AudioFormat(TypedDict):
 class ImageFormat(TypedDict):
     types: list[str]
     max_bytes: int
-    max_per_unit: int
+    max_frames_per_unit: int
     max_slice_nums: int
 
 

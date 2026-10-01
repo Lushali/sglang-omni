@@ -38,26 +38,30 @@ def state() -> MiniCPMOPerceptionState:
 def test_audio_plan_without_image(
     state: MiniCPMOPerceptionState, chunk_index: int, reference_audio: bool
 ) -> None:
-    state.audio_chunk_idx = chunk_index
+    state.audio_chunk_index = chunk_index
     if reference_audio:
         state.prefix_token_ids = [7, 0, 0, 8]
-        state.prefix_schema = [("tok", 1), ("audio", 2), ("tok", 1)]
+        state.prefix_schema = [("token", 1), ("audio", 2), ("token", 1)]
         state.prefix_embeds = torch.full((2, 4), 5.0)
         prefix_spans = [
             dict(
-                modality="audio", token_start=1, token_end=3, embed_start=0, embed_end=2
+                modality="audio",
+                token_start=1,
+                token_end=3,
+                embedding_start=0,
+                embedding_end=2,
             )
         ]
     else:
         state.prefix_token_ids = [7, 8]
-        state.prefix_schema = [("tok", 2)]
+        state.prefix_schema = [("token", 2)]
         prefix_spans = []
     audio = torch.full((10, 4), 9.0)
     plan = state.build_step_plan(audio)
     is_first_unit = chunk_index == 1
     prefix_ids = state.prefix_token_ids if is_first_unit else []
     spans = prefix_spans if is_first_unit else []
-    embed_start = 2 if is_first_unit and reference_audio else 0
+    embedding_start = 2 if is_first_unit and reference_audio else 0
     token_start = len(prefix_ids) + 1
     assert plan["token_ids"] == prefix_ids + [1] + [0] * 10
     assert plan["embedding_spans"] == spans + [
@@ -65,22 +69,21 @@ def test_audio_plan_without_image(
             modality="audio",
             token_start=token_start,
             token_end=token_start + 10,
-            embed_start=embed_start,
-            embed_end=embed_start + 10,
+            embedding_start=embedding_start,
+            embedding_end=embedding_start + 10,
         )
     ]
-    assert plan["input_embeds"].shape[0] == embed_start + 10
-    assert torch.equal(plan["input_embeds"][embed_start:], audio)
-    assert plan["prefill_schema"] == [("tok", 1), ("audio", 10)]
+    assert plan["input_embeds"].shape[0] == embedding_start + 10
+    assert torch.equal(plan["input_embeds"][embedding_start:], audio)
 
 
 @pytest.mark.parametrize("chunk_index", [1, 2])
 def test_image_plan_follows_official_slice_order(
     state: MiniCPMOPerceptionState, chunk_index: int
 ) -> None:
-    state.audio_chunk_idx = chunk_index
+    state.audio_chunk_index = chunk_index
     state.prefix_token_ids = [7, 0, 0, 8]
-    state.prefix_schema = [("tok", 1), ("audio", 2), ("tok", 1)]
+    state.prefix_schema = [("token", 1), ("audio", 2), ("token", 1)]
     state.prefix_embeds = torch.full((2, 4), 5.0)
     first = torch.cat([torch.full((64, 4), float(i)) for i in (1, 2, 3)])
     second = torch.full((64, 4), 4.0)
@@ -101,18 +104,6 @@ def test_image_plan_follows_official_slice_order(
         + [3]
         + [0] * 10
     )
-    assert plan["prefill_schema"] == [
-        ("tok", 2),
-        ("image", 64),
-        ("tok", 2),
-        ("image", 64),
-        ("tok", 2),
-        ("image", 64),
-        ("tok", 2),
-        ("image", 64),
-        ("tok", 1),
-        ("audio", 10),
-    ]
     unit_spans = plan["embedding_spans"][-5:]
     assert [span["modality"] for span in unit_spans] == ["image"] * 4 + ["audio"]
     assert [(span["token_start"], span["token_end"]) for span in unit_spans] == [
@@ -127,7 +118,7 @@ def test_image_plan_follows_official_slice_order(
     assert torch.equal(plan["input_embeds"], torch.cat(blocks))
     for span, block in zip(plan["embedding_spans"], blocks, strict=True):
         assert torch.equal(
-            plan["input_embeds"][span["embed_start"] : span["embed_end"]], block
+            plan["input_embeds"][span["embedding_start"] : span["embedding_end"]], block
         )
 
 

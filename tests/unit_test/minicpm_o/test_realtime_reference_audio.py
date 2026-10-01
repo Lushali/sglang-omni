@@ -84,7 +84,7 @@ def test_speech_reference_precedence_is_per_session() -> None:
     ):
         hooks.open(SessionIdentity(session_id), OmniRequest(None, params=params))
     assert [
-        call.kwargs["prompt_wav"] for call in runtime.open_session.call_args_list
+        call.kwargs["reference_audio"] for call in runtime.open_session.call_args_list
     ] == [b"output", b"input", b"default"]
 
 
@@ -94,6 +94,6 @@ def test_invalid_reference_fails_open_without_state() -> None:
     code2wav.prepare_references.side_effect = ValueError("invalid audio")
     runtime = MiniCPMOVocoderRuntime(code2wav)
     with pytest.raises(ValueError, match="invalid audio"):
-        runtime.open_session("voice", prompt_wav=b"invalid audio")
+        runtime.open_session("voice", reference_audio=b"invalid audio")
     code2wav.prepare_references.assert_called_once_with([b"invalid audio"])
     assert not runtime.sessions and not runtime.speakers
