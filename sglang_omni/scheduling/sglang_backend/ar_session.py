@@ -208,7 +208,6 @@ class ARSessionBridge:
     ) -> StagePayload:
         session_identity = operation.session_identity
         operation_kind = operation.operation
-        controller = self.bridge_scheduler.session_controller
         session = self.sessions.get(session_identity.id)
         if (
             session is not None
@@ -220,23 +219,14 @@ class ARSessionBridge:
                 raise ValueError("session already opened")
             elif len(self.sessions) >= self.bridge_scheduler.max_running_requests:
                 raise QueueFullError()
-            else:
-                result = controller.open(
-                    OpenSessionReqInput(
-                        session_id=session_identity.id,
-                        capacity_of_str_len=SESSION_STRING_LENGTH_LIMIT_CHARACTERS,
-                        streaming=True,
-                        timeout=None,
-                    )
+            elif self.open_streaming_session(session_identity.id):
+                self.sessions[session_identity.id] = BridgeSession(
+                    session_identity=session_identity
                 )
-                if result.success:
-                    self.sessions[session_identity.id] = BridgeSession(
-                        session_identity=session_identity
-                    )
-                    self.adapter.open(session_identity, payload.request)
-                    payload.data = {"opened": True}
-                else:
-                    raise ValueError("streaming session open failed")
+                self.adapter.open(session_identity, payload.request)
+                payload.data = {"opened": True}
+            else:
+                raise ValueError("streaming session open failed")
         elif operation_kind == "close":
             if session is not None:
                 self.close_session(session)
@@ -277,33 +267,40 @@ class ARSessionBridge:
             unit.session_identity, unit.chunk, payload
         )
         if preparation.reset_history:
-            self.drain()
             session_id = unit.session_identity.id
             self.sessions[session_id].embedding_spans.clear()
-            controller = self.bridge_scheduler.session_controller
-            controller.close(CloseSessionReqInput(session_id=session_id))
-            if (
-                controller.get(session_id) is not None
-                or session_id in self.bridge_scheduler.tree_cache.slots
-            ):
-                raise RuntimeError("native session reset is still pending")
-            else:
-                pass
-            result = controller.open(
-                OpenSessionReqInput(
-                    session_id=session_id,
-                    capacity_of_str_len=SESSION_STRING_LENGTH_LIMIT_CHARACTERS,
-                    streaming=True,
-                    timeout=None,
-                )
-            )
-            if not result.success:
+            self.release_streaming_session(session_id)
+            if not self.open_streaming_session(session_id):
                 raise RuntimeError("native session reset failed")
             else:
                 pass
         else:
             pass
         return preparation.bypass_generation
+
+    def open_streaming_session(self, session_id: str) -> bool:
+        result = self.bridge_scheduler.session_controller.open(
+            OpenSessionReqInput(
+                session_id=session_id,
+                capacity_of_str_len=SESSION_STRING_LENGTH_LIMIT_CHARACTERS,
+                streaming=True,
+                timeout=None,
+            )
+        )
+        return result.success
+
+    def release_streaming_session(self, session_id: str) -> None:
+        self.drain()
+        self.bridge_scheduler.session_controller.close(
+            CloseSessionReqInput(session_id=session_id)
+        )
+        if (
+            self.bridge_scheduler.session_controller.get(session_id) is not None
+            or session_id in self.bridge_scheduler.tree_cache.slots
+        ):
+            raise RuntimeError("streaming session close is still pending")
+        else:
+            pass
 
     def create_session_request(
         self, payload: StagePayload, request_data: SGLangARRequestData
@@ -557,18 +554,7 @@ class ARSessionBridge:
             self.bridge_scheduler.abort(session.unit.request_id)
         else:
             pass
-        session_id = session.session_identity.id
-        self.drain()
-        self.bridge_scheduler.session_controller.close(
-            CloseSessionReqInput(session_id=session_id)
-        )
-        if (
-            self.bridge_scheduler.session_controller.get(session_id) is not None
-            or session_id in self.bridge_scheduler.tree_cache.slots
-        ):
-            raise RuntimeError("streaming session close is still pending")
-        else:
-            pass
+        self.release_streaming_session(session.session_identity.id)
 
     def close_session(self, session: BridgeSession) -> None:
         self.close_streaming_session(session)

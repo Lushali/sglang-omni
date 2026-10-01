@@ -7,8 +7,12 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from sglang_omni.models.minicpm_o.components.code2wav import MiniCPMOCode2Wav
+from sglang_omni.models.minicpm_o.components.code2wav import (
+    OUTPUT_SAMPLE_RATE,
+    MiniCPMOCode2Wav,
+)
 from sglang_omni.models.minicpm_o.components.token2wav.vocoder import (
+    SILENCE_TOKEN_ID,
     SpeakerPrompt,
     StreamCaches,
     Token2Wav,
@@ -16,10 +20,8 @@ from sglang_omni.models.minicpm_o.components.token2wav.vocoder import (
 from sglang_omni.proto.session import ResourceUsage
 from sglang_omni.scheduling.speaker_cache import estimate_cache_bytes
 
-SILENCE_TOKEN_ID = 4218
 SILENCE_PREFIX_LENGTH = 3
 CODEC_CHUNK_SIZE = 25
-OUTPUT_SAMPLE_RATE = 24000
 
 
 def clone_caches(caches: StreamCaches) -> StreamCaches:
@@ -65,16 +67,9 @@ class MiniCPMOVocoderSessionState:
 class MiniCPMOVocoderRuntime:
     """Own streaming vocoder state independently per session."""
 
-    def __init__(
-        self, code2wav: MiniCPMOCode2Wav, *, codec_chunk_size: int = CODEC_CHUNK_SIZE
-    ) -> None:
-        if codec_chunk_size <= 0:
-            raise ValueError("codec_chunk_size must be positive")
-        else:
-            pass
+    def __init__(self, code2wav: MiniCPMOCode2Wav) -> None:
         self.code2wav = code2wav
         self.token2wav: Token2Wav = code2wav.token2wav
-        self.codec_chunk_size = codec_chunk_size
         self.sessions: dict[str, MiniCPMOVocoderSessionState] = {}
         self.speakers: dict[str, SharedSpeaker] = {}
 
@@ -157,7 +152,7 @@ class MiniCPMOVocoderRuntime:
         state.pending_codec_token_ids.extend(token_ids)
         pcm_chunks: list[bytes] = []
         minimum_flush_tokens = state.pre_lookahead_tokens + 5
-        window_tokens = self.codec_chunk_size + state.pre_lookahead_tokens
+        window_tokens = CODEC_CHUNK_SIZE + state.pre_lookahead_tokens
 
         if force_flush:
             while len(state.pending_codec_token_ids) >= minimum_flush_tokens:
@@ -166,7 +161,7 @@ class MiniCPMOVocoderRuntime:
                     self.stream(state, state.pending_codec_token_ids[:window_length])
                 )
                 consumed_tokens = min(
-                    self.codec_chunk_size, window_length - state.pre_lookahead_tokens
+                    CODEC_CHUNK_SIZE, window_length - state.pre_lookahead_tokens
                 )
                 del state.pending_codec_token_ids[:consumed_tokens]
         else:
@@ -174,7 +169,7 @@ class MiniCPMOVocoderRuntime:
                 pcm_chunks.append(
                     self.stream(state, state.pending_codec_token_ids[:window_tokens])
                 )
-                del state.pending_codec_token_ids[: self.codec_chunk_size]
+                del state.pending_codec_token_ids[:CODEC_CHUNK_SIZE]
 
         if is_last_chunk and state.pending_codec_token_ids:
             pcm_chunks.append(
@@ -216,9 +211,7 @@ class MiniCPMOVocoderRuntime:
 
 __all__ = [
     "CODEC_CHUNK_SIZE",
-    "OUTPUT_SAMPLE_RATE",
     "SILENCE_PREFIX_LENGTH",
-    "SILENCE_TOKEN_ID",
     "MiniCPMOVocoderRuntime",
     "MiniCPMOVocoderSessionState",
     "SharedSpeaker",

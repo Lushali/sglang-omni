@@ -30,7 +30,7 @@ from sglang_omni.models.minicpm_o.components.token2wav.conformer import (
 from sglang_omni.models.minicpm_o.components.token2wav.conformer_state import (
     ConformerState,
 )
-from sglang_omni.models.minicpm_o.components.token2wav.dit import DiT
+from sglang_omni.models.minicpm_o.components.token2wav.dit import DiT, DiTState
 
 
 class CausalConditionalCFM(torch.nn.Module):
@@ -54,8 +54,9 @@ class CausalConditionalCFM(torch.nn.Module):
         mask: torch.Tensor,
         speaker_embeddings: torch.Tensor,
         mel_conditioning: torch.Tensor,
-        caches: list[dict[str, torch.Tensor]] | None = None,
-    ) -> torch.Tensor:
+        states: list[DiTState] | None = None,
+    ) -> tuple[torch.Tensor, list[DiTState] | None]:
+        """Integrate the flow; streaming passes one estimator state per step."""
         batch_size = x.size(0)
         t = t_span[0].expand(batch_size)
         dt = t_span[1] - t_span[0]
@@ -68,18 +69,29 @@ class CausalConditionalCFM(torch.nn.Module):
         paired_mel_conditioning = torch.cat(
             [mel_conditioning, torch.zeros_like(mel_conditioning)], dim=0
         )
+        next_states: list[DiTState] | None = None if states is None else []
         for step in range(1, len(t_span)):
             paired_sample = torch.cat([x, x], dim=0)
             paired_timesteps = torch.cat([t, t], dim=0)
-            conditional_derivative = self.estimator.forward(
-                paired_sample,
-                paired_mask if caches is None else None,
-                paired_mu,
-                paired_timesteps,
-                paired_speaker_embeddings,
-                paired_mel_conditioning,
-                cache=caches[step - 1] if caches is not None else None,
-            )
+            if states is None:
+                conditional_derivative = self.estimator.forward(
+                    paired_sample,
+                    paired_mask,
+                    paired_mu,
+                    paired_timesteps,
+                    paired_speaker_embeddings,
+                    paired_mel_conditioning,
+                )
+            else:
+                conditional_derivative, next_state = self.estimator.forward_chunk(
+                    paired_sample,
+                    paired_mu,
+                    paired_timesteps,
+                    paired_speaker_embeddings,
+                    paired_mel_conditioning,
+                    states[step - 1],
+                )
+                next_states.append(next_state)
             conditional_derivative, unconditional_derivative = torch.split(
                 conditional_derivative, [x.size(0), x.size(0)], dim=0
             )
@@ -93,7 +105,7 @@ class CausalConditionalCFM(torch.nn.Module):
                 dt = t_span[step + 1] - t_span[step]
             else:
                 pass
-        return x
+        return x, next_states
 
     @torch.inference_mode()
     def forward(
@@ -104,9 +116,9 @@ class CausalConditionalCFM(torch.nn.Module):
         mel_conditioning: torch.Tensor,
         n_timesteps: int = 10,
         temperature: float = 1.0,
-        caches: list[dict[str, torch.Tensor]] | None = None,
+        states: list[DiTState] | None = None,
         offset: int = 0,
-    ) -> torch.Tensor:
+    ) -> tuple[torch.Tensor, list[DiTState] | None]:
         if n_timesteps <= 0:
             raise ValueError("n_timesteps must be positive")
         else:
@@ -126,7 +138,7 @@ class CausalConditionalCFM(torch.nn.Module):
         t_span = torch.linspace(0, 1, n_timesteps + 1, device=mu.device, dtype=mu.dtype)
         t_span = 1 - torch.cos(t_span * 0.5 * torch.pi)
         return self.solve_euler(
-            z, t_span, mu, mask, speaker_embeddings, mel_conditioning, caches
+            z, t_span, mu, mask, speaker_embeddings, mel_conditioning, states
         )
 
     @torch.inference_mode()
@@ -140,32 +152,34 @@ class CausalConditionalCFM(torch.nn.Module):
         convolution_cache: torch.Tensor | None = None,
         attention_cache: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        offset = attention_cache.shape[4] if attention_cache is not None else 0
-        caches = (
-            [{} for _ in range(n_timesteps)]
-            if attention_cache is None
-            else [
-                {
-                    "convolution": convolution_cache[index],
-                    "attention": attention_cache[index],
-                }
+        if attention_cache is None:
+            offset = 0
+            states = [DiTState() for _ in range(n_timesteps)]
+        else:
+            assert convolution_cache is not None
+            offset = attention_cache.shape[4]
+            states = [
+                DiTState(
+                    convolution=convolution_cache[index],
+                    attention=attention_cache[index],
+                )
                 for index in range(n_timesteps)
             ]
-        )
-        result = self.forward(
+        result, next_states = self.forward(
             mu,
             torch.ones_like(mu[:, :1]),
             speaker_embeddings,
             mel_conditioning,
             n_timesteps,
             temperature,
-            caches,
+            states,
             offset,
         )
+        assert next_states is not None
         return (
             result,
-            torch.stack([cache["convolution"] for cache in caches]),
-            torch.stack([cache["attention"] for cache in caches]),
+            torch.stack([state.convolution for state in next_states]),
+            torch.stack([state.attention for state in next_states]),
         )
 
 
@@ -249,7 +263,7 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
             prompt_frames = prompt_length * self.up_rate
             mel_conditioning[i, :prompt_frames] = prompt_mel[i, :prompt_frames]
         mel_conditioning = mel_conditioning.transpose(1, 2).contiguous()
-        predicted_mel = self.decoder.forward(
+        predicted_mel, _ = self.decoder.forward(
             mu=hidden_states.transpose(1, 2).contiguous(),
             mask=frame_mask.unsqueeze(1),
             speaker_embeddings=speaker_embeddings,

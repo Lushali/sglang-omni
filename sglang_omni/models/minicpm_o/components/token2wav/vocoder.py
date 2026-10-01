@@ -28,12 +28,15 @@ from sglang_omni.models.minicpm_o.components.token2wav.flow import (
     CausalMaskedDiffWithXvec,
 )
 from sglang_omni.models.minicpm_o.components.token2wav.hift import HiFTGenerator
-
-# note (Junnan Li): stepaudio2 Token2wav keeps the prompt plus this many frames so positions stay in range.
-FLOW_CACHE_TAIL_FRAMES = 100
 from sglang_omni.models.minicpm_o.components.token2wav.speech_tokenizer import (
     S3TokenizerV2,
 )
+
+# note (Junnan Li): stepaudio2 Token2wav keeps the prompt plus this many frames so positions stay in range.
+FLOW_CACHE_TAIL_FRAMES = 100
+SILENCE_TOKEN_ID = 4218
+MEL_CACHE_FRAMES = 8
+SAMPLES_PER_MEL_FRAME = 480
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -178,8 +181,8 @@ class Token2Wav(torch.nn.Module):
             strict=True,
         )
         self.hift.to(device).eval()
-        self.mel_cache_len = 8
-        self.source_cache_len = self.mel_cache_len * 480
+        self.mel_cache_len = MEL_CACHE_FRAMES
+        self.source_cache_len = MEL_CACHE_FRAMES * SAMPLES_PER_MEL_FRAME
         self.speech_window = torch.from_numpy(np.hamming(2 * self.source_cache_len)).to(
             device
         )
@@ -245,8 +248,8 @@ class Token2Wav(torch.nn.Module):
         speaker_embedding = prompt.speaker_embedding
         prompt_mels = prompt.prompt_mel
         right_pad_speech_tokens = torch.full(
-            (1, 3),
-            4218,
+            (1, self.flow.pre_lookahead_len),
+            SILENCE_TOKEN_ID,
             device=prompt_speech_tokens.device,
             dtype=prompt_speech_tokens.dtype,
         )

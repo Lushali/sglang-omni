@@ -12,7 +12,10 @@ from pydantic import JsonValue
 from transformers import AutoProcessor, AutoTokenizer, PreTrainedTokenizerBase
 
 from sglang_omni.models.minicpm_o.components.audio_encoder import MiniCPMOAudioEncoder
-from sglang_omni.models.minicpm_o.components.code2wav import MiniCPMOCode2Wav
+from sglang_omni.models.minicpm_o.components.code2wav import (
+    OUTPUT_SAMPLE_RATE,
+    MiniCPMOCode2Wav,
+)
 from sglang_omni.models.minicpm_o.components.image_encoder import MiniCPMOImageEncoder
 from sglang_omni.models.minicpm_o.components.streaming_perception import (
     MiniCPMOPerceptionState,
@@ -73,28 +76,22 @@ class PerceptionHooks(SessionHooks):
         else:
             state = self.states[context.session_identity]
             if isinstance(chunk.payload, dict):
-                # note (Junnan Li): Frames are acked before decoding, so a bad frame is dropped, not fatal.
-                image_embeds = []
-                for encoded_image in chunk.payload["images"]:
-                    try:
-                        image_embeds.append(state.encode_image(encoded_image))
-                    except (OSError, ValueError, Image.DecompressionBombError) as exc:
-                        logger.warning(
-                            f"Dropping undecodable frame of unit {chunk.seq}: {exc}"
-                        )
-                waveform = (
-                    np.frombuffer(chunk.payload["pcm"], dtype="<i2").astype(np.float32)
-                    / 32768.0
-                )
-                payload.data = state.build_step_plan(
-                    state.encode_audio(waveform), tuple(image_embeds)
-                )
+                pcm, encoded_images = chunk.payload["pcm"], chunk.payload["images"]
             else:
-                waveform = (
-                    np.frombuffer(chunk.payload, dtype="<i2").astype(np.float32)
-                    / 32768.0
-                )
-                payload.data = state.build_step_plan(state.encode_audio(waveform))
+                pcm, encoded_images = chunk.payload, ()
+            # note (Junnan Li): Frames are acked before decoding, so a bad frame is dropped, not fatal.
+            image_embeds = []
+            for encoded_image in encoded_images:
+                try:
+                    image_embeds.append(state.encode_image(encoded_image))
+                except (OSError, ValueError, Image.DecompressionBombError) as exc:
+                    logger.warning(
+                        f"Dropping undecodable frame of unit {chunk.seq}: {exc}"
+                    )
+            waveform = np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768.0
+            payload.data = state.build_step_plan(
+                state.encode_audio(waveform), tuple(image_embeds)
+            )
         return payload
 
     def close(self, session_identity: SessionIdentity) -> None:
@@ -144,7 +141,7 @@ class SpeechHooks(SessionHooks):
             if waveform is not None:
                 samples = np.asarray(waveform, dtype=np.float32).reshape(-1)
                 pcm = np.clip(samples * 32768, -32768, 32767).astype("<i2").tobytes()
-                duration_ms = len(samples) / 24
+                duration_ms = len(samples) * 1000 / OUTPUT_SAMPLE_RATE
             else:
                 pass
         else:

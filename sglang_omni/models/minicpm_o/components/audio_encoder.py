@@ -231,7 +231,7 @@ class MiniCPMOAudioEncoder(nn.Module):
         past_length = state.past_length
         convolution_length = (audio_features.shape[-1] + 1) // 2
         if past_length + convolution_length >= self.apm.embed_positions.num_embeddings:
-            logger.warning(f"Resetting audio encoder KV at {past_length} frames")
+            logger.info(f"Resetting audio encoder KV at {past_length} frames")
             state = AudioEncoderState()
             past_length = 0
         else:
