@@ -10,6 +10,8 @@ from transformers import PreTrainedTokenizerBase
 
 from sglang_omni.client.client import Client
 from sglang_omni.models.minicpm_o.components.streaming_perception import (
+    SAMPLE_RATE,
+    UNIT_MS,
     PerceptionStepPlan,
 )
 from sglang_omni.models.minicpm_o.native_config import (
@@ -52,7 +54,14 @@ class ThinkerAdapter(ARSessionAdapter):
         self.states: dict[SessionIdentity, MiniCPMOThinkerSessionState] = {}
 
     def open(self, session_identity: SessionIdentity, request: OmniRequest) -> None:
-        self.states[session_identity] = MiniCPMOThinkerSessionState()
+        self.states[session_identity] = MiniCPMOThinkerSessionState(
+            sampling=MiniCPMODuplexSampling.model_validate(
+                {
+                    key: request.params[key]
+                    for key in MiniCPMODuplexSampling.model_fields
+                }
+            )
+        )
 
     def close(self, session_identity: SessionIdentity) -> None:
         self.states.pop(session_identity, None)
@@ -85,12 +94,7 @@ class ThinkerAdapter(ARSessionAdapter):
             )
             for span in plan["embedding_spans"]
         ]
-        sampling = MiniCPMODuplexSampling.model_validate(
-            {
-                key: payload.request.params[key]
-                for key in MiniCPMODuplexSampling.model_fields
-            }
-        )
+        sampling = state.sampling
         sampling_params = SamplingParams(
             max_new_tokens=sampling.max_new_tokens_per_unit,
             temperature=1.0,
@@ -118,7 +122,6 @@ class ThinkerAdapter(ARSessionAdapter):
             stage_payload=payload,
             thinker_state=state,
             unit_embedding_spans=spans,
-            sampling=sampling,
             is_listen_forced=state.force_listen_counter < sampling.force_listen_count,
         )
 
@@ -235,13 +238,13 @@ def build_realtime_deployment(
                 },
             ),
             output_converter=OutputConverter(),
-            input_sample_rate_hz=16000,
+            input_sample_rate_hz=SAMPLE_RATE,
             atomic_consumption=True,
         )
 
     return RealtimeDeployment(
         Capabilities(
-            native_unit_ms=1000,
+            native_unit_ms=UNIT_MS,
             output_sample_rate_hz=24000,
             output_modalities=("audio", "text"),
             input_modalities=("audio", "image"),

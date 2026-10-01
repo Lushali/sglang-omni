@@ -65,17 +65,17 @@ class TimebaseConfig(TypedDict, total=False):
 
 
 class SamplingConfig(TypedDict, total=False):
-    temperature: Annotated[float, Field(ge=0)]
+    temperature: Annotated[float, Field(ge=0, le=2)]
     top_k: Annotated[int, Field(ge=-1)]
     top_p: Annotated[float, Field(gt=0, le=1)]
-    repetition_penalty: Annotated[float, Field(gt=0)]
+    repetition_penalty: Annotated[float, Field(ge=1)]
     listen_prob_scale: Annotated[float, Field(ge=0)]
     greedy: bool
     force_listen_count: Annotated[int, Field(ge=0)]
     max_new_tokens_per_unit: Annotated[int, Field(ge=1)]
     repetition_window_size: Annotated[int, Field(ge=1)]
-    talker_temperature: Annotated[float, Field(ge=0)]
-    talker_repetition_penalty: Annotated[float, Field(gt=0)]
+    talker_temperature: Annotated[float, Field(ge=0, le=2)]
+    talker_repetition_penalty: Annotated[float, Field(ge=1)]
 
 
 class AudioReference(BaseModel):

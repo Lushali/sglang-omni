@@ -61,16 +61,16 @@ class MiniCPMODuplexSampling(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     greedy: bool = False
-    temperature: float = Field(default=0.7, ge=0)
+    temperature: float = Field(default=0.7, ge=0, le=2)
     top_k: int = Field(default=20, ge=-1)
     top_p: float = Field(default=0.8, gt=0, le=1)
-    repetition_penalty: float = Field(default=1.05, gt=0)
+    repetition_penalty: float = Field(default=1.05, ge=1)
     listen_prob_scale: float = Field(default=1.0, ge=0)
     force_listen_count: int = Field(default=3, ge=0)
     max_new_tokens_per_unit: int = Field(default=20, ge=1)
     repetition_window_size: int = Field(default=512, ge=1)
-    talker_temperature: float = Field(default=0.8, ge=0)
-    talker_repetition_penalty: float = Field(default=1.05, gt=0)
+    talker_temperature: float = Field(default=0.8, ge=0, le=2)
+    talker_repetition_penalty: float = Field(default=1.05, ge=1)
 
 
 class MiniCPMODuplexVision(BaseModel):

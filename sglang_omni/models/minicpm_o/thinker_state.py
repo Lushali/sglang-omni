@@ -11,8 +11,9 @@ from sglang_omni.models.minicpm_o.native_config import MiniCPMODuplexSampling
 from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MiniCPMOThinkerSessionState:
+    sampling: MiniCPMODuplexSampling
     is_turn_ended: bool = True
     is_prefix_pending: bool = True
     force_listen_counter: int = 0
@@ -31,5 +32,4 @@ class DuplexUnitRequestData(SGLangARRequestData):
     generated_unit_ids: list[int] = field(default_factory=list)
     pending_unit_token: int | None = None
     is_listen_forced: bool = False
-    sampling: MiniCPMODuplexSampling = field(default_factory=MiniCPMODuplexSampling)
     enforce_request_limits: bool = True

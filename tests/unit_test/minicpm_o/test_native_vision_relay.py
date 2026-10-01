@@ -14,7 +14,6 @@ from sglang_omni.models.minicpm_o.components.streaming_perception import (
     PerceptionStepPlan,
 )
 from sglang_omni.models.minicpm_o.duplex_sampler import (
-    DuplexSamplerState,
     build_forbidden_token_index,
     duplex_sample,
 )
@@ -25,6 +24,7 @@ from sglang_omni.models.minicpm_o.native_thinker_model_runner import (
 )
 from sglang_omni.models.minicpm_o.session_adapters import ThinkerAdapter
 from sglang_omni.models.minicpm_o.special_tokens import REQUIRED_SPECIAL_TOKENS
+from sglang_omni.models.minicpm_o.thinker_state import MiniCPMOThinkerSessionState
 from sglang_omni.proto.request import OmniRequest, StagePayload
 from sglang_omni.proto.session import SessionIdentity, TimedChunk
 from sglang_omni.scheduling.sglang_backend.ar_session import ARSessionBridge
@@ -74,16 +74,16 @@ def unit_payload(data: PerceptionStepPlan | None = None) -> StagePayload:
 
 
 @pytest.mark.parametrize(
-    ("use_runner", "overrides", "closes"),
+    ("use_runner", "max_new_tokens", "generation_step", "closes"),
     [
-        (True, {}, False),
-        (False, {}, False),
-        (False, {"max_new_tokens": 5, "generation_step": 4}, True),
-        (False, {"max_new_tokens": 6, "generation_step": 4}, False),
+        (True, 20, 0, False),
+        (False, 20, 0, False),
+        (False, 5, 4, True),
+        (False, 6, 4, False),
     ],
 )
 def test_duplex_sample_masks_bad_tokens_and_closes_at_budget(
-    use_runner: bool, overrides: dict[str, int], closes: bool
+    use_runner: bool, max_new_tokens: int, generation_step: int, closes: bool
 ) -> None:
     """Both init paths keep the checkpoint mask; the token budget closes the chunk."""
     tokenizer = Mock(unk_token_id=0, bad_token_ids=[7, 8, 94])
@@ -102,20 +102,25 @@ def test_duplex_sample_masks_bad_tokens_and_closes_at_budget(
     logits[7] = 100.0
     logits[special.tts_pad] = 99.0
     logits[42] = 0.0
-    state = DuplexSamplerState(
+    state = MiniCPMOThinkerSessionState(
+        sampling=MiniCPMODuplexSampling(
+            greedy=True,
+            top_k=1,
+            repetition_penalty=1.0,
+            max_new_tokens_per_unit=max_new_tokens,
+        )
+    )
+    token_id = duplex_sample(
+        logits,
+        state,
         special_tokens=special,
         forbidden_token_index=build_forbidden_token_index(
             special, 128, torch.device("cpu")
         ),
-        temperature=0.7,
-        top_k=1,
-        top_p=0.8,
-        repetition_penalty=1.0,
-        listen_prob_scale=1.0,
-        greedy=True,
-        **{"max_new_tokens": 20, "repetition_window_size": 512, **overrides},
+        generation_step=generation_step,
+        is_listen_forced=False,
     )
-    assert duplex_sample(logits, state) == (special.chunk_eos if closes else 42)
+    assert token_id == (special.chunk_eos if closes else 42)
 
 
 @pytest.mark.parametrize(
