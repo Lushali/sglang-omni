@@ -14,6 +14,8 @@ from sglang_omni.config import (
 )
 
 PKG = "sglang_omni.models.minicpm_o.native_stages"
+DEFAULT_MAX_SESSIONS = 2
+DEFAULT_SPEECH_STATE_BYTES_PER_SESSION = 2 << 30
 
 
 def stages() -> list[StageConfig]:
@@ -103,8 +105,10 @@ class MiniCPMODuplexPipelineConfig(PipelineConfig):
     }
     model_path: str
     reference_audio: str | None = None
-    max_sessions: int = Field(default=2, ge=1)
-    speech_state_bytes_per_session: int = Field(default=2 << 30, ge=1)
+    max_sessions: int = Field(default=DEFAULT_MAX_SESSIONS, ge=1)
+    speech_state_bytes_per_session: int = Field(
+        default=DEFAULT_SPEECH_STATE_BYTES_PER_SESSION, ge=1
+    )
     sampling: MiniCPMODuplexSampling = Field(default_factory=MiniCPMODuplexSampling)
     vision: MiniCPMODuplexVision = Field(default_factory=MiniCPMODuplexVision)
     entry_stage: str = "perception"

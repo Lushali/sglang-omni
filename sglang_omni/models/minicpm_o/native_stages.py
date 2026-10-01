@@ -23,6 +23,10 @@ from sglang_omni.models.minicpm_o.components.streaming_perception import (
 )
 from sglang_omni.models.minicpm_o.components.tts_runtime import MiniCPMOVocoderRuntime
 from sglang_omni.models.minicpm_o.engine_builder import MiniCPMOThinkerEngineBuilder
+from sglang_omni.models.minicpm_o.native_config import (
+    DEFAULT_MAX_SESSIONS,
+    DEFAULT_SPEECH_STATE_BYTES_PER_SESSION,
+)
 from sglang_omni.models.minicpm_o.stages import (
     create_sglang_talker_executor_from_config,
 )
@@ -185,10 +189,10 @@ def create_perception_scheduler(
     gpu_id: int | None = None,
     dtype: str = "bfloat16",
     reference_audio: str | None = None,
-    max_open_sessions: int,
+    max_open_sessions: int = DEFAULT_MAX_SESSIONS,
 ) -> SessionScheduler:
-    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     device = str(resolve_concrete_device(device, gpu_id))
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     encoder = MiniCPMOAudioEncoder(model_path, device=device, dtype=dtype)
     image_encoder = MiniCPMOImageEncoder(model_path, device=device, dtype=dtype)
     processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
@@ -233,8 +237,9 @@ def create_speech_scheduler(
     device: str | None = None,
     gpu_id: int | None = None,
     reference_audio: str | None = None,
-    max_open_sessions: int,
-    max_state_bytes: int,
+    max_open_sessions: int = DEFAULT_MAX_SESSIONS,
+    max_state_bytes: int = DEFAULT_SPEECH_STATE_BYTES_PER_SESSION
+    * DEFAULT_MAX_SESSIONS,
 ) -> SessionScheduler:
     device = str(resolve_concrete_device(device, gpu_id))
     # note (Junnan Li): Sessions stream one reference each, so the batched-offline options stay off.
