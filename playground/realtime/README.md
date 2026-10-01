@@ -11,8 +11,7 @@ your own computer; headphones help prevent echo.
 Run these commands **on the GPU server**:
 
 ```bash
-git clone --branch feat/native-duplex-playground --single-branch \
-  https://github.com/sgl-project/sglang-omni.git
+git clone https://github.com/sgl-project/sglang-omni.git
 cd sglang-omni
 
 docker run -d --name omni-playground \

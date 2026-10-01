@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Serve the MiniCPM demo with a transparent SGLang-Omni realtime connection."""
 
 import argparse
