@@ -23,6 +23,7 @@ class DuplexSamplerState:
     listen_prob_scale: float
     greedy: bool
     max_new_tokens: int
+    repetition_window_size: int
     generation_step: int = 0
     force_listen_count: int = 0
     force_listen_counter: int = 0
@@ -114,7 +115,9 @@ def duplex_sample(logits: torch.Tensor, state: DuplexSamplerState) -> int:
                 else:
                     pass
                 if penalty != 1.0:
-                    for token_id in set(state.generated_history[-512:]):
+                    for token_id in set(
+                        state.generated_history[-state.repetition_window_size :]
+                    ):
                         if 0 <= int(token_id) < row.numel():
                             # note (Junnan Li): Matches the checkpoint sampler, which ignores the logit sign.
                             if penalty > 1.0:
@@ -143,7 +146,7 @@ def duplex_sample(logits: torch.Tensor, state: DuplexSamplerState) -> int:
 
                 # note (Junnan Li): History retains controls before the mid-turn listen rewrite.
                 state.generated_history.append(candidate)
-                del state.generated_history[:-512]
+                del state.generated_history[: -state.repetition_window_size]
                 if candidate == special.listen and not state.current_turn_ended:
                     candidate = special.tts_bos
                 else:

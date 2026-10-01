@@ -68,6 +68,9 @@ class MiniCPMODuplexSampling(BaseModel):
     listen_prob_scale: float = Field(default=1.0, ge=0)
     force_listen_count: int = Field(default=3, ge=0)
     max_new_tokens_per_unit: int = Field(default=20, ge=1)
+    repetition_window_size: int = Field(default=512, ge=1)
+    talker_temperature: float = Field(default=0.8, ge=0)
+    talker_repetition_penalty: float = Field(default=1.05, gt=0)
 
 
 class MiniCPMODuplexVision(BaseModel):
@@ -127,11 +130,8 @@ class MiniCPMODuplexPipelineConfig(PipelineConfig):
         elif stage_name in {"thinker", "talker"}:
             return {
                 "server_args_overrides": {
-                    "max_running_requests": max(
-                        4 if stage_name == "thinker" else 32,
-                        self.max_sessions
-                        + REQUEST_TO_TOKEN_SLOTS_RESERVED_FOR_RETAINED_KV,
-                    )
+                    "max_running_requests": self.max_sessions
+                    + REQUEST_TO_TOKEN_SLOTS_RESERVED_FOR_RETAINED_KV
                 }
             }
         else:

@@ -137,8 +137,8 @@ def test_engine_factory_resolves_native_config_before_server_args(
 @pytest.mark.parametrize(
     ("settings", "sessions", "state_bytes", "thinker", "talker"),
     [
-        ("", 2, 4 << 30, 4, 32),
-        ("max_sessions: 8\n", 8, 16 << 30, 9, 32),
+        ("", 2, 4 << 30, 3, 3),
+        ("max_sessions: 8\n", 8, 16 << 30, 9, 9),
         (
             "max_sessions: 64\nspeech_state_bytes_per_session: 1024\n",
             64,

@@ -24,6 +24,9 @@ DEFAULT_SAMPLING = {
     "listen_prob_scale": 1.0,
     "force_listen_count": 3,
     "max_new_tokens_per_unit": 20,
+    "repetition_window_size": 512,
+    "talker_temperature": 0.8,
+    "talker_repetition_penalty": 1.05,
 }
 
 
@@ -63,6 +66,9 @@ async def test_session_sampling_overrides_deployment_defaults_locally() -> None:
         "greedy": False,
         "force_listen_count": 0,
         "max_new_tokens_per_unit": 8,
+        "repetition_window_size": 64,
+        "talker_temperature": 0.6,
+        "talker_repetition_penalty": 1.1,
     }
     overridden = await open_session_params(config, override)
     plain = await open_session_params(config, {})

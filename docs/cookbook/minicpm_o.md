@@ -53,7 +53,10 @@ before sending the first audio packet:
         "repetition_penalty": 1.05,
         "listen_prob_scale": 1.0,
         "force_listen_count": 3,
-        "max_new_tokens_per_unit": 20
+        "max_new_tokens_per_unit": 20,
+        "repetition_window_size": 512,
+        "talker_temperature": 0.8,
+        "talker_repetition_penalty": 1.05
       }
     }
   }
@@ -64,7 +67,7 @@ before sending the first audio packet:
 Unsupported fields are rejected. Sampling settings are fixed once the session
 opens; start a new session to change them after audio input has begun.
 
-Omitted fields use the deployment defaults from the `sampling` section of the pipeline config (see `examples/full_duplex/minicpmo.yaml`), which ship as `greedy=false`, `temperature=0.7`, `top_k=20`, `top_p=0.8`, `repetition_penalty=1.05`, `listen_prob_scale=1.0`, `force_listen_count=3`, and `max_new_tokens_per_unit=20`. Values sent in `session.update` apply only to that session. Set `greedy=false` to enable temperature/top-k/top-p
+Omitted fields use the deployment defaults from the `sampling` section of the pipeline config (see `examples/full_duplex/minicpmo.yaml`), which ship as `greedy=false`, `temperature=0.7`, `top_k=20`, `top_p=0.8`, `repetition_penalty=1.05`, `listen_prob_scale=1.0`, `force_listen_count=3`, `max_new_tokens_per_unit=20`, `repetition_window_size=512`, `talker_temperature=0.8`, and `talker_repetition_penalty=1.05`. Values sent in `session.update` apply only to that session. Set `greedy=false` to enable temperature/top-k/top-p
 sampling; `temperature=0` selects the second-stage argmax. The initial
 chunk-end draw follows `greedy` and uses the unscaled distribution.
 `force_listen_count=0` disables the initial forced-listen units.

@@ -25,12 +25,7 @@ from sglang_omni.models.minicpm_o.thinker_state import (
     MiniCPMOThinkerSessionState,
 )
 from sglang_omni.proto.request import OmniRequest, StagePayload
-from sglang_omni.proto.session import (
-    OutputChunk,
-    SessionIdentity,
-    SessionLimits,
-    TimedChunk,
-)
+from sglang_omni.proto.session import OutputChunk, SessionIdentity, TimedChunk
 from sglang_omni.scheduling.sglang_backend.ar_session import ARSessionAdapter
 from sglang_omni.scheduling.sglang_backend.request_data import EmbeddingSpan
 from sglang_omni.serve.realtime.adapters import CoordinatorAdapter
@@ -236,7 +231,6 @@ def build_realtime_deployment(
             output_converter=OutputConverter(),
             input_sample_rate_hz=16000,
             atomic_consumption=True,
-            limits=SessionLimits(operation_timeout_s=120),
         )
 
     return RealtimeDeployment(

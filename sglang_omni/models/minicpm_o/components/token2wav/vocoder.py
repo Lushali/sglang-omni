@@ -28,6 +28,9 @@ from sglang_omni.models.minicpm_o.components.token2wav.flow import (
     CausalMaskedDiffWithXvec,
 )
 from sglang_omni.models.minicpm_o.components.token2wav.hift import HiFTGenerator
+
+# note (Junnan Li): stepaudio2 Token2wav keeps the prompt plus this many frames so positions stay in range.
+FLOW_CACHE_TAIL_FRAMES = 100
 from sglang_omni.models.minicpm_o.components.token2wav.speech_tokenizer import (
     S3TokenizerV2,
 )
@@ -289,21 +292,31 @@ class Token2Wav(torch.nn.Module):
                 n_timesteps=self.n_timesteps,
             )
         prompt_len = prompt_mels.shape[1]
-        if flow_cache["estimator_att_cache"].shape[4] > prompt_len + 100:
+        if (
+            flow_cache["estimator_att_cache"].shape[4]
+            > prompt_len + FLOW_CACHE_TAIL_FRAMES
+        ):
             flow_cache["estimator_att_cache"] = torch.cat(
                 [
                     flow_cache["estimator_att_cache"][:, :, :, :, :prompt_len],
-                    flow_cache["estimator_att_cache"][:, :, :, :, -100:],
+                    flow_cache["estimator_att_cache"][
+                        :, :, :, :, -FLOW_CACHE_TAIL_FRAMES:
+                    ],
                 ],
                 dim=4,
             )
         else:
             pass
-        if flow_cache["conformer_att_cache"].shape[3] > prompt_len + 100:
+        if (
+            flow_cache["conformer_att_cache"].shape[3]
+            > prompt_len + FLOW_CACHE_TAIL_FRAMES
+        ):
             flow_cache["conformer_att_cache"] = torch.cat(
                 [
                     flow_cache["conformer_att_cache"][:, :, :, :prompt_len, :],
-                    flow_cache["conformer_att_cache"][:, :, :, -100:, :],
+                    flow_cache["conformer_att_cache"][
+                        :, :, :, -FLOW_CACHE_TAIL_FRAMES:, :
+                    ],
                 ],
                 dim=3,
             )

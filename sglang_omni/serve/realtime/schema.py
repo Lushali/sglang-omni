@@ -73,6 +73,9 @@ class SamplingConfig(TypedDict, total=False):
     greedy: bool
     force_listen_count: Annotated[int, Field(ge=0)]
     max_new_tokens_per_unit: Annotated[int, Field(ge=1)]
+    repetition_window_size: Annotated[int, Field(ge=1)]
+    talker_temperature: Annotated[float, Field(ge=0)]
+    talker_repetition_penalty: Annotated[float, Field(gt=0)]
 
 
 class AudioReference(BaseModel):

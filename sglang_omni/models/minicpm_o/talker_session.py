@@ -11,6 +11,7 @@ from sglang_omni.models.minicpm_o.components.sglang_talker import (
     MiniCPMOTalkerForCausalLM,
 )
 from sglang_omni.models.minicpm_o.components.talker import build_tts_condition
+from sglang_omni.models.minicpm_o.components.tts_runtime import CODEC_CHUNK_SIZE
 from sglang_omni.models.minicpm_o.talker_request import CodecTokenizer
 from sglang_omni.proto.request import OmniRequest, StagePayload
 from sglang_omni.proto.session import SessionIdentity, TimedChunk
@@ -22,6 +23,9 @@ from sglang_omni.scheduling.sglang_backend.request_data import (
     EmbeddingSpan,
     SGLangARRequestData,
 )
+
+# note (Junnan Li): One 1 s unit of codec tokens plus one, as in the checkpoint's duplex TTS.
+TALKER_TOKENS_PER_UNIT = CODEC_CHUNK_SIZE + 1
 
 
 @dataclass(kw_only=True)
@@ -89,9 +93,13 @@ class TalkerAdapter(ARSessionAdapter):
             normalize_projected_hidden=self.model.normalize_projected_hidden,
         )
         sampling = SamplingParams(
-            max_new_tokens=26,
-            min_new_tokens=0 if state.turn_start or payload.data["end_of_turn"] else 26,
-            temperature=0.8,
+            max_new_tokens=TALKER_TOKENS_PER_UNIT,
+            min_new_tokens=(
+                0
+                if state.turn_start or payload.data["end_of_turn"]
+                else TALKER_TOKENS_PER_UNIT
+            ),
+            temperature=payload.request.params["talker_temperature"],
             top_p=1.0,
             top_k=-1,
             repetition_penalty=1.0,
@@ -116,8 +124,10 @@ class TalkerAdapter(ARSessionAdapter):
             unit_embedding_spans=[
                 EmbeddingSpan(start=0, end=condition_rows, input_embeds=condition)
             ],
-            max_new_tokens=26,
-            talker_model_inputs={"rep_penalty": 1.05},
+            max_new_tokens=TALKER_TOKENS_PER_UNIT,
+            talker_model_inputs={
+                "rep_penalty": payload.request.params["talker_repetition_penalty"]
+            },
         )
 
     def result(

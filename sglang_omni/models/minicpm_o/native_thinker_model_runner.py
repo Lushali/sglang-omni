@@ -183,6 +183,7 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
                     listen_prob_scale=sampling.listen_prob_scale,
                     greedy=sampling.greedy,
                     max_new_tokens=sampling.max_new_tokens_per_unit,
+                    repetition_window_size=sampling.repetition_window_size,
                 )
                 token = duplex_sample(original_logits[index], sampler_state)
                 session.current_turn_ended = sampler_state.current_turn_ended

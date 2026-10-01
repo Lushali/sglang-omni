@@ -80,6 +80,7 @@ def test_checkpoint_bad_tokens_are_not_sampled(use_runner: bool) -> None:
         listen_prob_scale=1.0,
         greedy=True,
         max_new_tokens=20,
+        repetition_window_size=512,
     )
     assert duplex_sample(logits, state) == 42
 
@@ -102,6 +103,7 @@ def test_unit_token_budget_closes_the_chunk(max_new_tokens: int, closes: bool) -
         listen_prob_scale=1.0,
         greedy=True,
         max_new_tokens=max_new_tokens,
+        repetition_window_size=512,
         generation_step=4,
     )
     assert (duplex_sample(logits, state) == special.chunk_eos) is closes

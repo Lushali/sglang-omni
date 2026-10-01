@@ -17,8 +17,11 @@ const SAMPLING_FIELDS = [
   { key: "listen_prob_scale", label: "Listen scale", step: "0.1", min: "0", placeholder: "1" },
   { key: "force_listen_count", label: "Initial listen units", step: "1", min: "0", placeholder: "3" },
   { key: "max_new_tokens_per_unit", label: "Tokens per unit", step: "1", min: "1", placeholder: "20" },
+  { key: "repetition_window_size", label: "Repetition window", step: "1", min: "1", placeholder: "512" },
+  { key: "talker_temperature", label: "Voice temperature", step: "0.05", min: "0", placeholder: "0.8" },
+  { key: "talker_repetition_penalty", label: "Voice repetition penalty", step: "0.05", min: "1", placeholder: "1.05" },
 ];
-const INTEGER_FIELDS = new Set(["top_k", "force_listen_count", "max_new_tokens_per_unit"]);
+const INTEGER_FIELDS = new Set(["top_k", "force_listen_count", "max_new_tokens_per_unit", "repetition_window_size"]);
 
 // Float32 mono samples at 16 kHz -> the {media_type, data} WAV the server accepts.
 function referenceWav(samples) {

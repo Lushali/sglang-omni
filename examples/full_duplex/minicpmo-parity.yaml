@@ -14,6 +14,9 @@ sampling:
   listen_prob_scale: 1.0
   force_listen_count: 3
   max_new_tokens_per_unit: 20
+  repetition_window_size: 512
+  talker_temperature: 0.8
+  talker_repetition_penalty: 1.05
 
 vision:
   max_frames_per_unit: 4
