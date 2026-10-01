@@ -79,8 +79,32 @@ def test_checkpoint_bad_tokens_are_not_sampled(use_runner: bool) -> None:
         repetition_penalty=1.0,
         listen_prob_scale=1.0,
         greedy=True,
+        max_new_tokens=20,
     )
     assert duplex_sample(logits, state) == 42
+
+
+@pytest.mark.parametrize(("max_new_tokens", "closes"), [(5, True), (6, False)])
+def test_unit_token_budget_closes_the_chunk(max_new_tokens: int, closes: bool) -> None:
+    tokenizer = Mock(unk_token_id=0, bad_token_ids=[7, 8, 94])
+    tokenizer.convert_tokens_to_ids.side_effect = dict(
+        zip(REQUIRED_SPECIAL_TOKENS, range(100, 116))
+    ).__getitem__
+    special = ThinkerAdapter(tokenizer, 128).special
+    logits = torch.zeros(128)
+    state = DuplexSamplerState(
+        special_tokens=special,
+        forbidden_index=forbidden_token_index(special, 128, torch.device("cpu")),
+        temperature=0.7,
+        top_k=1,
+        top_p=0.8,
+        repetition_penalty=1.0,
+        listen_prob_scale=1.0,
+        greedy=True,
+        max_new_tokens=max_new_tokens,
+        generation_step=4,
+    )
+    assert (duplex_sample(logits, state) == special.chunk_eos) is closes
 
 
 @pytest.mark.parametrize(

@@ -22,6 +22,7 @@ class DuplexSamplerState:
     repetition_penalty: float
     listen_prob_scale: float
     greedy: bool
+    max_new_tokens: int
     generation_step: int = 0
     force_listen_count: int = 0
     force_listen_counter: int = 0
@@ -90,7 +91,7 @@ def duplex_sample(logits: torch.Tensor, state: DuplexSamplerState) -> int:
         pass
     special = state.special_tokens
 
-    if state.generation_step >= 19:
+    if state.generation_step >= state.max_new_tokens - 1:
         return special.chunk_eos
     else:
         if (

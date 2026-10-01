@@ -23,6 +23,7 @@ DEFAULT_SAMPLING = {
     "repetition_penalty": 1.05,
     "listen_prob_scale": 1.0,
     "force_listen_count": 3,
+    "max_new_tokens_per_unit": 20,
 }
 
 
@@ -61,6 +62,7 @@ async def test_session_sampling_overrides_deployment_defaults_locally() -> None:
         "listen_prob_scale": 0.5,
         "greedy": False,
         "force_listen_count": 0,
+        "max_new_tokens_per_unit": 8,
     }
     overridden = await open_session_params(config, override)
     plain = await open_session_params(config, {})

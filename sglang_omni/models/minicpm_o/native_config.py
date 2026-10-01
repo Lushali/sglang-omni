@@ -67,6 +67,7 @@ class MiniCPMODuplexSampling(BaseModel):
     repetition_penalty: float = Field(default=1.05, gt=0)
     listen_prob_scale: float = Field(default=1.0, ge=0)
     force_listen_count: int = Field(default=3, ge=0)
+    max_new_tokens_per_unit: int = Field(default=20, ge=1)
 
 
 class MiniCPMODuplexVision(BaseModel):

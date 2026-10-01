@@ -88,8 +88,14 @@ class ThinkerAdapter(ARSessionAdapter):
             )
             for span in plan["embedding_spans"]
         ]
+        sampling = MiniCPMODuplexSampling.model_validate(
+            {
+                key: payload.request.params[key]
+                for key in MiniCPMODuplexSampling.model_fields
+            }
+        )
         params = SamplingParams(
-            max_new_tokens=plan["decode_budget"],
+            max_new_tokens=sampling.max_new_tokens_per_unit,
             temperature=1.0,
             top_p=1.0,
             top_k=-1,
@@ -104,16 +110,10 @@ class ThinkerAdapter(ARSessionAdapter):
         )
         req.tokenizer = self.tokenizer
         req.return_hidden_states = True
-        sampling = MiniCPMODuplexSampling.model_validate(
-            {
-                key: payload.request.params[key]
-                for key in MiniCPMODuplexSampling.model_fields
-            }
-        )
         return DuplexUnitRequestData(
             req=req,
             input_ids=torch.tensor(ids),
-            max_new_tokens=plan["decode_budget"],
+            max_new_tokens=sampling.max_new_tokens_per_unit,
             stage_payload=payload,
             thinker_state=state,
             unit_embedding_spans=spans,

@@ -72,7 +72,6 @@ def test_audio_plan_without_image(
     assert plan["input_embeds"].shape[0] == embed_start + 10
     assert torch.equal(plan["input_embeds"][embed_start:], audio)
     assert plan["prefill_schema"] == [("tok", 1), ("audio", 10)]
-    assert plan["decode_budget"] == 20
 
 
 @pytest.mark.parametrize("chunk_index", [1, 2])

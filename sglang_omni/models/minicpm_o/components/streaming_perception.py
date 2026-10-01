@@ -21,7 +21,6 @@ from sglang_omni.scheduling.speaker_cache import estimate_cache_bytes
 SAMPLE_RATE = 16000
 UNIT_MS = 1000
 FIRST_CHUNK_MS = 1035
-UNIT_DECODE_BUDGET = 20
 IMAGE_TOKENS = 64
 MAX_FRAME_PIXELS = 4096 * 4096
 
@@ -103,7 +102,6 @@ class PerceptionStepPlan(TypedDict):
     input_embeds: torch.Tensor
     embedding_spans: list[EmbeddingSpanPlan]
     prefill_schema: list[tuple[Literal["tok", "audio", "image"], int]]
-    decode_budget: int
 
 
 @dataclass(kw_only=True)
@@ -347,5 +345,4 @@ class MiniCPMOPerceptionState:
             input_embeds=torch.cat(embed_blocks, dim=0),
             embedding_spans=spans,
             prefill_schema=schema,
-            decode_budget=UNIT_DECODE_BUDGET,
         )

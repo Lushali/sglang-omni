@@ -182,6 +182,7 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
                     repetition_penalty=sampling.repetition_penalty,
                     listen_prob_scale=sampling.listen_prob_scale,
                     greedy=sampling.greedy,
+                    max_new_tokens=sampling.max_new_tokens_per_unit,
                 )
                 token = duplex_sample(original_logits[index], sampler_state)
                 session.current_turn_ended = sampler_state.current_turn_ended
@@ -232,10 +233,6 @@ class MiniCPMOThinkerModelRunner(OfflineThinkerModelRunner):
                     data.unit_pairs.append(
                         (pending, hidden.to("cpu"), pending == special.turn_eos)
                     )
-                    if len(data.unit_pairs) > 20:
-                        del data.unit_pairs[:-20]
-                    else:
-                        pass
                 else:
                     pass
                 if sampled in special.chunk_terminators:
