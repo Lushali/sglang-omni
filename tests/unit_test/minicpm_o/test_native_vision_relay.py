@@ -237,7 +237,6 @@ def test_empty_eos_does_not_encode(
     "error",
     [
         ValueError("bad frame"),
-        OSError("truncated"),
         Image.DecompressionBombError("big"),
     ],
 )

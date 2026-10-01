@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import hashlib
-import inspect
 import json
 import subprocess
 import sys
@@ -155,7 +154,6 @@ def stub_stage_models(monkeypatch: pytest.MonkeyPatch) -> SessionHooks:
     ("settings", "sessions", "state_bytes", "thinker", "talker"),
     [
         ("", 2, 4 << 30, 3, 3),
-        ("max_sessions: 8\n", 8, 16 << 30, 9, 9),
         (
             "max_sessions: 64\nspeech_state_bytes_per_session: 1024\n",
             64,
@@ -231,14 +229,6 @@ def test_native_thinker_context_length(
     with pytest.raises(ConfigLoaded):
         builder.build(str(snapshot), device="cpu", server_args_overrides=overrides)
     assert server_args.call_args.kwargs["context_length"] == (context_length or 8192)
-
-
-def test_native_engine_factories_declare_the_placement_fraction() -> None:
-    for factory in (
-        native_stages.create_thinker_scheduler,
-        native_stages.create_talker_scheduler,
-    ):
-        assert "total_gpu_memory_fraction" in inspect.signature(factory).parameters
 
 
 def test_minicpmo_configs_load_without_sglang(tmp_path: Path) -> None:

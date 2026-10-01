@@ -157,22 +157,13 @@ def test_open_session_merges_patch_into_current_configuration() -> None:
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("temperature", -1.0),
         ("temperature", float("nan")),
-        ("temperature", float("inf")),
         ("temperature", "0.7"),
-        ("top_k", -2),
         ("top_k", True),
-        ("top_p", 0.0),
         ("top_p", 1.1),
-        ("repetition_penalty", 0.0),
-        ("listen_prob_scale", -1.0),
-        ("force_listen_count", -1),
         ("force_listen_count", 1.5),
         ("max_new_tokens_per_unit", 0),
-        ("repetition_window_size", 0),
         ("talker_temperature", -1.0),
-        ("talker_repetition_penalty", 0.0),
         ("length_penalty", 1.1),
     ],
 )

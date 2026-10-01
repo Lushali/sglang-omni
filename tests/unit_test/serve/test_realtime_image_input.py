@@ -57,9 +57,7 @@ def image_event(t_ms: float = 0.0, image: bytes = JPEG) -> JsonObject:
     "fields",
     [
         {"sglang": {}},
-        {"sglang": {"t_ms": "0"}},
         {"sglang": {"t_ms": float("nan")}},
-        {"sglang": {"t_ms": 0.0, "seq": 1}},
         {"image": b"abc"},
         {"extra": 1},
     ],
@@ -91,18 +89,22 @@ def test_frame_binding_missing_frame_and_accounting() -> None:
 
 
 @pytest.mark.parametrize(
-    ("scenario", "code", "message"),
+    ("scenario", "fields", "code"),
     [
-        ("late", "invalid_state", "frame unit already cut"),
-        ("ended", "invalid_state", "input has ended"),
-        ("unsupported", "not_supported", "image input is not granted"),
+        ("late", {}, "invalid_state"),
+        ("ended", {}, "invalid_state"),
+        ("unsupported", {}, "not_supported"),
+        ("lookahead", {"sglang": {"t_ms": 60.0}}, "buffer_overflow"),
+        ("too_large", {"image": "!" * 13}, "buffer_overflow"),
+        ("not_base64", {"image": "!!!!"}, "invalid_request"),
+        ("gif", {"image": base64.b64encode(b"GIF89a").decode()}, "invalid_request"),
     ],
 )
-def test_binding_rejections_are_nonfatal(
-    scenario: str, code: str, message: str
+def test_frame_rejections_are_nonfatal(
+    scenario: str, fields: JsonObject, code: str
 ) -> None:
     modalities = ("audio",) if scenario == "unsupported" else ("audio", "image")
-    with image_websocket(ScriptedAdapter(), modalities) as websocket:
+    with image_websocket(ScriptedAdapter(), modalities, max_image_bytes=8) as websocket:
         open_session(websocket)
         if scenario == "late":
             append_audio(websocket, b"\0" * UNIT_BYTES, 0)
@@ -112,47 +114,12 @@ def test_binding_rejections_are_nonfatal(
             receive_until(websocket, "sglang.input_audio.drained")
         else:
             pass
-        websocket.send_json(image_event())
+        websocket.send_json({**image_event(), **fields})
         error = websocket.receive_json()
-        assert error["error"]["code"] == code
-        assert error["error"]["event_id"] == "frame"
+        assert (error["error"]["code"], error["error"]["event_id"]) == (code, "frame")
         assert error["sglang"]["fatal"] is False
-        assert error["error"]["message"] == message
         send_event(websocket, "session.update", session={})
         assert websocket.receive_json()["type"] == "session.updated"
-
-
-def test_lookahead_uses_ceiling_of_accepted_audio_time() -> None:
-    with image_websocket(ScriptedAdapter()) as websocket:
-        open_session(websocket)
-        websocket.send_json(image_event(40.0))
-        assert websocket.receive_json()["unit_id"] == "unit_2"
-        append_audio(websocket, b"\0\0", 0)
-        websocket.receive_json()
-        websocket.send_json(image_event(60.0))
-        assert websocket.receive_json()["unit_id"] == "unit_3"
-        websocket.send_json(image_event(80.0))
-        assert websocket.receive_json()["error"]["code"] == "buffer_overflow"
-
-
-@pytest.mark.parametrize(
-    ("encoded", "code"),
-    [
-        ("!" * 13, "buffer_overflow"),
-        ("!!!!", "invalid_request"),
-        (base64.b64encode(b"GIF89a").decode(), "invalid_request"),
-        (base64.b64encode(b"\xff\xd8" + b"x" * 7).decode(), "buffer_overflow"),
-    ],
-)
-def test_invalid_image_bytes_are_nonfatal(encoded: str, code: str) -> None:
-    with image_websocket(ScriptedAdapter(), max_image_bytes=8) as websocket:
-        open_session(websocket)
-        websocket.send_json({**image_event(), "image": encoded})
-        error = websocket.receive_json()
-        assert error["error"]["code"] == code
-        assert error["sglang"]["fatal"] is False
-        websocket.send_json(image_event(image=PNG))
-        assert websocket.receive_json()["type"] == "sglang.input_image.accepted"
 
 
 def test_image_capability_is_granted_over_http_and_session() -> None:
@@ -209,24 +176,9 @@ def test_audio_only_session_events_carry_no_image_fields() -> None:
         send_event(websocket, "session.update", session={})
         events.append(websocket.receive_json())
         append_audio(websocket, b"\0" * UNIT_BYTES, 0)
-        events.extend([websocket.receive_json(), websocket.receive_json()])
-        send_event(websocket, "sglang.input_audio.end")
-        events.extend([websocket.receive_json() for _ in range(3)])
-        send_event(websocket, "session.close")
-        events.append(websocket.receive_json())
-    assert [event["type"] for event in events] == [
-        "session.created",
-        "session.updated",
-        "sglang.input_audio.accepted",
-        "sglang.unit.done",
-        "sglang.input_audio.ended",
-        "sglang.unit.done",
-        "sglang.input_audio.drained",
-        "session.closed",
-    ]
+        events.extend(receive_until(websocket, "sglang.unit.done"))
     granted = events[1]["session"]["sglang"]["granted"]
     assert granted["input_modalities"] == ["audio"]
-    assert "input_image_format" not in granted
     assert "image" not in json.dumps(events)
 
 

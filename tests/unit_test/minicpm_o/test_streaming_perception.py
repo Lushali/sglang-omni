@@ -91,28 +91,16 @@ def test_image_plan_follows_official_slice_order(
     plan = state.build_step_plan(audio, (first, second))
     prefix = state.prefix_token_ids if chunk_index == 1 else []
     offset = len(prefix)
-    assert plan["token_ids"] == (
-        prefix
-        + [1, 2]
-        + [0] * 64
-        + [3, 4]
-        + [0] * 64
-        + [5, 4]
-        + [0] * 64
-        + [5, 2]
-        + [0] * 64
-        + [3]
-        + [0] * 10
-    )
+    # note (Junnan Li): Overview, its two slices, then the second frame's overview.
+    expected = prefix + [1]
+    for open_id, close_id in [(2, 3), (4, 5), (4, 5), (2, 3)]:
+        expected += [open_id, *[0] * 64, close_id]
+    assert plan["token_ids"] == expected + [0] * 10
     unit_spans = plan["embedding_spans"][-5:]
     assert [span["modality"] for span in unit_spans] == ["image"] * 4 + ["audio"]
     assert [(span["token_start"], span["token_end"]) for span in unit_spans] == [
-        (offset + 2, offset + 66),
-        (offset + 68, offset + 132),
-        (offset + 134, offset + 198),
-        (offset + 200, offset + 264),
-        (offset + 265, offset + 275),
-    ]
+        (offset + 2 + 66 * index, offset + 66 + 66 * index) for index in range(4)
+    ] + [(offset + 265, offset + 275)]
     blocks = [state.prefix_embeds] if prefix else []
     blocks += [*first.split(64), second, audio]
     assert torch.equal(plan["input_embeds"], torch.cat(blocks))
