@@ -10,7 +10,7 @@ import pytest
 
 from sglang_omni.serve.realtime.negotiation import SessionNegotiation
 from sglang_omni.serve.realtime.reference_audio import MAX_REFERENCE_AUDIO_BYTES
-from sglang_omni.serve.realtime.schema import JsonValue
+from sglang_omni.serve.realtime.schema import JsonValue, SessionConfiguration
 from sglang_omni.serve.realtime.types import Capabilities, ProtocolError, RuntimeLimits
 from tests.unit_test.serve.test_realtime_duplex_session import (
     ScriptedAdapter,
@@ -35,6 +35,13 @@ NEGOTIATION = SessionNegotiation(
     capabilities=Capabilities(supports_reference_audio=True),
     limits=RuntimeLimits(),
 )
+
+
+def negotiate_reference(field: str, data: JsonValue) -> SessionConfiguration:
+    config, _ = NEGOTIATION.negotiate(
+        {}, "CREATED", {"sglang": {field: {"media_type": "audio/wav", "data": data}}}
+    )
+    return config
 
 
 @pytest.mark.parametrize(
@@ -65,11 +72,7 @@ NEGOTIATION = SessionNegotiation(
 )
 def test_invalid_reference_is_rejected(data: JsonValue) -> None:
     with pytest.raises(ProtocolError) as error:
-        NEGOTIATION.negotiate(
-            {},
-            "CREATED",
-            {"sglang": {"reference_audio": {"media_type": "audio/wav", "data": data}}},
-        )
+        negotiate_reference("reference_audio", data)
     assert error.value.code == "invalid_request"
 
 
@@ -111,17 +114,8 @@ def test_invalid_reference_is_rejected(data: JsonValue) -> None:
 def test_reference_is_normalized_to_canonical_wav(
     audio: bytes, expected: bytes
 ) -> None:
-    config, _ = NEGOTIATION.negotiate(
-        {},
-        "CREATED",
-        {
-            "sglang": {
-                "tts_reference_audio": {
-                    "media_type": "audio/wav",
-                    "data": base64.b64encode(audio).decode(),
-                }
-            }
-        },
+    config = negotiate_reference(
+        "tts_reference_audio", base64.b64encode(audio).decode()
     )
     assert config["sglang"]["tts_reference_audio"].data == expected
 

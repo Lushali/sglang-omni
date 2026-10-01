@@ -7,6 +7,7 @@ from dataclasses import replace
 
 import pytest
 from pydantic import ValidationError
+from starlette.testclient import WebSocketTestSession
 
 from sglang_omni.serve.realtime.schema import CLIENT_EVENT, JsonObject
 from sglang_omni.serve.realtime.types import Capabilities
@@ -17,6 +18,7 @@ from tests.unit_test.serve.test_realtime_coordinator_adapter import (
     build_adapter,
     build_unit,
 )
+from tests.unit_test.serve.test_realtime_duplex_negotiation import FRAMES_BY_SLICES
 from tests.unit_test.serve.test_realtime_duplex_session import (
     UNIT_BYTES,
     ScriptedAdapter,
@@ -29,7 +31,17 @@ from tests.unit_test.serve.test_realtime_duplex_session import (
 
 JPEG = b"\xff\xd8frame"
 PNG = b"\x89PNGtest"
-FRAMES_BY_SLICES = (4, 3, 2, 2, 1, 1, 1, 1, 1)
+
+
+def image_websocket(
+    adapter: ScriptedAdapter,
+    input_modalities: tuple[str, ...] = ("audio", "image"),
+    **capabilities: int | tuple[int, ...],
+) -> WebSocketTestSession:
+    return build_test_client(
+        adapter,
+        capabilities=Capabilities(input_modalities=input_modalities, **capabilities),
+    ).websocket_connect("/v1/realtime")
 
 
 def image_event(t_ms: float = 0.0, image: bytes = JPEG) -> JsonObject:
@@ -59,9 +71,7 @@ def test_image_schema_rejects_invalid_event(fields: JsonObject) -> None:
 
 def test_frame_binding_missing_frame_and_accounting() -> None:
     adapter = ScriptedAdapter()
-    with build_test_client(
-        adapter, capabilities=Capabilities(input_modalities=("audio", "image"))
-    ).websocket_connect("/v1/realtime") as websocket:
+    with image_websocket(adapter) as websocket:
         open_session(websocket)
         websocket.send_json(image_event(39.999))
         accepted = websocket.receive_json()
@@ -91,12 +101,8 @@ def test_frame_binding_missing_frame_and_accounting() -> None:
 def test_binding_rejections_are_nonfatal(
     scenario: str, code: str, message: str
 ) -> None:
-    capabilities = Capabilities(
-        input_modalities=("audio",) if scenario == "unsupported" else ("audio", "image")
-    )
-    with build_test_client(
-        ScriptedAdapter(), capabilities=capabilities
-    ).websocket_connect("/v1/realtime") as websocket:
+    modalities = ("audio",) if scenario == "unsupported" else ("audio", "image")
+    with image_websocket(ScriptedAdapter(), modalities) as websocket:
         open_session(websocket)
         if scenario == "late":
             append_audio(websocket, b"\0" * UNIT_BYTES, 0)
@@ -117,10 +123,7 @@ def test_binding_rejections_are_nonfatal(
 
 
 def test_lookahead_uses_ceiling_of_accepted_audio_time() -> None:
-    with build_test_client(
-        ScriptedAdapter(),
-        capabilities=Capabilities(input_modalities=("audio", "image")),
-    ).websocket_connect("/v1/realtime") as websocket:
+    with image_websocket(ScriptedAdapter()) as websocket:
         open_session(websocket)
         websocket.send_json(image_event(40.0))
         assert websocket.receive_json()["unit_id"] == "unit_2"
@@ -142,12 +145,7 @@ def test_lookahead_uses_ceiling_of_accepted_audio_time() -> None:
     ],
 )
 def test_invalid_image_bytes_are_nonfatal(encoded: str, code: str) -> None:
-    with build_test_client(
-        ScriptedAdapter(),
-        capabilities=Capabilities(
-            input_modalities=("audio", "image"), max_image_bytes=8
-        ),
-    ).websocket_connect("/v1/realtime") as websocket:
+    with image_websocket(ScriptedAdapter(), max_image_bytes=8) as websocket:
         open_session(websocket)
         websocket.send_json({**image_event(), "image": encoded})
         error = websocket.receive_json()
@@ -234,9 +232,7 @@ def test_audio_only_session_events_carry_no_image_fields() -> None:
 
 def test_clear_drops_frames_and_moves_frame_origin() -> None:
     adapter = ScriptedAdapter()
-    with build_test_client(
-        adapter, capabilities=Capabilities(input_modalities=("audio", "image"))
-    ).websocket_connect("/v1/realtime") as websocket:
+    with image_websocket(adapter) as websocket:
         open_session(websocket)
         websocket.send_json(image_event(0.0, JPEG))
         assert websocket.receive_json()["unit_id"] == "unit_0"
@@ -269,13 +265,7 @@ def test_unit_frames_follow_slice_grant_and_media_time(
     frames: list[tuple[float, bytes]], expected: tuple[bytes, ...]
 ) -> None:
     adapter = ScriptedAdapter()
-    capabilities = Capabilities(
-        input_modalities=("audio", "image"),
-        image_frames_per_unit=FRAMES_BY_SLICES,
-    )
-    with build_test_client(adapter, capabilities=capabilities).websocket_connect(
-        "/v1/realtime"
-    ) as websocket:
+    with image_websocket(adapter, image_frames_per_unit=FRAMES_BY_SLICES) as websocket:
         websocket.receive_json()
         send_event(
             websocket, "session.update", session={"sglang": {"max_slice_nums": 4}}

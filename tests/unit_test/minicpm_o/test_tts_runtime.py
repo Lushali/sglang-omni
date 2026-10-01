@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Sessions with the same reference voice share its prefilled stream caches."""
+"""Vocoder sessions: shared per-voice stream caches, turn resets and failed opens."""
 
 from types import SimpleNamespace
+from unittest.mock import Mock
 
+import pytest
 import torch
 
 from sglang_omni.models.minicpm_o.components.tts_runtime import (
@@ -53,7 +55,7 @@ class FakeCode2Wav:
         return [(torch.zeros(4), torch.zeros(4), torch.ones(8), torch.zeros(1, 6, 80))]
 
 
-def test_sessions_of_one_voice_share_the_stream_caches() -> None:
+def test_voice_caches_are_shared_and_handed_over_on_close() -> None:
     code2wav = FakeCode2Wav()
     runtime = MiniCPMOVocoderRuntime(code2wav)
 
@@ -73,18 +75,10 @@ def test_sessions_of_one_voice_share_the_stream_caches() -> None:
     assert runtime.held("a").bytes == own + shared
     assert runtime.held("b").bytes == own
 
-
-def test_closing_hands_the_shared_caches_to_the_next_session() -> None:
-    runtime = MiniCPMOVocoderRuntime(FakeCode2Wav())
-    first = runtime.open_session("a", reference_audio=b"voice")
-    runtime.open_session("b", reference_audio=b"voice")
-    shared = estimate_cache_bytes(first.speaker.base_caches)
-    own = estimate_cache_bytes((first.caches, first.pending_codec_token_ids))
-
     runtime.close_session("a")
     assert runtime.held("b").bytes == own + shared
-
     runtime.close_session("b")
+    runtime.close_session("c")
     assert not runtime.speakers and not runtime.sessions
 
 
@@ -104,3 +98,14 @@ def test_turn_reset_restores_untouched_prompt_caches() -> None:
 
     runtime.synthesize("a", [], is_turn_start=False, end_of_turn=True)
     assert state.caches[0]["estimator_attention_cache"].sum() == 0
+
+
+def test_invalid_reference_fails_open_without_state() -> None:
+    code2wav = Mock()
+    code2wav.resolve_reference_key.return_value = ("bytes:bad", b"invalid audio")
+    code2wav.prepare_references.side_effect = ValueError("invalid audio")
+    runtime = MiniCPMOVocoderRuntime(code2wav)
+    with pytest.raises(ValueError, match="invalid audio"):
+        runtime.open_session("voice", reference_audio=b"invalid audio")
+    code2wav.prepare_references.assert_called_once_with([b"invalid audio"])
+    assert not runtime.sessions and not runtime.speakers

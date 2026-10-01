@@ -11,6 +11,7 @@ from PIL import Image
 
 from sglang_omni.models.minicpm_o.components.streaming_perception import (
     MiniCPMOPerceptionState,
+    PerceptionStepPlan,
 )
 from sglang_omni.models.minicpm_o.duplex_sampler import (
     DuplexSamplerState,
@@ -23,7 +24,10 @@ from sglang_omni.models.minicpm_o.native_thinker_model_runner import (
     MiniCPMOThinkerModelRunner,
 )
 from sglang_omni.models.minicpm_o.session_adapters import ThinkerAdapter
-from sglang_omni.models.minicpm_o.special_tokens import REQUIRED_SPECIAL_TOKENS
+from sglang_omni.models.minicpm_o.special_tokens import (
+    REQUIRED_SPECIAL_TOKENS,
+    MiniCPMOSpecialTokenIds,
+)
 from sglang_omni.proto.request import OmniRequest, StagePayload
 from sglang_omni.proto.session import SessionIdentity, TimedChunk
 from sglang_omni.scheduling.sglang_backend.ar_session import ARSessionBridge
@@ -31,6 +35,8 @@ from sglang_omni.scheduling.sglang_backend.request_data import (
     EmbeddingSpan,
     splice_embedding_spans,
 )
+
+IDENTITY = SessionIdentity("vision")
 
 
 @pytest.fixture
@@ -51,13 +57,55 @@ def perception() -> MiniCPMOPerceptionState:
     return state
 
 
-@pytest.mark.parametrize("use_runner", [True, False])
-def test_checkpoint_bad_tokens_are_not_sampled(use_runner: bool) -> None:
-    """Both duplex initialization paths retain the checkpoint sampling mask."""
+@pytest.fixture
+def hooks(perception: MiniCPMOPerceptionState) -> PerceptionHooks:
+    hooks = PerceptionHooks(
+        perception.tokenizer,
+        Mock(),
+        perception.audio_encoder,
+        reference_audio=b"",
+        image_encoder=Mock(),
+    )
+    hooks.states[IDENTITY] = perception
+    return hooks
+
+
+def sampling_tokenizer() -> Mock:
     tokenizer = Mock(unk_token_id=0, bad_token_ids=[7, 8, 94])
     tokenizer.convert_tokens_to_ids.side_effect = dict(
         zip(REQUIRED_SPECIAL_TOKENS, range(100, 116))
     ).__getitem__
+    return tokenizer
+
+
+def sampler_state(
+    special: MiniCPMOSpecialTokenIds, **overrides: int
+) -> DuplexSamplerState:
+    return DuplexSamplerState(
+        special_tokens=special,
+        forbidden_token_index=build_forbidden_token_index(
+            special, 128, torch.device("cpu")
+        ),
+        temperature=0.7,
+        top_k=1,
+        top_p=0.8,
+        repetition_penalty=1.0,
+        listen_prob_scale=1.0,
+        greedy=True,
+        **{"max_new_tokens": 20, "repetition_window_size": 512, **overrides},
+    )
+
+
+def unit_payload(data: PerceptionStepPlan | None = None) -> StagePayload:
+    return StagePayload(
+        "unit", OmniRequest(None, params=MiniCPMODuplexSampling().model_dump()), data
+    )
+
+
+@pytest.mark.parametrize("use_runner", [True, False])
+def test_checkpoint_bad_tokens_are_not_sampled(use_runner: bool) -> None:
+    """Both duplex initialization paths retain the checkpoint sampling mask."""
+    tokenizer = sampling_tokenizer()
     if use_runner:
         runner = MiniCPMOThinkerModelRunner.__new__(MiniCPMOThinkerModelRunner)
         runner.special_tokens = None
@@ -70,47 +118,14 @@ def test_checkpoint_bad_tokens_are_not_sampled(use_runner: bool) -> None:
     logits[7] = 100.0
     logits[special.tts_pad] = 99.0
     logits[42] = 0.0
-    state = DuplexSamplerState(
-        special_tokens=special,
-        forbidden_token_index=build_forbidden_token_index(
-            special, 128, torch.device("cpu")
-        ),
-        temperature=0.7,
-        top_k=1,
-        top_p=0.8,
-        repetition_penalty=1.0,
-        listen_prob_scale=1.0,
-        greedy=True,
-        max_new_tokens=20,
-        repetition_window_size=512,
-    )
-    assert duplex_sample(logits, state) == 42
+    assert duplex_sample(logits, sampler_state(special)) == 42
 
 
 @pytest.mark.parametrize(("max_new_tokens", "closes"), [(5, True), (6, False)])
 def test_unit_token_budget_closes_the_chunk(max_new_tokens: int, closes: bool) -> None:
-    tokenizer = Mock(unk_token_id=0, bad_token_ids=[7, 8, 94])
-    tokenizer.convert_tokens_to_ids.side_effect = dict(
-        zip(REQUIRED_SPECIAL_TOKENS, range(100, 116))
-    ).__getitem__
-    special = ThinkerAdapter(tokenizer, 128).special
-    logits = torch.zeros(128)
-    state = DuplexSamplerState(
-        special_tokens=special,
-        forbidden_token_index=build_forbidden_token_index(
-            special, 128, torch.device("cpu")
-        ),
-        temperature=0.7,
-        top_k=1,
-        top_p=0.8,
-        repetition_penalty=1.0,
-        listen_prob_scale=1.0,
-        greedy=True,
-        max_new_tokens=max_new_tokens,
-        repetition_window_size=512,
-        generation_step=4,
-    )
-    assert (duplex_sample(logits, state) == special.chunk_eos) is closes
+    special = ThinkerAdapter(sampling_tokenizer(), 128).special
+    state = sampler_state(special, max_new_tokens=max_new_tokens, generation_step=4)
+    assert (duplex_sample(torch.zeros(128), state) == special.chunk_eos) is closes
 
 
 @pytest.mark.parametrize(
@@ -118,26 +133,16 @@ def test_unit_token_budget_closes_the_chunk(max_new_tokens: int, closes: bool) -
 )
 def test_append_and_thinker_splice(
     perception: MiniCPMOPerceptionState,
+    hooks: PerceptionHooks,
     has_image: bool,
     first_unit: bool,
 ) -> None:
-    identity = SessionIdentity("vision")
-    hooks = PerceptionHooks(
-        perception.tokenizer,
-        Mock(),
-        perception.audio_encoder,
-        reference_audio=b"",
-        image_encoder=Mock(),
-    )
-    hooks.states[identity] = perception
     pcm = np.arange(16000, dtype="<i2").tobytes()
     chunk = TimedChunk(
         "audio", 0, 1000, 0, {"pcm": pcm, "images": [b"frame"]} if has_image else pcm
     )
-    payload = StagePayload(
-        "unit", OmniRequest(None, params=MiniCPMODuplexSampling().model_dump()), None
-    )
-    result = hooks.append(chunk, payload, SimpleNamespace(session_identity=identity))
+    payload = unit_payload()
+    result = hooks.append(chunk, payload, SimpleNamespace(session_identity=IDENTITY))
     assert result is payload
     np.testing.assert_array_equal(
         perception.encode_audio.call_args.args[0],
@@ -148,9 +153,9 @@ def test_append_and_thinker_splice(
     else:
         perception.encode_image.assert_not_called()
     adapter = ThinkerAdapter(perception.tokenizer, 100)
-    adapter.open(identity, payload.request)
-    adapter.states[identity].is_prefix_pending = first_unit
-    request = adapter.build(identity, chunk, payload)
+    adapter.open(IDENTITY, payload.request)
+    adapter.states[IDENTITY].is_prefix_pending = first_unit
+    request = adapter.build(IDENTITY, chunk, payload)
     assert len(request.unit_embedding_spans) == (2 if has_image else 1)
     prefix_length = 0 if first_unit else 1
     for actual, planned in zip(
@@ -177,29 +182,26 @@ def test_append_and_thinker_splice(
 def test_image_audio_commit_atomically(
     perception: MiniCPMOPerceptionState, finish: str
 ) -> None:
-    identity = SessionIdentity("vision")
-    payload = StagePayload(
-        "unit",
-        OmniRequest(None, params=MiniCPMODuplexSampling().model_dump()),
+    payload = unit_payload(
         perception.build_step_plan(
             torch.full((10, 4), 9.0), (torch.full((64, 4), 6.0),)
-        ),
+        )
     )
     adapter = ThinkerAdapter(perception.tokenizer, 100)
-    adapter.open(identity, payload.request)
-    request = adapter.build(identity, TimedChunk("audio", 0, 1000, 0, b""), payload)
+    adapter.open(IDENTITY, payload.request)
+    request = adapter.build(IDENTITY, TimedChunk("audio", 0, 1000, 0, b""), payload)
     history = EmbeddingSpan(start=1, end=3, input_embeds=torch.ones(2, 4))
     unit = SimpleNamespace(
-        session_identity=identity, session_request=None, embedding_spans=[]
+        session_identity=IDENTITY, session_request=None, embedding_spans=[]
     )
     session = SimpleNamespace(unit=unit, embedding_spans=[history])
-    native = Mock(session_id=identity.id)
+    native = Mock(session_id=IDENTITY.id)
     native.create_req.return_value = Mock(
         origin_input_ids=[7] * 12 + list(request.req.origin_input_ids), to_finish=None
     )
     bridge = ARSessionBridge.__new__(ARSessionBridge)
     bridge.drain = Mock()
-    bridge.sessions = {identity.id: session}
+    bridge.sessions = {IDENTITY.id: session}
     bridge.units_by_request_id = {"unit": unit}
     bridge.bridge_scheduler = Mock()
     bridge.bridge_scheduler.session_controller.get.return_value = native
@@ -221,17 +223,10 @@ def test_image_audio_commit_atomically(
     assert session.unit is None
 
 
-def test_empty_eos_does_not_encode(perception: MiniCPMOPerceptionState) -> None:
-    hooks = PerceptionHooks(
-        perception.tokenizer,
-        Mock(),
-        perception.audio_encoder,
-        reference_audio=b"",
-        image_encoder=Mock(),
-    )
-    payload = StagePayload(
-        "unit", OmniRequest(None, params=MiniCPMODuplexSampling().model_dump()), None
-    )
+def test_empty_eos_does_not_encode(
+    perception: MiniCPMOPerceptionState, hooks: PerceptionHooks
+) -> None:
+    payload = unit_payload()
     hooks.append(TimedChunk("audio", 0, 0, 1, None, eos=True), payload, Mock())
     assert payload.data is None
     perception.encode_audio.assert_not_called()
@@ -247,27 +242,18 @@ def test_empty_eos_does_not_encode(perception: MiniCPMOPerceptionState) -> None:
     ],
 )
 def test_undecodable_frame_is_dropped_and_siblings_kept(
-    perception: MiniCPMOPerceptionState, error: Exception
+    perception: MiniCPMOPerceptionState, hooks: PerceptionHooks, error: Exception
 ) -> None:
-    identity = SessionIdentity("vision")
-    hooks = PerceptionHooks(
-        perception.tokenizer,
-        Mock(),
-        perception.audio_encoder,
-        reference_audio=b"",
-        image_encoder=Mock(),
-    )
-    hooks.states[identity] = perception
     first = torch.full((64, 4), 3.0)
     last = torch.full((64, 4), 7.0)
     perception.encode_image.side_effect = [first, error, last]
-    payload = StagePayload("unit", OmniRequest(None), None)
+    payload = unit_payload()
     hooks.append(
         TimedChunk(
             "audio", 0, 1000, 0, {"pcm": b"\0\0", "images": [b"first", b"bad", b"last"]}
         ),
         payload,
-        SimpleNamespace(session_identity=identity),
+        SimpleNamespace(session_identity=IDENTITY),
     )
     spans = payload.data["embedding_spans"]
     assert [span["modality"] for span in spans] == ["image", "image", "audio"]

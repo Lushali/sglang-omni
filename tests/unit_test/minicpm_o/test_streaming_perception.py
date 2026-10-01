@@ -152,19 +152,29 @@ def encoded_image(format: str) -> bytes:
 
 
 @pytest.mark.parametrize(
-    ("encoded", "error", "match"),
+    ("encoded", "error", "match", "pixel_limit"),
     [
-        (encoded_image("GIF"), ValueError, "JPEG or PNG"),
-        (b"\x89PNG\r\n\x1a\ninvalid", UnidentifiedImageError, None),
-        (encoded_image("PNG")[:45], OSError, None),
+        (encoded_image("GIF"), ValueError, "JPEG or PNG", None),
+        (b"\x89PNG\r\n\x1a\ninvalid", UnidentifiedImageError, None, None),
+        (encoded_image("PNG")[:45], OSError, None, None),
+        (encoded_image("PNG"), ValueError, "pixel limit", 15),
     ],
 )
-def test_reject_undecodable_frame_before_processor(
+def test_reject_frame_before_processor(
     state: MiniCPMOPerceptionState,
+    monkeypatch: pytest.MonkeyPatch,
     encoded: bytes,
     error: type[Exception],
     match: str | None,
+    pixel_limit: int | None,
 ) -> None:
+    if pixel_limit is not None:
+        monkeypatch.setattr(
+            "sglang_omni.models.minicpm_o.components.streaming_perception.MAX_FRAME_PIXELS",
+            pixel_limit,
+        )
+    else:
+        pass
     with pytest.raises(error, match=match):
         state.encode_image(encoded)
     state.processor.process_image.assert_not_called()
@@ -176,15 +186,3 @@ def test_reject_invalid_embedding_slot(
 ) -> None:
     with pytest.raises(AssertionError):
         state.build_step_plan(torch.zeros(10, 4), (torch.zeros(shape),))
-
-
-def test_reject_pixel_limit_before_decode(
-    state: MiniCPMOPerceptionState, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(
-        "sglang_omni.models.minicpm_o.components.streaming_perception.MAX_FRAME_PIXELS",
-        15,
-    )
-    with pytest.raises(ValueError, match="pixel limit"):
-        state.encode_image(encoded_image("PNG"))
-    state.processor.process_image.assert_not_called()

@@ -134,6 +134,23 @@ def test_engine_factory_resolves_native_config_before_server_args(
         factory(str(snapshot), server_args_overrides=overrides)
 
 
+@pytest.fixture
+def stub_stage_models(monkeypatch: pytest.MonkeyPatch) -> SessionHooks:
+    hooks = SessionHooks()
+    for name in (
+        "AutoTokenizer",
+        "AutoProcessor",
+        "MiniCPMOAudioEncoder",
+        "MiniCPMOImageEncoder",
+        "MiniCPMOCode2Wav",
+        "MiniCPMOVocoderRuntime",
+    ):
+        monkeypatch.setattr(native_stages, name, Mock())
+    for name in ("PerceptionHooks", "SpeechHooks"):
+        monkeypatch.setattr(native_stages, name, Mock(return_value=hooks))
+    return hooks
+
+
 @pytest.mark.parametrize(
     ("settings", "sessions", "state_bytes", "thinker", "talker"),
     [
@@ -155,7 +172,7 @@ def test_duplex_yaml_session_limits(
     thinker: int,
     talker: int,
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    stub_stage_models: SessionHooks,
 ) -> None:
     reference_path = tmp_path / "reference.wav"
     reference_path.write_bytes(b"reference")
@@ -165,19 +182,7 @@ def test_duplex_yaml_session_limits(
         f"model_path: unused\nreference_audio: {reference_path}\n" + settings
     )
     config = ConfigManager.from_file(str(config_path)).config
-    hooks = SessionHooks()
-    monkeypatch.setattr(native_stages.AutoTokenizer, "from_pretrained", Mock())
-    monkeypatch.setattr(native_stages.AutoProcessor, "from_pretrained", Mock())
-    monkeypatch.setattr(native_stages, "MiniCPMOAudioEncoder", Mock())
-    monkeypatch.setattr(native_stages, "MiniCPMOImageEncoder", Mock())
-    monkeypatch.setattr(native_stages, "PerceptionHooks", Mock(return_value=hooks))
-    monkeypatch.setattr(
-        native_stages,
-        "MiniCPMOCode2Wav",
-        Mock(return_value=Mock(default_prompt_wav=str(reference_path))),
-    )
-    monkeypatch.setattr(native_stages, "MiniCPMOVocoderRuntime", Mock())
-    monkeypatch.setattr(native_stages, "SpeechHooks", Mock(return_value=hooks))
+    native_stages.MiniCPMOCode2Wav.return_value.default_prompt_wav = str(reference_path)
     perception = native_stages.create_perception_scheduler(
         config.model_path, device="cpu", **config.stage_factory_kwargs("perception")
     )
@@ -280,18 +285,10 @@ def test_duplex_deployment_grants_images_by_slice_count() -> None:
 
 
 def test_perception_encoders_share_stage_device(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, stub_stage_models: SessionHooks
 ) -> None:
     reference = tmp_path / "reference.wav"
     reference.write_bytes(b"reference")
-    for name in (
-        "AutoTokenizer",
-        "AutoProcessor",
-        "MiniCPMOAudioEncoder",
-        "MiniCPMOImageEncoder",
-        "PerceptionHooks",
-    ):
-        monkeypatch.setattr(native_stages, name, Mock())
     native_stages.create_perception_scheduler(
         "checkpoint",
         device="cpu",

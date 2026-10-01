@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 import pytest
 
@@ -18,6 +18,9 @@ from tests.unit_test.serve.test_realtime_reference_audio import wav_reference
 
 MODEL_NAME = "duplex-test"
 FRAMES_BY_SLICES = (4, 3, 2, 2, 1, 1, 1, 1, 1)
+IMAGE_CAPABILITIES = Capabilities(
+    input_modalities=("audio", "image"), image_frames_per_unit=FRAMES_BY_SLICES
+)
 REFERENCE = {"media_type": "audio/wav", "data": wav_reference()}
 
 
@@ -203,11 +206,10 @@ def test_invalid_sampling_is_rejected(field: str, value: JsonValue) -> None:
 )
 def test_open_session_freezes_admission_fields(patch: JsonObject) -> None:
     negotiation = build_negotiation(
-        Capabilities(
-            input_modalities=("audio", "image"),
+        replace(
+            IMAGE_CAPABILITIES,
             sampling_parameters=("temperature",),
             supports_reference_audio=True,
-            image_frames_per_unit=FRAMES_BY_SLICES,
         )
     )
     current, granted = negotiation.negotiate(
@@ -233,27 +235,16 @@ def test_open_session_freezes_admission_fields(patch: JsonObject) -> None:
     assert exc_info.value.code == "invalid_state"
 
 
-@pytest.mark.parametrize(("slices", "frames"), [(1, 4), (4, 2), (9, 1)])
-def test_image_frame_grant_follows_slice_setting(slices: int, frames: int) -> None:
-    negotiation = build_negotiation(
-        Capabilities(
-            input_modalities=("audio", "image"),
-            image_frames_per_unit=FRAMES_BY_SLICES,
-        )
-    )
-    _, granted = negotiation.negotiate(
-        {}, "CREATED", {"sglang": {"max_slice_nums": slices}}
-    )
-    assert granted["input_image_format"]["max_frames_per_unit"] == frames
-
-
-def test_slice_setting_beyond_deployment_is_rejected() -> None:
-    negotiation = build_negotiation(
-        Capabilities(
-            input_modalities=("audio", "image"),
-            image_frames_per_unit=FRAMES_BY_SLICES,
-        )
-    )
-    with pytest.raises(ProtocolError) as exc_info:
-        negotiation.negotiate({}, "CREATED", {"sglang": {"max_slice_nums": 10}})
-    assert exc_info.value.code == "invalid_request"
+@pytest.mark.parametrize(("slices", "frames"), [(1, 4), (4, 2), (9, 1), (10, None)])
+def test_image_frame_grant_follows_slice_setting(
+    slices: int, frames: int | None
+) -> None:
+    negotiation = build_negotiation(IMAGE_CAPABILITIES)
+    patch = {"sglang": {"max_slice_nums": slices}}
+    if frames is None:
+        with pytest.raises(ProtocolError) as exc_info:
+            negotiation.negotiate({}, "CREATED", patch)
+        assert exc_info.value.code == "invalid_request"
+    else:
+        _, granted = negotiation.negotiate({}, "CREATED", patch)
+        assert granted["input_image_format"]["max_frames_per_unit"] == frames
