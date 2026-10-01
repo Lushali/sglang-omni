@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Model computations executed by the shared session stage scheduler."""
 
+import copy
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -196,9 +197,12 @@ def create_perception_scheduler(
     device = str(resolve_concrete_device(device, gpu_id))
     encoder = MiniCPMOAudioEncoder(model_path, device=device, dtype=dtype)
     image_encoder = MiniCPMOImageEncoder(model_path, device=device, dtype=dtype)
+    processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
+    # Note (Junnan Li): Loading the processor takes ~0.6 s; a session's only own state is the streaming
+    # mel processor, which set_streaming_mode replaces on the shallow copy at open.
     hooks = PerceptionHooks(
         tokenizer,
-        lambda: AutoProcessor.from_pretrained(model_path, trust_remote_code=True),
+        lambda: copy.copy(processor),
         encoder,
         reference_audio=Path(
             reference_audio

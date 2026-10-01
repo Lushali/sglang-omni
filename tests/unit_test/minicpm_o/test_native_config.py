@@ -167,6 +167,7 @@ def test_duplex_yaml_session_limits(
     config = ConfigManager.from_file(str(config_path)).config
     hooks = SessionHooks()
     monkeypatch.setattr(native_stages.AutoTokenizer, "from_pretrained", Mock())
+    monkeypatch.setattr(native_stages.AutoProcessor, "from_pretrained", Mock())
     monkeypatch.setattr(native_stages, "MiniCPMOAudioEncoder", Mock())
     monkeypatch.setattr(native_stages, "MiniCPMOImageEncoder", Mock())
     monkeypatch.setattr(native_stages, "PerceptionHooks", Mock(return_value=hooks))
@@ -285,6 +286,7 @@ def test_perception_encoders_share_stage_device(
     reference.write_bytes(b"reference")
     for name in (
         "AutoTokenizer",
+        "AutoProcessor",
         "MiniCPMOAudioEncoder",
         "MiniCPMOImageEncoder",
         "PerceptionHooks",
@@ -306,3 +308,7 @@ def test_perception_encoders_share_stage_device(
         native_stages.PerceptionHooks.call_args.kwargs["image_encoder"]
         is native_stages.MiniCPMOImageEncoder.return_value
     )
+    processor_factory = native_stages.PerceptionHooks.call_args.args[1]
+    first, second = processor_factory(), processor_factory()
+    native_stages.AutoProcessor.from_pretrained.assert_called_once()
+    assert first is not second
