@@ -4,8 +4,8 @@
 // for it. Settings are applied when the next session starts and kept in localStorage.
 import { bytesToBase64 } from "./session.js";
 
-// v2: settings stored by v1 carried the persona prompt that stalled audio-only calls.
-const STORE_KEY = "orb.settings.v2";
+// v3: settings stored by v1 carried the persona prompt that stalled audio-only calls; v2 defaulted to the English preset.
+const STORE_KEY = "orb.settings.v3";
 const REFERENCE_RATE = 16000;
 // The server rejects a reference WAV over 1 MiB; 30 s of 16 kHz PCM16 stays under it.
 const MAX_REFERENCE_S = 30;
@@ -118,8 +118,8 @@ export class Settings {
       this.presets = [];
     }
     if (!this.state.presetId && this.presets.length) {
-      const english = this.presets.find((preset) => preset.key.endsWith("/english_call")) || this.presets[0];
-      await this.applyPreset(english.key);
+      // Presets come sorted by their order field; the first one is the deployment's default.
+      await this.applyPreset(this.presets[0].key);
     } else if (this.state.voice.source === "preset") {
       await this.loadPresetVoice(this.state.presetId);
     }
@@ -305,10 +305,7 @@ export class Settings {
     });
     ui.settingsReset.addEventListener("click", async () => {
       this.state = { presetId: "", prompt: this.defaultInstructions, voice: { source: "default" }, output: "audio", mic: "", sampling: {}, sliceNums: "" };
-      if (this.presets.length) {
-        const english = this.presets.find((preset) => preset.key.endsWith("/english_call")) || this.presets[0];
-        await this.applyPreset(english.key);
-      }
+      if (this.presets.length) await this.applyPreset(this.presets[0].key);
       this.save();
       this.render();
     });
