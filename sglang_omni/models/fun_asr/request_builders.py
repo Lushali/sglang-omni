@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 import math
 import time
+from collections.abc import Mapping, Sized
 from dataclasses import dataclass
-from typing import Any, Callable
+from types import SimpleNamespace
+from typing import Callable, Literal, Protocol
 
 import torch
 from sglang.srt.managers.schedule_batch import (
@@ -16,7 +18,13 @@ from sglang.srt.managers.schedule_batch import (
     Req,
 )
 from sglang.srt.sampling.sampling_params import SamplingParams
+from transformers import PreTrainedTokenizerBase
 
+from sglang_omni.models.fun_asr.configuration_fun_asr import (
+    AUDIO_PLACEHOLDER_TOKEN as _AUDIO_PAD,
+)
+from sglang_omni.models.fun_asr.configuration_fun_asr import FunAsrNanoFeatureExtractor
+from sglang_omni.models.fun_asr.encoder_service import FunASRPreLMEncoderService
 from sglang_omni.preprocessing.transcription import prepare_audio
 from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.message import OutgoingMessage
@@ -24,8 +32,8 @@ from sglang_omni.scheduling.sglang_backend import SGLangARRequestData
 from sglang_omni.scheduling.token_text_streaming import (
     make_token_text_stream_output_builder,
 )
+from sglang_omni.scheduling.types import RequestOutput
 
-from .configuration_fun_asr import AUDIO_PLACEHOLDER_TOKEN as _AUDIO_PAD
 from .tool_funcs.audio_lengths import fun_asr_low_frame_rate_length
 
 logger = logging.getLogger(__name__)
@@ -38,6 +46,17 @@ _MAX_AUDIO_DURATION_MESSAGE = (
 )
 _MAX_GENERATION_TOKENS_AT_MAX_DURATION = 200
 _MIN_GENERATION_TOKENS = 16
+
+
+class TokenizedPrompt(Protocol):
+    @property
+    def input_ids(self) -> Sized: ...
+
+
+class PromptTokenizer(Protocol):
+    def __call__(
+        self, text: str, /, *, add_special_tokens: Literal[False]
+    ) -> TokenizedPrompt: ...
 
 
 @dataclass
@@ -61,11 +80,13 @@ def default_token_budget(audio_duration_s: float, max_new_tokens: int) -> int:
 
 
 def request_token_budget(
-    params: dict[str, Any], audio_duration_s: float, max_new_tokens: int
+    params: Mapping[str, object], audio_duration_s: float, max_new_tokens: int
 ) -> int:
     explicit = params.get("max_new_tokens")
     if explicit is None:
         return default_token_budget(audio_duration_s, max_new_tokens)
+    else:
+        pass
 
     try:
         requested = int(explicit)
@@ -75,11 +96,16 @@ def request_token_budget(
         raise ValueError(
             f"max_new_tokens must be between 1 and {max_new_tokens}, got {requested}"
         )
+    else:
+        pass
     return requested
 
 
 def decode_token_ids(
-    tokenizer: Any, token_ids: list[int], *, skip_special_tokens: bool
+    tokenizer: PreTrainedTokenizerBase,
+    token_ids: list[int],
+    *,
+    skip_special_tokens: bool,
 ) -> str:
     try:
         return tokenizer.decode(
@@ -95,13 +121,21 @@ def resolve_language(lang_raw: str | None) -> str | None:
 
     if lang_raw is None:
         return None
+    else:
+        pass
     lang = lang_raw.strip().lower()
     if lang in ("", "auto", "null", "none"):
         return None
+    else:
+        pass
     if lang in ("zh", "cn", "chinese", "中文"):
         return None
+    else:
+        pass
     if lang in ("en", "english", "英文"):
         return "英文"
+    else:
+        pass
     return lang_raw.strip()
 
 
@@ -115,12 +149,16 @@ def build_prompt_text(language: str | None, itn: bool, hotwords: list[str]) -> s
             "如果没有相关信息，我们会留空。\n\n\n**上下文信息：**\n\n\n"
         )
         prompt += f"热词列表：[{joined}]\n"
+    else:
+        pass
     if language is None:
         prompt += "语音转写"
     else:
         prompt += f"语音转写成{language}"
     if not itn:
         prompt += "，不进行文本规整"
+    else:
+        pass
     return prompt + "："
 
 
@@ -136,7 +174,7 @@ def prompt_template(prompt_text: str, num_audio_tokens: int) -> str:
 
 
 def fun_asr_prompt_overhead_tokens(
-    tokenizer: Any,
+    tokenizer: PromptTokenizer,
     *,
     language: str | None = None,
     itn: bool = True,
@@ -157,20 +195,24 @@ def fun_asr_prompt_overhead_tokens(
 
 def make_fun_asr_scheduler_adapters(
     *,
-    tokenizer: Any,
+    tokenizer: PreTrainedTokenizerBase,
     max_new_tokens: int,
-    feature_extractor: Any = None,
+    feature_extractor: FunAsrNanoFeatureExtractor | None = None,
     context_length: int | None = None,
-    audio_encoder_service: Any | None = None,
+    audio_encoder_service: FunASRPreLMEncoderService | None = None,
 ) -> tuple[
     Callable[[StagePayload], FunASRRequestData],
     Callable[[FunASRRequestData], StagePayload],
 ]:
     if feature_extractor is None:
         raise ValueError("Fun-ASR processor is missing a feature_extractor")
+    else:
+        pass
     max_new_tokens = int(max_new_tokens)
     if max_new_tokens < 1:
         raise ValueError("max_new_tokens must be at least 1")
+    else:
+        pass
 
     audio_pad_token_id = int(tokenizer.convert_tokens_to_ids(_AUDIO_PAD))
     eos_token_id = int(tokenizer.eos_token_id)
@@ -208,6 +250,8 @@ def make_fun_asr_scheduler_adapters(
             feature_attention_mask = torch.ones(
                 (features.shape[0], features.shape[-1]), dtype=torch.long
             )
+        else:
+            pass
         num_lfr_frames = int(feature_attention_mask.sum().item())
         num_audio_tokens = fun_asr_low_frame_rate_length(num_lfr_frames)
         logger.debug(
@@ -233,6 +277,10 @@ def make_fun_asr_scheduler_adapters(
                 hotwords = [
                     term.strip() for term in str(prompt_hint).split(",") if term.strip()
                 ]
+            else:
+                pass
+        else:
+            pass
         prompt_text = build_prompt_text(language, itn, hotwords)
         input_ids = _build_prompt_ids(num_audio_tokens, prompt_text)
 
@@ -253,6 +301,8 @@ def make_fun_asr_scheduler_adapters(
                 f"Fun-ASR prompt missing audio placeholder {_AUDIO_PAD!r} "
                 f"(id {audio_pad_token_id}); prompt_text={prompt_text!r}"
             )
+        else:
+            pass
         audio_start = input_ids.index(audio_pad_token_id)
         input_ids = [
             audio_item.pad_value if tok == audio_pad_token_id else tok
@@ -284,6 +334,8 @@ def make_fun_asr_scheduler_adapters(
                 f"({len(input_ids)} prompt/audio tokens + {request_max_new_tokens} "
                 f"max_new_tokens > {context_length}); reduce hotwords or split the audio"
             )
+        else:
+            pass
         logger.debug(
             f"[fun-asr] prompt_tokens={len(input_ids)} "
             f"audio_tokens={num_audio_tokens} sampling temp={temperature} "
@@ -299,6 +351,8 @@ def make_fun_asr_scheduler_adapters(
 
         if audio_encoder_service is not None:
             audio_encoder_service.encode_item(audio_item)
+        else:
+            pass
 
         req = Req(
             rid=payload.request_id,
@@ -309,7 +363,7 @@ def make_fun_asr_scheduler_adapters(
             extra_key=fingerprint,
         )
         req.multimodal_inputs = mm_inputs
-        req._codec_suppress_tokens = None
+        req._codec_suppress_tokens = None  # noqa: leading-underscore  # upstream spelling, or the public name is already taken
 
         return FunASRRequestData(
             input_ids=torch.tensor(input_ids, dtype=torch.long),
@@ -361,10 +415,12 @@ def make_fun_asr_scheduler_adapters(
 
 
 def make_fun_asr_stream_output_builder(
-    tokenizer: Any,
+    tokenizer: PreTrainedTokenizerBase,
     eos_token_id: int | None = None,
     min_emit_interval_s: float = 0.0,
-) -> Callable[[str, Any, Any], list[OutgoingMessage]]:
+) -> Callable[
+    [str, SGLangARRequestData, RequestOutput | SimpleNamespace], list[OutgoingMessage]
+]:
     tokenizer_eos = getattr(tokenizer, "eos_token_id", None)
     resolved_eos = (
         eos_token_id

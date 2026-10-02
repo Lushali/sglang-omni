@@ -7,20 +7,25 @@ import asyncio
 import base64
 import logging
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 import av
 import librosa
 import numpy as np
+import numpy.typing as npt
 import torch
 from qwen_vl_utils import vision_process as qwen_vision
 from torchvision.transforms import InterpolationMode
 from torchvision.transforms import functional as tv_f
 
+from sglang_omni.preprocessing.resource_connector import (
+    MultiModalResourceConnector,
+    global_thread_pool,
+)
+
 from .base import MediaIO, is_url
 from .cache_key import compute_media_cache_key
-from .resource_connector import global_thread_pool
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +34,7 @@ class VideoDecodeError(RuntimeError):
     """Raised when video decoding fails."""
 
 
-class VideoMediaIO(MediaIO[tuple[torch.Tensor, float, Any | None]]):
+class VideoMediaIO(MediaIO[tuple[torch.Tensor, float, npt.NDArray[np.float32] | None]]):
     """MediaIO implementation for video files with optional audio extraction."""
 
     def __init__(
@@ -43,7 +48,7 @@ class VideoMediaIO(MediaIO[tuple[torch.Tensor, float, Any | None]]):
         image_mode: str = "RGB",
         extract_audio: bool = False,
         audio_target_sr: int = 16000,
-        **kwargs,
+        **kwargs: object,
     ) -> None:
         """Initialize VideoMediaIO.
 
@@ -79,7 +84,9 @@ class VideoMediaIO(MediaIO[tuple[torch.Tensor, float, Any | None]]):
             total_pixels=self.total_pixels,
         )
 
-    def load_bytes(self, data: bytes) -> tuple[torch.Tensor, float, Any | None]:
+    def load_bytes(
+        self, data: bytes
+    ) -> tuple[torch.Tensor, float, npt.NDArray[np.float32] | None]:
         """Load video from raw bytes, optionally extracting audio.
 
         Returns:
@@ -109,11 +116,13 @@ class VideoMediaIO(MediaIO[tuple[torch.Tensor, float, Any | None]]):
         self,
         media_type: str,
         data: str,
-    ) -> tuple[torch.Tensor, float, Any | None]:
+    ) -> tuple[torch.Tensor, float, npt.NDArray[np.float32] | None]:
         """Load video from base64-encoded data, optionally extracting audio."""
         return self.load_bytes(base64.b64decode(data))
 
-    def load_file(self, filepath: Path) -> tuple[torch.Tensor, float, Any | None]:
+    def load_file(
+        self, filepath: Path
+    ) -> tuple[torch.Tensor, float, npt.NDArray[np.float32] | None]:
         """Load video from a local file path, optionally extracting audio."""
         if self.extract_audio:
             # Load video and extract audio from the same file
@@ -126,7 +135,7 @@ class VideoMediaIO(MediaIO[tuple[torch.Tensor, float, Any | None]]):
 
 
 async def ensure_video_list_async(
-    videos: Any,
+    videos: object,
     *,
     fps: float | None = None,
     max_frames: int | None = None,
@@ -134,10 +143,12 @@ async def ensure_video_list_async(
     max_pixels: int | None = None,
     total_pixels: int | None = None,
     image_mode: str = "RGB",
-    resource_connector: Any | None = None,
+    resource_connector: MultiModalResourceConnector | None = None,
     extract_audio: bool = False,
     audio_target_sr: int = 16000,
-) -> tuple[list[Any], list[float] | None, list[Any] | None]:
+) -> tuple[
+    list[object], list[float] | None, list[npt.NDArray[np.float32] | None] | None
+]:
     """Asynchronously normalize video inputs into a list.
 
     Args:
@@ -159,13 +170,15 @@ async def ensure_video_list_async(
     """
     if videos is None:
         return [], None, None
+    else:
+        pass
     if isinstance(videos, list):
         items = videos
     else:
         items = [videos]
-    normalized: list[Any] = []
+    normalized: list[object] = []
     sample_fps_list: list[float] = []
-    extracted_audios: list[Any] = [] if extract_audio else []
+    extracted_audios: list[npt.NDArray[np.float32] | None] = [] if extract_audio else []
     all_paths = True
 
     # Import here to avoid circular dependency
@@ -173,10 +186,12 @@ async def ensure_video_list_async(
         from .resource_connector import get_global_resource_connector
 
         resource_connector = get_global_resource_connector()
+    else:
+        pass
 
     async def _load_video_with_audio(
         video_item: str | Path, is_url: bool
-    ) -> tuple[Any, float, Any | None]:
+    ) -> tuple[torch.Tensor, float, npt.NDArray[np.float32] | None]:
         """Load video and optionally extract audio."""
         loop = asyncio.get_running_loop()
 
@@ -231,7 +246,9 @@ async def ensure_video_list_async(
                 return video, sample_fps, None
 
     # Collect coroutines for URL and local file items
-    coroutines: list[asyncio.Task[tuple[Any, float, Any | None]] | None] = []
+    coroutines: list[
+        asyncio.Task[tuple[torch.Tensor, float, npt.NDArray[np.float32] | None]]
+    ] = []
     url_indices: list[int] = []
 
     # First pass: identify items that need loading
@@ -247,6 +264,8 @@ async def ensure_video_list_async(
                 sample_fps_list.append(0.0)  # Placeholder for fps
                 if extract_audio:
                     extracted_audios.append(None)  # Placeholder for audio
+                else:
+                    pass
             elif Path(video_item).exists():
                 # Load from local path with optional audio extraction
                 coro = _load_video_with_audio(video_item, is_url=False)
@@ -257,18 +276,24 @@ async def ensure_video_list_async(
                 sample_fps_list.append(0.0)  # Placeholder for fps
                 if extract_audio:
                     extracted_audios.append(None)  # Placeholder for audio
+                else:
+                    pass
             else:
                 # Path doesn't exist, treat as already processed
                 normalized.append(video_item)
                 all_paths = False
                 if extract_audio:
                     extracted_audios.append(None)
+                else:
+                    pass
         else:
             # Already processed (torch Tensor, etc.)
             normalized.append(video_item)
             all_paths = False
             if extract_audio:
                 extracted_audios.append(None)
+            else:
+                pass
 
     # Wait for all loads to complete
     if coroutines:
@@ -279,6 +304,10 @@ async def ensure_video_list_async(
             sample_fps_list[url_idx] = sample_fps
             if extract_audio:
                 extracted_audios[url_idx] = audio
+            else:
+                pass
+    else:
+        pass
 
     if all_paths:
         return (
@@ -286,15 +315,21 @@ async def ensure_video_list_async(
             sample_fps_list,
             extracted_audios if extract_audio else None,
         )
+    else:
+        pass
     return normalized, None, extracted_audios if extract_audio else None
 
 
-def extract_audio_from_path(video_path: Path, target_sr: int) -> np.ndarray | None:
+def extract_audio_from_path(
+    video_path: Path, target_sr: int
+) -> npt.NDArray[np.float32] | None:
     """Decode the first audio stream to mono float32 at the target sample rate."""
     try:
         with av.open(str(video_path)) as container:
             if not container.streams.audio:
                 return None
+            else:
+                pass
             stream = container.streams.audio[0]
             sample_rate = stream.rate
             # note (MayDomine): convert packed/integer PCM before channel averaging.
@@ -309,6 +344,8 @@ def extract_audio_from_path(video_path: Path, target_sr: int) -> np.ndarray | No
             frames.extend(output.to_ndarray() for output in converter.resample(None))
         if not frames:
             return None
+        else:
+            pass
         audio = librosa.to_mono(np.concatenate(frames, axis=1))
         return librosa.resample(audio, orig_sr=sample_rate, target_sr=target_sr)
     except (av.FFmpegError, ValueError) as exc:
@@ -326,17 +363,27 @@ def load_video_path(
 ) -> tuple[torch.Tensor, float]:
     """Load a local video into a torch tensor (T, C, H, W) on CPU."""
     path = Path(path)
-    ele: dict[str, Any] = {"video": str(path)}
+    ele: dict[str, str | float | int] = {"video": str(path)}
     if fps is not None:
         ele["fps"] = float(fps)
+    else:
+        pass
     if max_frames is not None:
         ele["max_frames"] = int(max_frames)
+    else:
+        pass
     if min_pixels is not None:
         ele["min_pixels"] = int(min_pixels)
+    else:
+        pass
     if max_pixels is not None:
         ele["max_pixels"] = int(max_pixels)
+    else:
+        pass
     if total_pixels is not None:
         ele["total_pixels"] = int(total_pixels)
+    else:
+        pass
     backend = qwen_vision.get_video_reader_backend()
     try:
         video, sample_fps = qwen_vision.VIDEO_READER_BACKENDS[backend](ele)
@@ -346,6 +393,8 @@ def load_video_path(
                 f"Failed to decode video path={path}; torchvision failed with "
                 f"{type(backend_exc).__name__}: {backend_exc}"
             ) from backend_exc
+        else:
+            pass
         logger.warning(f"Video reader {backend} failed, falling back to torchvision")
         try:
             video, sample_fps = qwen_vision.VIDEO_READER_BACKENDS["torchvision"](ele)
@@ -391,7 +440,9 @@ def load_video_path(
     return video, sample_fps
 
 
-def build_video_mm_inputs(hf_inputs: dict[str, Any]) -> dict[str, Any]:
+def build_video_mm_inputs(
+    hf_inputs: Mapping[str, torch.Tensor],
+) -> dict[str, torch.Tensor | bool | None]:
     return {
         "pixel_values_videos": hf_inputs.get("pixel_values_videos"),
         "video_grid_thw": hf_inputs.get("video_grid_thw"),
@@ -400,7 +451,7 @@ def build_video_mm_inputs(hf_inputs: dict[str, Any]) -> dict[str, Any]:
 
 
 def compute_video_cache_key(
-    videos: Any,
+    videos: object,
     *,
     fps: float | None = None,
     max_frames: int | None = None,
@@ -419,6 +470,8 @@ def compute_video_cache_key(
     base = compute_media_cache_key(videos, prefix="video")
     if base is None:
         return None
+    else:
+        pass
     decode_sig = (
         f"|fps={fps}|max_frames={max_frames}"
         f"|min_px={min_pixels}|max_px={max_pixels}|total_px={total_pixels}"

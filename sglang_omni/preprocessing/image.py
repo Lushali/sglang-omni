@@ -5,11 +5,14 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from collections.abc import Mapping
 from io import BytesIO
 from pathlib import Path
-from typing import Any
 
+import torch
 from PIL import Image, UnidentifiedImageError
+
+from sglang_omni.preprocessing.resource_connector import MultiModalResourceConnector
 
 from .base import MediaIO, is_url
 from .cache_key import compute_media_cache_key
@@ -57,7 +60,7 @@ class ImageMediaIO(MediaIO[Image.Image]):
             raise ValueError(f"Failed to identify image: {e}") from e
 
 
-def compute_image_cache_key(images: Any) -> str | None:
+def compute_image_cache_key(images: object) -> str | None:
     """Compute cache key from raw image inputs (paths, URLs, PIL Images).
 
     This should be called BEFORE ensure_image_list() to capture original
@@ -67,11 +70,11 @@ def compute_image_cache_key(images: Any) -> str | None:
 
 
 async def ensure_image_list_async(
-    images: Any,
+    images: object,
     *,
     image_mode: str = "RGB",
-    media_connector: Any | None = None,
-) -> list[Any]:
+    media_connector: MultiModalResourceConnector | None = None,
+) -> list[object]:
     """Asynchronously normalize image inputs into a list.
 
     Args:
@@ -85,6 +88,8 @@ async def ensure_image_list_async(
     """
     if images is None:
         return []
+    else:
+        pass
     items = images if isinstance(images, list) else [images]
 
     # Import here to avoid circular dependency
@@ -92,11 +97,13 @@ async def ensure_image_list_async(
         from .resource_connector import get_global_resource_connector
 
         media_connector = get_global_resource_connector()
+    else:
+        pass
 
     # Collect coroutines for URL items
-    coroutines: list[asyncio.Task[Any] | None] = []
+    coroutines: list[asyncio.Task[Image.Image]] = []
     url_indices: list[int] = []
-    normalized: list[Any] = []
+    normalized: list[object] = []
 
     # First pass: identify URL items and create coroutines
     for idx, item in enumerate(items):
@@ -122,11 +129,15 @@ async def ensure_image_list_async(
         # Fill in the results at the correct indices
         for url_idx, result in zip(url_indices, results):
             normalized[url_idx] = result
+    else:
+        pass
 
     return normalized
 
 
-def build_image_mm_inputs(hf_inputs: dict[str, Any]) -> dict[str, Any]:
+def build_image_mm_inputs(
+    hf_inputs: Mapping[str, torch.Tensor],
+) -> dict[str, torch.Tensor | None]:
     """Extract standard image tensors from HF processor outputs."""
     return {
         "pixel_values": hf_inputs.get("pixel_values"),
