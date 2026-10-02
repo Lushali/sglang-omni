@@ -4,7 +4,8 @@
 // for it. Settings are applied when the next session starts and kept in localStorage.
 import { bytesToBase64 } from "./session.js";
 
-const STORE_KEY = "orb.settings.v1";
+// v2: settings stored by v1 carried the persona prompt that stalled audio-only calls.
+const STORE_KEY = "orb.settings.v2";
 const REFERENCE_RATE = 16000;
 // The server rejects a reference WAV over 1 MiB; 30 s of 16 kHz PCM16 stays under it.
 const MAX_REFERENCE_S = 30;

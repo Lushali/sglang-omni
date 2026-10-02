@@ -2,6 +2,7 @@
 window.DEMO_WS_URL = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/v1/realtime`;
 window.DEMO_STATUS_URL = "";
 window.DEMO_MODEL_NAME = "MiniCPM-o 4.5";
-// Persona sent as the session's system prompt. Without one the thinker (a Qwen3
-// derivative) introduces itself as Qwen.
-window.DEMO_INSTRUCTIONS = "You are MiniCPM-o 4.5, a friendly voice assistant built by OpenBMB and served by sglang-omni. Answer briefly in the language the user speaks. If asked to count or list many items, give only the first few.";
+// No page-level system prompt: presets carry the checkpoint's own duplex prompts, and
+// without one the server uses its default. A persona prompt asking for brief answers made
+// the model stop answering after its first reply in audio-only calls.
+window.DEMO_INSTRUCTIONS = "";
