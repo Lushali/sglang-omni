@@ -183,6 +183,25 @@ def create_sglang_talker_executor_from_config(
     return scheduler
 
 
+def create_sglang_session_talker_executor_from_config(
+    model_path: str,
+    *,
+    device: str | None = None,
+    gpu_id: int | None = None,
+    server_args_overrides: Mapping[str, object] | None = None,
+    total_gpu_memory_fraction: float | None = None,
+) -> OmniScheduler[SGLangARRequestData]:
+    """Returns the talker that keeps native KV across the units of a duplex session."""
+    return create_sglang_talker_executor_from_config(
+        model_path,
+        device=device,
+        gpu_id=gpu_id,
+        server_args_overrides=server_args_overrides,
+        total_gpu_memory_fraction=total_gpu_memory_fraction,
+        session_mode=True,
+    )
+
+
 def vocode_code2wav_payloads(
     model: MiniCPMOCode2Wav, payloads: list[StagePayload]
 ) -> list[StagePayload]:

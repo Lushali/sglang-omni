@@ -197,7 +197,7 @@ def test_duplex_yaml_builds_session_stages(
     assert build_realtime_deployment(Mock(), config).max_connections == sessions
     for stage_name, factory, expected in (
         ("thinker", native_stages.create_thinker_scheduler, thinker),
-        ("talker", native_stages.create_talker_scheduler, talker),
+        ("talker", stages.create_sglang_session_talker_executor_from_config, talker),
     ):
         kwargs = apply_typed_stage_kwargs(
             factory,

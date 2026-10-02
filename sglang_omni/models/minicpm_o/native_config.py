@@ -42,7 +42,7 @@ def stages() -> list[StageConfig]:
             process="talker",
             gpu=0,
             gpu_memory_fraction=0.15,
-            factory_path=f"{PKG}.create_talker_scheduler",
+            factory_path="sglang_omni.models.minicpm_o.stages.create_sglang_session_talker_executor_from_config",
             next="speech",
             engine=EngineArgs(disable_cuda_graph=True),
         ),

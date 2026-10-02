@@ -27,9 +27,6 @@ from sglang_omni.models.minicpm_o.native_config import (
     DEFAULT_MAX_SESSIONS,
     DEFAULT_SPEECH_STATE_BYTES_PER_SESSION,
 )
-from sglang_omni.models.minicpm_o.stages import (
-    create_sglang_talker_executor_from_config,
-)
 from sglang_omni.models.weight_loader import resolve_model_path
 from sglang_omni.proto.request import OmniRequest, StagePayload
 from sglang_omni.proto.session import ResourceUsage, SessionIdentity, TimedChunk
@@ -257,22 +254,4 @@ def create_speech_scheduler(
         max_open_sessions=max_open_sessions,
         max_concurrency=1,
         max_state_bytes=max_state_bytes,
-    )
-
-
-def create_talker_scheduler(
-    model_path: str,
-    *,
-    device: str | None = None,
-    gpu_id: int | None = None,
-    server_args_overrides: dict[str, JsonValue] | None = None,
-    total_gpu_memory_fraction: float | None = None,
-) -> OmniScheduler:
-    return create_sglang_talker_executor_from_config(
-        model_path,
-        device=device,
-        gpu_id=gpu_id,
-        server_args_overrides=server_args_overrides,
-        total_gpu_memory_fraction=total_gpu_memory_fraction,
-        session_mode=True,
     )
