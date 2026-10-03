@@ -34,18 +34,18 @@ CUDA_VISIBLE_DEVICES=0 python examples/run_nemotron_voicechat_duplex.py \
 ### Browser conversation UI
 
 Open **http://localhost:8097** after the server prints `VoiceChat UI`.
-The example serves its HTML, CSS and JavaScript directly; no frontend build or
+The example serves the shared `playground/realtime` frontend; no frontend build or
 npm installation is required. Startup captures the fixed-size codec graph and runs two silent frames to warm
 first-frame and continuation kernels, including the speech sampler graph, before
 opening the port (`--no-warmup` skips the silent session). File-input runs also
 warm up first. The warmup session allows 120 seconds per unit for cold kernel
 compilation; live sessions retain the standard operation timeout.
 
-1. Click **开始对话** and allow microphone access. Headphones help avoid acoustic feedback.
+1. Click **Start** and allow microphone access. Headphones help avoid acoustic feedback.
 2. Speak naturally. The browser sends continuous 80 ms PCM frames and plays
    streamed output, with assistant text shown alongside it.
-3. **静音麦克风** sends silence while the model continues responding.
-   **结束** releases the microphone and session.
+3. **Mute** sends silence while the model continues responding.
+   **End** releases the microphone and session.
 
 Microphone access requires localhost or HTTPS. To use a Kubernetes worker,
 forward its example port, then open the same localhost URL:
@@ -54,21 +54,17 @@ forward its example port, then open the same localhost URL:
 kubectl port-forward --context YOUR_CONTEXT -n default pod/YOUR_GPU_POD 8097:8097 --address 127.0.0.1
 ```
 
-The minimal page has start, stop, and microphone mute controls, connection
-status, and assistant text. It stops if input backlog exceeds 9 seconds instead
-of silently dropping input. Sessions last at most four minutes;
-one browser session is supported at a time. This is a prototype: sustained GPU
-processing can fall behind real time. Automatic interruption depends on model
-behavior. Explicit response cancellation is not supported by the current protocol.
+The shared playground provides microphone mute, local playback interruption,
+transcripts and downloadable protocol traces. Sessions last at most four minutes;
+one browser session is supported at a time. Automatic interruption depends on
+model behavior; the playback interrupt button does not cancel model generation.
+VoiceChat uses its checkpoint prompt and voice, so custom prompt and reference
+voice controls are hidden.
 
-Playback uses a 480 ms startup/rebuffer reserve, then schedules packets
-contiguously. Where supported, the output AudioContext runs at 22050 Hz so
-resampling happens on the continuous mix, rather than independently per packet.
-If the browser uses another device rate, a stateful 32-tap windowed-sinc converter
-retains filter history across packets before scheduling buffers at that rate.
-This prevents periodic clicks from restarting browser resampling at packet edges.
+Playback uses the shared AudioWorklet with adaptive buffering. Its AudioContext
+runs at the model's 22050 Hz output rate, so browser resampling operates on the
+continuous output stream rather than restarting at each packet boundary.
 
-Browser audio tests: `node --test examples/voicechat_ui/audio.test.mjs`.
 Static route tests: `pytest tests/unit_test/nemotron_voicechat/test_duplex_ui.py`.
 
 ### WebSocket clients

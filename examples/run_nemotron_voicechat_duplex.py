@@ -16,7 +16,7 @@ from typing import Protocol
 import numpy as np
 import uvicorn
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from sglang_omni.client.client import Client
@@ -52,13 +52,28 @@ class WorkerStop(Protocol):
 
 def mount_example_ui(app: FastAPI) -> None:
     """Keep the demo and its WebSocket on the same origin (no CORS setup)."""
-    assets = Path(__file__).resolve().parent / "voicechat_ui"
-    app.mount("/voicechat-assets", StaticFiles(directory=assets), name="voicechat-ui")
+    assets = Path(__file__).resolve().parents[1] / "playground/realtime/frontend"
+
+    @app.get("/static/orb/config.js", include_in_schema=False)
+    async def playground_config() -> Response:
+        return Response(
+            (assets / "orb/config.js").read_text()
+            + '\nwindow.DEMO_MODEL_NAME = "Nemotron VoiceChat";'
+            + "\nwindow.DEMO_EDITABLE_INSTRUCTIONS = false;"
+            + "\nwindow.DEMO_SESSION_CAP_S = 240;",
+            media_type="application/javascript",
+        )
+
+    @app.get("/api/presets", include_in_schema=False)
+    async def playground_presets() -> dict[str, list[str]]:
+        return {}
+
+    app.mount("/static", StaticFiles(directory=assets), name="realtime-playground")
 
     @app.get("/", include_in_schema=False)
-    async def voicechat_ui() -> FileResponse:
+    async def playground_ui() -> FileResponse:
         return FileResponse(
-            assets / "index.html", headers={"Cache-Control": "no-store"}
+            assets / "orb/index.html", headers={"Cache-Control": "no-store"}
         )
 
 

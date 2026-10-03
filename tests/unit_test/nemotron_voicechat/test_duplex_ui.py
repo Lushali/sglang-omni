@@ -32,11 +32,22 @@ def test_browser_assets_are_served_with_javascript_content_type(
     with TestClient(application) as client:
         home_response = client.get("/")
         assert home_response.status_code == 200
-        for filename in ["app.mjs", "audio.mjs", "capture-worklet.js"]:
-            response = client.get(f"/voicechat-assets/{filename}")
+        for filename in [
+            "app.js",
+            "session.js",
+            "settings.js",
+            "worklet.js",
+            "config.js",
+        ]:
+            response = client.get(f"/static/orb/{filename}")
             assert response.status_code == 200
             assert "javascript" in response.headers["content-type"]
-        assert client.get("/voicechat-assets/missing.js").status_code == 404
+        assert client.get("/static/orb/missing.js").status_code == 404
+        assert client.get("/api/presets").json() == {}
+        configuration = client.get("/static/orb/config.js").text
+        assert 'window.DEMO_MODEL_NAME = "Nemotron VoiceChat"' in configuration
+        assert "window.DEMO_EDITABLE_INSTRUCTIONS = false" in configuration
+        assert "window.DEMO_SESSION_CAP_S = 240" in configuration
 
 
 def test_workers_stop_after_sessions_close(example_module: ModuleType) -> None:
