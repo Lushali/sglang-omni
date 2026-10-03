@@ -260,6 +260,11 @@ export class DuplexSession {
     this.emit("state", this.state);
   }
 
+  // Everything this session sent and received, audio included, for replaying a report offline.
+  exportTrace() {
+    return JSON.stringify({ session_id: this.sessionId, granted: this.granted, close_reason: this.closeReason, trace: this.trace });
+  }
+
   packetFor(eventId) {
     return this.packets.find((packet) => packet.eventId === eventId) || null;
   }

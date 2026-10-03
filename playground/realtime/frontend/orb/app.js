@@ -22,7 +22,7 @@ const INTERRUPT_WINDOW_MS = 1500;
 const MODEL_HOLD_MS = 700;
 const MIC_HOLD_MS = 400;
 
-const ids = ["brandName", "statusPill", "statusText", "transcriptBtn", "themeBtn", "warning", "selfView", "cameraPreview", "frameCount", "orb", "orbCanvas", "statusLine", "caption", "note", "startBtn", "dock", "cameraBtn", "cameraOn", "cameraOff", "muteBtn", "micOn", "micOff", "interruptBtn", "endBtn", "hint", "sheet", "sheetClose", "transcript", "settingsBtn", "settingsPanel", "settingsClose", "settingsForm", "settingsLocked", "presetRow", "setPreset", "setPrompt", "voiceRow", "setVoice", "voicePreview", "voiceInfo", "voiceFile", "outputRow", "setOutput", "setMic", "advanced", "greedyRow", "setGreedy", "samplingFields", "sliceRow", "setSlices", "settingsReset"];
+const ids = ["brandName", "statusPill", "statusText", "transcriptBtn", "traceBtn", "themeBtn", "warning", "selfView", "cameraPreview", "frameCount", "orb", "orbCanvas", "statusLine", "caption", "note", "startBtn", "dock", "cameraBtn", "cameraOn", "cameraOff", "muteBtn", "micOn", "micOff", "interruptBtn", "endBtn", "hint", "sheet", "sheetClose", "transcript", "settingsBtn", "settingsPanel", "settingsClose", "settingsForm", "settingsLocked", "presetRow", "setPreset", "setPrompt", "voiceRow", "setVoice", "voicePreview", "voiceInfo", "voiceFile", "outputRow", "setOutput", "setMic", "advanced", "greedyRow", "setGreedy", "samplingFields", "sliceRow", "setSlices", "settingsReset"];
 const ui = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
 
 function wsUrl() {
@@ -40,6 +40,8 @@ const CLOSE_MESSAGES = {
 
 let socket = null;
 let session = null;
+// The most recent session, kept after it closes so its trace can still be downloaded.
+let lastSession = null;
 let connecting = false;
 let startingMic = false;
 let micGeneration = 0;
@@ -412,6 +414,8 @@ async function connect() {
       listeners: sessionListeners(),
     });
     session = activeSession;
+    lastSession = activeSession;
+    ui.traceBtn.hidden = false;
     eventChain = Promise.resolve();
     activeSocket.addEventListener("open", () => {
       if (socket !== activeSocket) return;
@@ -579,3 +583,13 @@ setButtons();
 tick();
 requestAnimationFrame(render);
 settings.init().catch((error) => warn(`Settings: ${error.message}`));
+
+ui.traceBtn.addEventListener("click", () => {
+  if (!lastSession) return;
+  const blob = new Blob([lastSession.exportTrace()], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `duplex-trace-${lastSession.sessionId || "session"}.json`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+});

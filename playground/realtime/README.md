@@ -73,6 +73,8 @@ Click **Start talking** and allow microphone access; the camera button appears o
 
 The settings button in the top bar opens the preset (English or Chinese call, with or without video), the system prompt, the voice (the preset's, the model's default or a recording you upload), text-only replies, the microphone and, under **Advanced**, the sampling parameters and camera detail. Changes apply to the next conversation and are remembered by the browser; empty sampling fields keep the server's defaults.
 
+The download button in the top bar saves the last conversation's trace as JSON: every event the page sent and received, including the audio you sent. Attach it when reporting a problem, so the conversation can be replayed exactly.
+
 ## Stop or restart
 
 To stop both services, run `docker stop omni-playground` on the server.
