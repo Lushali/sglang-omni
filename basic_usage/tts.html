@@ -855,11 +855,24 @@ in response headers. It does not include in-band JSON events, final usage, or a
 terminal sentinel. Set <code class="docutils literal notranslate"><span class="pre">&quot;stream_format&quot;:</span> <span class="pre">&quot;sse&quot;</span></code> to receive the same PCM as
 Server-Sent Events instead; <code class="docutils literal notranslate"><span class="pre">sse</span></code> streams even when <code class="docutils literal notranslate"><span class="pre">stream</span></code> is omitted. Each
 <code class="docutils literal notranslate"><span class="pre">speech.audio.delta</span></code> event carries base64 PCM in <code class="docutils literal notranslate"><span class="pre">audio</span></code>, and the stream ends
-with one <code class="docutils literal notranslate"><span class="pre">speech.audio.done</span></code> event carrying <code class="docutils literal notranslate"><span class="pre">usage</span></code>, or with an <code class="docutils literal notranslate"><span class="pre">error</span></code> event if
+with one <code class="docutils literal notranslate"><span class="pre">speech.audio.done</span></code> event carrying <code class="docutils literal notranslate"><span class="pre">usage</span></code> and <code class="docutils literal notranslate"><span class="pre">finish_reason</span></code>, or with an <code class="docutils literal notranslate"><span class="pre">error</span></code> event if
 generation fails mid-stream. The sample-rate headers are the same for both
 formats. <code class="docutils literal notranslate"><span class="pre">usage</span></code> reports the model’s own token counts, so what <code class="docutils literal notranslate"><span class="pre">input_tokens</span></code>
 covers depends on the model: Qwen3-TTS counts reference-audio codec frames, not
 text tokens.</p>
+<p>For raw PCM, use the response’s <code class="docutils literal notranslate"><span class="pre">X-SGLang-Omni-Speech-Id</span></code> with
+<code class="docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/v1/audio/speech/{request_id}</span></code> after the stream ends to retrieve its
+<code class="docutils literal notranslate"><span class="pre">finish_reason</span></code> and <code class="docutils literal notranslate"><span class="pre">usage</span></code>. This generated speech ID is independent of the
+<code class="docutils literal notranslate"><span class="pre">X-Request-Id</span></code> correlation header. Behind a router, also echo the response’s
+<code class="docutils literal notranslate"><span class="pre">X-SGLang-Omni-Worker</span></code> as <code class="docutils literal notranslate"><span class="pre">X-SGLang-Omni-Route-Worker</span></code> on the GET.
+Only the most recent outcomes are retained; missing outcomes do not establish
+a natural stop or a cap hit.</p>
+<p>The SeedTTS benchmark collects raw PCM outcomes over a separate connection pool.
+Collection still consumes server resources during generation. Use
+<code class="docutils literal notranslate"><span class="pre">--no-collect-stream-outcomes</span></code> for an instrumentation control, and keep the setting
+identical between performance arms. The setting is saved with the results.
+Missing reasons remain unknown and are excluded from the observed-reason count;
+a cap hit does not by itself establish poor audio quality.</p>
 <p>When the client does not set <code class="docutils literal notranslate"><span class="pre">initial_codec_chunk_frames</span></code>,
 the model selects a continuity-safe first vocoder chunk. Set the field explicitly
 to override that default, or set it to <code class="docutils literal notranslate"><span class="pre">0</span></code> to use the model’s steady chunk size
