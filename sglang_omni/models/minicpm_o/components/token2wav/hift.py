@@ -269,7 +269,9 @@ class HiFTGenerator(nn.Module):
         return x
 
     @torch.inference_mode()
-    def forward(self, speech_feat: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, speech_feat: torch.Tensor, cache_source: torch.Tensor | None = None
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         if self.noise_generator is None:
             # note (zhaochenyang20): vocoder noise must not advance a colocated sampler's RNG.
             noise_generator = torch.Generator(device=speech_feat.device)
@@ -281,5 +283,9 @@ class HiFTGenerator(nn.Module):
         source_signal = self.f0_upsamp(fundamental_frequency[:, None]).transpose(1, 2)
         source_signal, _, _ = self.m_source(source_signal, noise_generator)
         source_signal = source_signal.transpose(1, 2)
+        if cache_source is not None and cache_source.shape[2]:
+            source_signal[:, :, : cache_source.shape[2]] = cache_source
+        else:
+            pass
         generated_speech = self.decode(x=speech_feat, s=source_signal)
         return (generated_speech, source_signal)
