@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""CUDA graph replay preserves inputs, causal state, and random sampling."""
+"""CUDA graph replay handles changing inputs and fresh random samples."""
 
 from unittest.mock import Mock
 
@@ -7,8 +7,8 @@ import pytest
 import torch
 
 from sglang_omni.model_runner.model_worker import ModelWorker
-from sglang_omni.models.nemotron_voicechat.duplex import CodecHooks
 from sglang_omni.models.nemotron_voicechat.duplex_ar import DuplexTalkerRunner
+from sglang_omni.models.nemotron_voicechat.duplex_hooks import CodecHooks
 from sglang_omni.models.nemotron_voicechat.talker_model_runner import (
     NemotronVoiceChatTalkerModelRunner,
 )

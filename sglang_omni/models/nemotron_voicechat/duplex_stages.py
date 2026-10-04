@@ -12,12 +12,15 @@ from transformers import AutoTokenizer
 from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.nemotron_voicechat.code2wav_stream import DECODE_WINDOW_FRAMES
 from sglang_omni.models.nemotron_voicechat.conformer import AudioPerception
-from sglang_omni.models.nemotron_voicechat.duplex import CodecHooks, PerceptionHooks
 from sglang_omni.models.nemotron_voicechat.duplex_ar import (
     DuplexTalkerRunner,
     DuplexThinkerRunner,
     TalkerAdapter,
     ThinkerAdapter,
+)
+from sglang_omni.models.nemotron_voicechat.duplex_hooks import (
+    CodecHooks,
+    PerceptionHooks,
 )
 from sglang_omni.models.nemotron_voicechat.engine_builder import (
     NemotronVoiceChatEngineBuilder,
@@ -37,7 +40,7 @@ from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputP
 from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
 from sglang_omni.utils.device import resolve_concrete_device
 
-# MAX 2 requests a time, one is for storing context, another is to safely enter and reuse the stored one
+# Retained session KV and the incoming request need separate request slots.
 MAX_RUNNING_REQUESTS = 2
 SESSION_KV_TOKEN_BUDGET = 16_384
 REQUEST_BUILD_WORKERS = 1
@@ -54,8 +57,6 @@ class OfflineResultAdapter(Protocol):
 
 
 class DuplexSessionBuilderMixin:
-    """Share session settings within the existing TtsEngineBuilder lifecycle."""
-
     adapter: ARSessionAdapter
     scheduler_class = OmniScheduler
 
@@ -65,7 +66,7 @@ class DuplexSessionBuilderMixin:
             "enable_streaming_session": True,
             "max_running_requests": MAX_RUNNING_REQUESTS,
             "max_total_tokens": SESSION_KV_TOKEN_BUDGET,
-            # Otherwise the attn backend would be trtllm_mha which does not support 1 page size attn
+            # Triton supports the single-token KV pages used by streaming sessions.
             "attention_backend": "triton",
             "page_size": 1,
         }
@@ -90,7 +91,7 @@ class ThinkerBuilder(DuplexSessionBuilderMixin, NemotronVoiceChatEngineBuilder):
     def make_adapters(
         self, model: torch.nn.Module
     ) -> tuple[OfflineRequestBuilder, OfflineResultAdapter]:
-        offline_adapters = super().make_adapters(model)
+        request_builder, result_adapter = super().make_adapters(model)
         prompt_token_ids, pad_token_id = self.prompt_tokens()
         speech_to_text_config = json.loads((self.source / "config.json").read_text())[
             "model"
@@ -105,7 +106,7 @@ class ThinkerBuilder(DuplexSessionBuilderMixin, NemotronVoiceChatEngineBuilder):
             tokenizer=tokenizer,
             context_length=self.context_length,
         )
-        return offline_adapters
+        return request_builder, result_adapter
 
 
 class TalkerBuilder(DuplexSessionBuilderMixin, NemotronVoiceChatTalkerEngineBuilder):
@@ -121,9 +122,9 @@ class TalkerBuilder(DuplexSessionBuilderMixin, NemotronVoiceChatTalkerEngineBuil
     def make_adapters(
         self, model: torch.nn.Module
     ) -> tuple[OfflineRequestBuilder, OfflineResultAdapter]:
-        offline_adapters = super().make_adapters(model)
+        request_builder, result_adapter = super().make_adapters(model)
         self.adapter = TalkerAdapter(self.runner, context_length=self.context_length)
-        return offline_adapters
+        return request_builder, result_adapter
 
 
 def create_thinker(
@@ -191,12 +192,11 @@ def create_codec(
     device: str | None = None,
     gpu_id: int | None = None,
 ) -> SessionScheduler:
-    # Reuse checkpoint loading and marker validation from the offline factory.
     codec_executor = create_code2wav_executor(
         model_path, dtype=dtype, device=device, gpu_id=gpu_id
     )
     hooks = CodecHooks(codec_executor.decoder, codec_executor.device)
-    # Capture the steady-state codec before accepting a live microphone.
+    # Capture before serving to keep its startup cost off live audio processing.
     if torch.device(codec_executor.device).type == "cuda":
         hooks.decode(
             torch.zeros(

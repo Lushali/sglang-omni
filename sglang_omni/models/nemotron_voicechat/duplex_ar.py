@@ -1,13 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Frame fusion over scheduler-owned streaming KV sessions.
-
-Each unit supplies fusion embeddings; the scheduler owns token history and KV.
-Keep prior embeddings so a replayed prefix uses the original model inputs.
-"""
+"""Frame fusion over scheduler-owned KV, retaining inputs for prefix recomputation."""
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 
 import torch
@@ -37,8 +32,6 @@ from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputP
 from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
 from sglang_omni.scheduling.types import SchedulerRequest
 
-logger = logging.getLogger(__name__)
-
 
 @dataclass(kw_only=True)
 class FrameHistory:
@@ -49,9 +42,6 @@ class FrameHistory:
     previous_codes: torch.Tensor | None = None
     text_token_ids: list[int] = field(default_factory=list)
     emitted_text: str = ""
-    forwarded_positions: int = 0
-    reused_prefix_positions: int = 0
-    unit_count: int = 0
 
 
 def attach_fusion_rows(
@@ -68,11 +58,7 @@ def attach_fusion_rows(
             )
         else:
             pass
-        # The common path needs just the final row; never concatenate the
-        # entire conversation merely to slice off its last position.
-        history.forwarded_positions += uncached_positions
-        history.reused_prefix_positions += cached_positions
-        history.unit_count += 1
+        # Concatenating the full history would make each unit cost grow with the session.
         remaining_positions = uncached_positions
         suffix_blocks: list[torch.Tensor] = []
         for block in reversed(history.fusion_rows):
@@ -126,8 +112,6 @@ class DuplexTalkerRunner(NemotronVoiceChatTalkerModelRunner):
         self.sampler_output: torch.Tensor | None = None
 
     def generate_codes(self, index: int) -> torch.Tensor:
-        # Fixed one-frame sampler only: backbone/session KV remains scheduler-owned.
-        # Replaying its small kernels avoids Python dispatch on every 80 ms unit.
         if self.model.hidden_out.device.type != "cuda":
             return super().generate_codes(index)
         else:
@@ -219,14 +203,7 @@ class FrameAdapter(ARSessionAdapter):
         self.states[session_identity] = FrameHistory()
 
     def close(self, session_identity: SessionIdentity) -> None:
-        state = self.states.pop(session_identity, None)
-        if state is not None:
-            logger.info(
-                f"VoiceChat {type(self).__name__} session closed: units={state.unit_count} "
-                f"forwarded_positions={state.forwarded_positions} reused_prefix_positions={state.reused_prefix_positions}"
-            )
-        else:
-            pass
+        self.states.pop(session_identity, None)
 
     def finish_input(
         self, session_identity: SessionIdentity, payload: StagePayload
@@ -252,12 +229,14 @@ class FrameAdapter(ARSessionAdapter):
             )
         else:
             pass
-        # note (Codex): The next unit forwards the previous sampled token with new fusion input.
-        input_token_ids = opening_token_ids if state.position_count == 0 else []
+        # The next unit forwards the previous sampled token with new fusion input.
         state.fusion_rows.append(fusion_rows.detach())
         state.position_count += new_position_count
         request_data = ar_request(
-            payload, input_ids=input_token_ids, max_new_tokens=1, vocab_size=vocab_size
+            payload,
+            input_ids=opening_token_ids,
+            max_new_tokens=1,
+            vocab_size=vocab_size,
         )
         request_data.talker_model_inputs["duplex_history"] = state
         request_data.pending_stream_tokens = []
@@ -338,7 +317,7 @@ class ThinkerAdapter(FrameAdapter):
         if state.previous_text_token_id not in self.silent_token_ids:
             state.text_token_ids.append(state.previous_text_token_id)
             decoded = self.tokenizer.decode(state.text_token_ids)
-            # note (Codex): Byte fallback tokens must form complete UTF-8 before publication.
+            # Byte fallback tokens must form complete UTF-8 before publication.
             if decoded.endswith("\ufffd"):
                 pass
             elif not decoded.startswith(state.emitted_text):

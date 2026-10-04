@@ -81,8 +81,7 @@ class PerceptionHooks(SessionHooks):
         else:
             pass
         state.is_ended = chunk.eos
-        # Match the offline pipeline: the encoder's extra flush row is not a
-        # model frame. EOS only drains the codec, it does not synthesize input.
+        # The encoder's flush row is not a model frame; EOS must not add one.
         payload.data = {"acoustic": acoustic_features, "eos": chunk.eos}
         return payload
 
@@ -116,8 +115,6 @@ class CodecState:
 
 
 class CodecHooks(SessionHooks):
-    """A bounded rolling decoder window with the offline codec's tail holdback."""
-
     def __init__(self, decoder: RVQVAEDecoder, device: str | torch.device) -> None:
         self.decoder, self.device = decoder, device
         self.states: dict[SessionIdentity, CodecState] = {}
@@ -127,8 +124,6 @@ class CodecHooks(SessionHooks):
 
     @torch.inference_mode()
     def decode(self, codes: torch.Tensor) -> torch.Tensor:
-        # Once the rolling window is full, its shape never changes. Reuse a
-        # graph for codec kernels without changing the window or audio samples.
         if codes.device.type != "cuda" or codes.shape[0] != DECODE_WINDOW_FRAMES:
             return self.decoder(codes)
         else:

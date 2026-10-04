@@ -10,7 +10,10 @@ import torch
 
 from sglang_omni.models.nemotron_voicechat.code2wav_stream import StreamingCodec
 from sglang_omni.models.nemotron_voicechat.conformer import StreamingPerception
-from sglang_omni.models.nemotron_voicechat.duplex import CodecHooks, PerceptionHooks
+from sglang_omni.models.nemotron_voicechat.duplex_hooks import (
+    CodecHooks,
+    PerceptionHooks,
+)
 from sglang_omni.models.nemotron_voicechat.realtime import VoiceChatOutput
 from sglang_omni.proto.request import OmniRequest, StagePayload
 from sglang_omni.proto.session import OutputChunk, SessionIdentity, TimedChunk
@@ -39,7 +42,7 @@ def test_perception_preserves_pcm_and_drains_without_an_extra_frame(
 
     stream = Mock(spec=StreamingPerception, push=encode_frame)
     monkeypatch.setattr(
-        "sglang_omni.models.nemotron_voicechat.duplex.GraphPerception",
+        "sglang_omni.models.nemotron_voicechat.duplex_hooks.GraphPerception",
         Mock(return_value=stream),
     )
     hooks = PerceptionHooks(Mock())
@@ -72,7 +75,7 @@ def test_perception_rejects_incomplete_units_before_model_execution(
 ) -> None:
     stream = Mock(spec=StreamingPerception)
     monkeypatch.setattr(
-        "sglang_omni.models.nemotron_voicechat.duplex.GraphPerception",
+        "sglang_omni.models.nemotron_voicechat.duplex_hooks.GraphPerception",
         Mock(return_value=stream),
     )
     hooks = PerceptionHooks(Mock())
@@ -168,7 +171,7 @@ def test_perception_rejects_unsupported_input_format(
 ) -> None:
     stream = Mock(spec=StreamingPerception)
     monkeypatch.setattr(
-        "sglang_omni.models.nemotron_voicechat.duplex.GraphPerception",
+        "sglang_omni.models.nemotron_voicechat.duplex_hooks.GraphPerception",
         Mock(return_value=stream),
     )
     hooks = PerceptionHooks(Mock())

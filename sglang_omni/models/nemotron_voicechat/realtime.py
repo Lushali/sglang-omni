@@ -67,7 +67,12 @@ class VoiceChatOutput:
             yield TextFinished(response_id, item_id, self.transcript)
             yield AudioFinished(response_id, item_id)
             yield ResponseFinished(
-                response_id, item_id, self.transcript, True, "completed", "stop"
+                response_id=response_id,
+                item_id=item_id,
+                text=self.transcript,
+                has_audio=True,
+                status="completed",
+                reason="stop",
             )
             self.response_id = None
         else:

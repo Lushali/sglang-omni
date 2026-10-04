@@ -125,14 +125,14 @@ Follow one 80 ms input unit through these files:
    The existing TTS builder creates the runner, then adapters, then the scheduler.
    The offline request/result callbacks remain part of that builder contract;
    session units use the session adapter instead.
-3. `duplex.py`, `PerceptionHooks.append`: convert 1280 PCM16 samples into acoustic
+3. `duplex_hooks.py`, `PerceptionHooks.append`: convert 1280 PCM16 samples into acoustic
    features, retaining causal encoder history across units.
 4. `duplex_ar.py`, `ThinkerAdapter.build` and `result`: fuse acoustic features with
    the previous text/function tokens, run one position, and publish new tokens.
    The first unit also supplies the checkpoint prompt.
 5. `TalkerAdapter.build` and `result`: fuse the new text token with previous audio
    codes, then produce the next frame of codes.
-6. `duplex.py`, `CodecHooks.append`: decode a bounded code window, emit only fresh
+6. `duplex_hooks.py`, `CodecHooks.append`: decode a bounded code window, emit only fresh
    samples, and release the held-back tail when input ends.
 7. `realtime.py`: convert terminal audio/text into events for the shared WebSocket
    runtime. The browser records and plays audio; it does not schedule model stages.
