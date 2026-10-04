@@ -185,7 +185,7 @@ function tick() {
     const left = Math.max(0, SESSION_CAP_S - Math.floor((performance.now() - sessionStart) / 1000));
     label = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
     pill = "live";
-    if (left === 0) {
+    if (window.DEMO_SESSION_CAP_S && left === 0) {
       sessionStart = null;
       closeNow().catch((error) => warn(error.message));
       warn("Session time limit reached. Start a new conversation to continue.");

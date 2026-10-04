@@ -1,15 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Exercise VoiceChat framing through the mounted shared WebSocket."""
+"""VoiceChat output events and framing through the shared WebSocket."""
 
 import asyncio
 import base64
 from collections.abc import AsyncIterator
 from dataclasses import replace
 
+import pytest
 from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketTestSession
 
-from sglang_omni.models.nemotron_voicechat.realtime import deployment
+from sglang_omni.models.nemotron_voicechat.realtime import VoiceChatOutput, deployment
 from sglang_omni.proto.request import OmniRequest
 from sglang_omni.proto.session import (
     OutputChunk,
@@ -18,6 +19,7 @@ from sglang_omni.proto.session import (
     TimedChunk,
 )
 from sglang_omni.serve.openai_api import create_app
+from sglang_omni.serve.realtime.output import ResponseFinished, ResponseStarted
 from sglang_omni.serve.realtime.schema import JsonObject, JsonValue
 
 
@@ -177,3 +179,57 @@ def test_native_websocket_reconnect_accepts_audio_after_session_close() -> None:
                 receive_until(websocket, "session.closed")
                 assert websocket.receive()["type"] == "websocket.close"
             assert client.closed_sessions == conversation_index + 1
+
+
+def test_output_response_spans_units_and_restarts_after_reopen() -> None:
+    converter = VoiceChatOutput()
+    output = OutputChunk(
+        SessionIdentity("conversation"),
+        0,
+        0,
+        "audio",
+        0,
+        80,
+        {"pcm": bytes(2), "text": "hi", "eos": False},
+    )
+    first_events = list(converter(output))
+    continuation_events = list(converter(replace(output, input_seq=1)))
+    assert isinstance(first_events[0], ResponseStarted)
+    assert not any(isinstance(event, ResponseStarted) for event in continuation_events)
+    reopened_output = replace(
+        output, session_identity=SessionIdentity("conversation", open_index=2)
+    )
+    reopened_events = list(converter(reopened_output))
+    assert isinstance(reopened_events[0], ResponseStarted)
+    assert reopened_events[0].response_id != first_events[0].response_id
+    final_events = list(
+        converter(
+            replace(reopened_output, payload={"pcm": b"", "text": "", "eos": True})
+        )
+    )
+    assert isinstance(final_events[-1], ResponseFinished)
+    assert final_events[-1].text == "hi"
+
+
+@pytest.mark.parametrize(
+    "terminal_payload",
+    [
+        b"not-a-mapping",
+        {"pcm": "not-bytes", "text": "", "eos": False},
+        {"pcm": b"", "text": None, "eos": False},
+        {"pcm": b"", "text": "", "eos": "true"},
+    ],
+)
+def test_output_converter_rejects_invalid_terminal_payload_before_starting_response(
+    terminal_payload: bytes | dict[str, bytes | str | bool | None],
+) -> None:
+    converter = VoiceChatOutput()
+    invalid_output = OutputChunk(
+        SessionIdentity("validation"), 0, 0, "audio", 0, 80, terminal_payload
+    )
+    with pytest.raises(ValueError, match="invalid VoiceChat"):
+        list(converter(invalid_output))
+    valid_output = replace(
+        invalid_output, payload={"pcm": bytes(2), "text": "hello", "eos": False}
+    )
+    assert isinstance(list(converter(valid_output))[0], ResponseStarted)

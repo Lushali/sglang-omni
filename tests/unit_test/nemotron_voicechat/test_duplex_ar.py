@@ -8,6 +8,7 @@ import torch
 from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 from transformers import PreTrainedTokenizerBase
 
+from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.model_runner.prefill_inputs import get_omni_prefill_inputs
 from sglang_omni.models.nemotron_voicechat.duplex_ar import (
     DuplexTalkerRunner,
@@ -16,8 +17,12 @@ from sglang_omni.models.nemotron_voicechat.duplex_ar import (
     ThinkerAdapter,
 )
 from sglang_omni.models.nemotron_voicechat.fusion import AddFusion
+from sglang_omni.models.nemotron_voicechat.talker_model_runner import (
+    NemotronVoiceChatTalkerModelRunner,
+)
 from sglang_omni.proto.request import OmniRequest, StagePayload
 from sglang_omni.proto.session import SessionIdentity, TimedChunk
+from sglang_omni.scheduling.sglang_backend.output_processor import SGLangOutputProcessor
 from sglang_omni.scheduling.types import SchedulerRequest
 
 
@@ -182,15 +187,20 @@ def test_thinker_sessions_keep_text_history_independent(
         thinker_adapter.open(session_identity, OmniRequest(None))
     chunk = TimedChunk("audio", 0, 80, 0, bytes(2560), "pcm16")
     texts: list[str] = []
-    for session_identity in (first_session, first_session, second_session):
+    for session_identity, token_ids in [
+        (first_session, [3]),
+        (second_session, [5]),
+        (first_session, [3, 4]),
+    ]:
         request = thinker_adapter.build(
             session_identity,
             chunk,
             StagePayload("unit", OmniRequest(None), {"acoustic": torch.ones(1, 4)}),
         )
-        request.output_ids = [3]
+        request.output_ids = token_ids[-1:]
         request.extra_model_outputs = {"function_ids": [4]}
         texts.append(thinker_adapter.result(session_identity, request).data["text"])
+        thinker_adapter.tokenizer.decode.assert_called_with(token_ids)
     assert texts == ["x", "x", "x"]
     thinker_adapter.close(first_session)
     request = thinker_adapter.build(
@@ -199,6 +209,10 @@ def test_thinker_sessions_keep_text_history_independent(
         StagePayload("still-open", OmniRequest(None), {"acoustic": torch.ones(1, 4)}),
     )
     assert request.input_ids.numel() == 0
+    request.output_ids = [6]
+    request.extra_model_outputs = {"function_ids": [4]}
+    assert thinker_adapter.result(second_session, request).data["text"] == "x"
+    thinker_adapter.tokenizer.decode.assert_called_with([5, 6])
 
 
 def test_thinker_withholds_incomplete_unicode_and_special_tokens(
@@ -306,3 +320,52 @@ def test_talker_continuation_fuses_previous_codes_with_current_text() -> None:
         get_omni_prefill_inputs(forward_batch).input_embeds,
         torch.tensor([[9.0, 10.0, 11.0, 12.0]]),
     )
+
+
+@pytest.mark.accelerator
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA graph requires GPU")
+@torch.inference_mode()
+def test_sampler_replay_uses_new_hidden_states_and_randomness(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def sample_codes(
+        hidden: torch.Tensor,
+        head: torch.nn.Module,
+        *,
+        num_iter: int,
+        exponent: float,
+        top_p: float,
+        noise_scale: float,
+        assignment_counts: tuple[int, ...],
+    ) -> torch.Tensor:
+        return hidden + torch.rand_like(hidden)
+
+    def initialize_runner(
+        runner: NemotronVoiceChatTalkerModelRunner,
+        tp_worker: ModelWorker,
+        output_processor: SGLangOutputProcessor,
+    ) -> None:
+        runner.model = Mock(
+            hidden_out=torch.zeros(1, 16, device="cuda"),
+            talker=Mock(num_quantizers=8, generate_codes=sample_codes),
+            mog_head=Mock(),
+        )
+        runner.exponent = 1.0
+        runner.top_p = 0.9
+        runner.noise_scale = 1.0
+
+    monkeypatch.setattr(
+        NemotronVoiceChatTalkerModelRunner, "__init__", initialize_runner
+    )
+    runner = DuplexTalkerRunner(
+        Mock(spec=ModelWorker), Mock(spec=SGLangOutputProcessor)
+    )
+    first_codes = runner.generate_codes(0)
+    saved_codes = first_codes.clone()
+    second_codes = runner.generate_codes(0)
+    assert not torch.equal(first_codes, second_codes)
+    runner.model.hidden_out.fill_(10)
+    changed_codes = runner.generate_codes(0)
+    assert torch.all(changed_codes >= 10)
+    assert torch.all(changed_codes < 11)
+    torch.testing.assert_close(first_codes, saved_codes, rtol=0, atol=0)
