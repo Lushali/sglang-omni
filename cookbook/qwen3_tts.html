@@ -1027,9 +1027,10 @@ first chunk, so their audio arrives complete in a single final flush.</p>
 <h4>Codec decoding defaults<a class="headerlink" href="#codec-decoding-defaults" title="Link to this heading">#</a></h4>
 <p>Streaming decodes run on the stateful incremental codec by default: each
 follow-up chunk decodes only its fresh frames against per-stream state held in
-a preallocated arena, steady-state cohorts replay CUDA graphs whose decode step
-is <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code>d, and the follow-up workers collect for 4 ms. Startup spends
-about a minute compiling the steady shapes. The left-context decoder remains
+a preallocated arena, and the follow-up workers collect for 4 ms. On NVIDIA, AMD
+and MUSA GPUs steady-state cohorts also decode asynchronously on a priority stream
+and replay CUDA graphs whose decode step is <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code>d, which costs about
+a minute of startup compiling the steady shapes. The left-context decoder remains
 available as a rollback:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">stages</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">vocoder</span><span class="p">:</span>
@@ -1037,12 +1038,15 @@ available as a rollback:</p>
 <span class="w">      </span><span class="nt">enable_stateful_codec_decoder</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">incremental_codec_cuda_graph</span></code>, <code class="docutils literal notranslate"><span class="pre">incremental_codec_compile</span></code> and
+<p><code class="docutils literal notranslate"><span class="pre">incremental_codec_cuda_graph</span></code>, <code class="docutils literal notranslate"><span class="pre">incremental_codec_compile</span></code>, <code class="docutils literal notranslate"><span class="pre">async_decode</span></code> and
 <code class="docutils literal notranslate"><span class="pre">followup_batch_wait_ms</span></code> are the individual switches. Measured on one H100
 80GB at 20 requests per second, three client seeds of roughly 1200 requests
 each: the default path holds 0.6% to 2.3% of streams underrun against 20.9%
 for the left-context decoder, with first playable audio at 55 to 58 ms
 against 82 to 89 ms.</p>
+<p>Intel XPU, Ascend NPU, CPU and Apple MPS decode synchronously by default. To opt
+in on Intel GPUs, follow the
+<a class="reference internal" href="../get_started/installation_xpu.html#qwen3-tts-text-to-speech-single-xpu"><span class="std std-ref">Qwen3-TTS XPU recipe</span></a>.</p>
 </section>
 <section id="first-audio-chunk-ramp">
 <h4>First-audio chunk ramp<a class="headerlink" href="#first-audio-chunk-ramp" title="Link to this heading">#</a></h4>

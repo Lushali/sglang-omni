@@ -512,7 +512,10 @@
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-environment-important">Runtime environment (important)</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#qwen3-asr-speech-to-text-single-xpu">Qwen3-ASR (speech-to-text, single XPU)</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fun-asr-nano-speech-to-text-single-xpu">Fun-ASR-Nano (speech-to-text, single XPU)</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#qwen3-tts-text-to-speech-single-xpu">Qwen3-TTS (text-to-speech, single XPU)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#qwen3-tts-text-to-speech-single-xpu">Qwen3-TTS (text-to-speech, single XPU)</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#codec-decoding-on-xpu">Codec decoding on XPU</a></li>
+</ul>
+</li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#zonos2-moe-tts-single-xpu">ZONOS2 (MoE TTS, single XPU)</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#personaplex-speech-to-speech-single-xpu">PersonaPlex (speech-to-speech, single XPU)</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#qwen3-omni-30b-a3b-moe-multi-xpu-tensor-parallel">Qwen3-Omni (30B-A3B MoE, multi-XPU tensor parallel)</a></li>
@@ -694,6 +697,32 @@ curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>
 <span class="s1">       "response_format":"wav"}'</span><span class="w"> </span>-o<span class="w"> </span>out.wav
 </pre></div>
 </div>
+<section id="codec-decoding-on-xpu">
+<h4>Codec decoding on XPU<a class="headerlink" href="#codec-decoding-on-xpu" title="Link to this heading">#</a></h4>
+<p>The stateful incremental codec decoder runs, but the pipeline starts it with
+<code class="docutils literal notranslate"><span class="pre">async_decode:</span> <span class="pre">false</span></code>, and the vocoder captures its decode graphs during the
+asynchronous decode warmup, so none are captured. Capturing the shape set the CUDA
+defaults imply has not been shown to pay here yet: on one Arc Pro B60 it ran past
+the 600 s stage startup budget, and the engine then ran out of memory on a 24 GB
+card once the graphs were resident.</p>
+<p>The speaker encoder graphs do capture, on the default bucket ladder, for about 2 s of
+extra startup. The reference encoder stays eager whatever the ladder says: its
+transformers Mimi encoder reads a mask tensor on the host mid-forward, which a capture
+cannot record, so the platform declines that one capability and the batcher logs
+<code class="docutils literal notranslate"><span class="pre">qwen3_tts_reference_encoder_graph</span> <span class="pre">resolved=eager</span></code>.</p>
+<p>To try the fast path, turn the asynchronous path back on; <code class="docutils literal notranslate"><span class="pre">incremental_codec_compile</span></code>
+is worth dropping with it, since compiling the codec kernels is what dominated that
+startup:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">stages</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">vocoder</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">factory</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">async_decode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">      </span><span class="nt">incremental_codec_compile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</pre></div>
+</div>
+<p>An explicit stage value wins over the pipeline default. See the platform-neutral
+defaults in <a class="reference internal" href="../cookbook/qwen3_tts.html"><span class="std std-doc">docs/cookbook/qwen3_tts.md</span></a>.</p>
+</section>
 </section>
 <section id="zonos2-moe-tts-single-xpu">
 <h3>ZONOS2 (MoE TTS, single XPU)<a class="headerlink" href="#zonos2-moe-tts-single-xpu" title="Link to this heading">#</a></h3>
@@ -873,7 +902,10 @@ Qwen3-Omni thinker across 8 cards with tensor parallelism).</p>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-environment-important">Runtime environment (important)</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#qwen3-asr-speech-to-text-single-xpu">Qwen3-ASR (speech-to-text, single XPU)</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fun-asr-nano-speech-to-text-single-xpu">Fun-ASR-Nano (speech-to-text, single XPU)</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#qwen3-tts-text-to-speech-single-xpu">Qwen3-TTS (text-to-speech, single XPU)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#qwen3-tts-text-to-speech-single-xpu">Qwen3-TTS (text-to-speech, single XPU)</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#codec-decoding-on-xpu">Codec decoding on XPU</a></li>
+</ul>
+</li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#zonos2-moe-tts-single-xpu">ZONOS2 (MoE TTS, single XPU)</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#personaplex-speech-to-speech-single-xpu">PersonaPlex (speech-to-speech, single XPU)</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#qwen3-omni-30b-a3b-moe-multi-xpu-tensor-parallel">Qwen3-Omni (30B-A3B MoE, multi-XPU tensor parallel)</a></li>
