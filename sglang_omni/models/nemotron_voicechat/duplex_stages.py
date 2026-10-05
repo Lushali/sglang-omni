@@ -11,7 +11,10 @@ from transformers import AutoTokenizer
 
 from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.nemotron_voicechat.code2wav_stream import DECODE_WINDOW_FRAMES
-from sglang_omni.models.nemotron_voicechat.conformer import AudioPerception
+from sglang_omni.models.nemotron_voicechat.conformer import (
+    SAMPLES_PER_FRAME,
+    AudioPerception,
+)
 from sglang_omni.models.nemotron_voicechat.duplex_ar import (
     DuplexTalkerRunner,
     DuplexThinkerRunner,
@@ -180,9 +183,10 @@ def create_perception(
         device=concrete_device,
         strict=True,
     )
-    return SessionScheduler(
-        PerceptionHooks(model.eval()), max_open_sessions=1, max_concurrency=1
-    )
+    hooks = PerceptionHooks(model.eval())
+    hooks.stream.push(torch.zeros(SAMPLES_PER_FRAME, device=concrete_device))
+    hooks.stream.reset()
+    return SessionScheduler(hooks, max_open_sessions=1, max_concurrency=1)
 
 
 def create_codec(

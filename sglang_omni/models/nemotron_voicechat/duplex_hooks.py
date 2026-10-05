@@ -39,12 +39,12 @@ class PerceptionState:
 class PerceptionHooks(SessionHooks):
     def __init__(self, model: AudioPerception) -> None:
         self.model = model
+        self.stream = GraphPerception(model)
         self.states: dict[SessionIdentity, PerceptionState] = {}
 
     def open(self, session_identity: SessionIdentity, request: OmniRequest) -> None:
-        self.states[session_identity] = PerceptionState(
-            stream=GraphPerception(self.model)
-        )
+        self.stream.reset()
+        self.states[session_identity] = PerceptionState(stream=self.stream)
 
     @torch.inference_mode()
     def append(
