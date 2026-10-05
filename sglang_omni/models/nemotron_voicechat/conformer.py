@@ -446,9 +446,7 @@ class StreamingPerception:
         num_keys = (self.cached_frame_count + 1).clamp(max=self.max_keys)
         is_padding_K1 = (self.key_positions_K < self.max_keys - num_keys)[:, None]
         scores_KH = (content_KH + position_KH) / math.sqrt(self.head_size)
-        weights_KH = scores_KH.masked_fill(is_padding_K1, float("-inf")).softmax(
-            dim=0
-        )
+        weights_KH = scores_KH.masked_fill(is_padding_K1, float("-inf")).softmax(dim=0)
         attended_HS = einsum(weights_KH, values_KHS, "k h, k h s -> h s")
         return attention.linear_out(rearrange(attended_HS, "h s -> 1 1 (h s)"))
 
