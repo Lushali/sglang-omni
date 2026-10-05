@@ -56,12 +56,9 @@ class MiniCPMOVocoderSessionState:
     has_pending_turn: bool = False
 
     def held(self) -> ResourceUsage:
-        size = estimate_cache_bytes((self.caches, self.pending_codec_token_ids))
-        # note (Junnan Li): Shared caches are charged once, to the voice's earliest open session.
-        if self.speaker.session_ids[0] == self.session_id:
-            size += estimate_cache_bytes(self.speaker.base_caches)
-        else:
-            pass
+        size = estimate_cache_bytes(
+            (self.caches, self.pending_codec_token_ids)
+        ) + estimate_cache_bytes(self.speaker.base_caches)
         return ResourceUsage(slots={"tts": 1}, bytes=size)
 
 

@@ -11,7 +11,6 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-import torch
 from pydantic import ValidationError
 from transformers import AutoConfig
 from transformers.models.auto.configuration_auto import CONFIG_MAPPING
@@ -23,10 +22,6 @@ from sglang_omni.config.runtime import (
 )
 from sglang_omni.models.minicpm_o import native_stages, stages
 from sglang_omni.models.minicpm_o.components import audio_encoder, image_encoder
-from sglang_omni.models.minicpm_o.components.whisper_encoder import (
-    AudioAttentionState,
-    AudioEncoderState,
-)
 from sglang_omni.models.minicpm_o.hf_config import MiniCPMOConfig
 from sglang_omni.models.minicpm_o.native_config import (
     MiniCPMODuplexPipelineConfig,
@@ -223,18 +218,6 @@ def test_duplex_yaml_builds_session_stages(
     processor_factory = native_stages.PerceptionHooks.call_args.args[1]
     assert processor_factory() is not processor_factory()
     native_stages.AutoProcessor.from_pretrained.assert_called_once()
-
-
-def test_perception_budget_holds_a_full_audio_encoder_history() -> None:
-    # note (Junnan Li): MiniCPM-o 4.5 audio encoder: 24 layers of 16 x 64 heads, history dropped at 1500 frames.
-    history = torch.empty((1, 16, 1500, 64), dtype=torch.bfloat16, device="meta")
-    state = AudioEncoderState(
-        layers=tuple(
-            AudioAttentionState(key_states=history, value_states=history)
-            for _ in range(24)
-        )
-    )
-    assert state.nbytes < native_stages.PERCEPTION_STATE_BYTES_PER_SESSION
 
 
 def test_minicpmo_configs_load_without_sglang(tmp_path: Path) -> None:

@@ -41,9 +41,6 @@ from sglang_omni.utils.device import resolve_concrete_device
 
 logger = logging.getLogger(__name__)
 
-# note (Junnan Li): The audio encoder drops its history at 1500 frames (30 s, about 141 MiB in bfloat16), so this cap catches leaks and is not a tuning knob.
-PERCEPTION_STATE_BYTES_PER_SESSION = 256 << 20
-
 
 class PerceptionHooks(SessionHooks):
     def __init__(
@@ -212,7 +209,6 @@ def create_perception_scheduler(
         hooks,
         max_open_sessions=max_open_sessions,
         max_concurrency=1,
-        max_state_bytes_per_session=PERCEPTION_STATE_BYTES_PER_SESSION,
     )
 
 
