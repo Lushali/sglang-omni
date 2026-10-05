@@ -598,7 +598,7 @@ def test_speech_pipeline_colocates_batched_code2wav_with_talker_by_default() -> 
     assert code2wav.gpu == talker.gpu
     factory = code2wav.factory
     assert factory.max_batch_size == 16
-    assert factory.max_batch_wait_ms == 100.0
+    assert factory.max_batch_wait_ms == 0
     assert factory.batch_wait_when_idle is False
     assert factory.dtype == "float16"
     assert factory.enable_dit_torch_compile is True
