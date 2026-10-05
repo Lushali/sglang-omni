@@ -131,7 +131,9 @@ def code2wav_stage(*, gpu: int, process: str) -> StageConfig:
             reference_workers=8,
             prompt_cache_capacity=32,
             decode_stream_priority=CODE2WAV_DECODE_STREAM_PRIORITY,
-            enable_flow_block_compile=True,
+            # note (Dayuxiaoshui): compiles the packed DiT, which only runs when
+            # enable_flow_variable_length is on.
+            enable_flow_block_compile=False,
         ),
         # Note (Chenyang): As a general comment and my usual understanding
         # of SGLang Omni, SGLang Omni has a poor runtime which leads to a

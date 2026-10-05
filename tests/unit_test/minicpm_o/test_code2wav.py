@@ -606,7 +606,7 @@ def test_speech_pipeline_colocates_batched_code2wav_with_talker_by_default() -> 
     assert factory.reference_workers == 8
     assert factory.prompt_cache_capacity == 32
     assert factory.decode_stream_priority == -1
-    assert factory.enable_flow_block_compile is True
+    assert factory.enable_flow_block_compile is False
 
 
 @pytest.mark.parametrize(
@@ -707,7 +707,7 @@ def test_cuda_flow_blocks_compile_with_packed_precision(
     fake_token2wav.flow.decoder.estimator.blocks = flow_blocks
     install_offline_cuda_streams(monkeypatch)
     compiled_options = capture_flow_compile(monkeypatch)
-    build_code2wav_model()
+    build_code2wav_model(enable_flow_block_compile=True)
     assert compiled_options == [PACKED_FLOW_COMPILE, PACKED_FLOW_COMPILE]
 
 
