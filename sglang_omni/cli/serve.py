@@ -17,6 +17,7 @@ from sglang_omni.config.patch import (
 )
 from sglang_omni.config.path import ConfigPath, ConfigPathError
 from sglang_omni.config.sources import dump_user_config, patches_from_model_path_flag
+from sglang_omni.models.minimax_music3.config import MiniMaxMusic3PipelineConfig
 from sglang_omni.preprocessing.resource_connector import (
     resolve_allowed_local_media_path,
 )
@@ -310,57 +311,14 @@ def apply_stage_offload_cli_overrides(
     else:
         pass
 
-    role_to_stage = type(pipeline_config).stage_offload_role_to_stage()
-    if not role_to_stage:
+    if not isinstance(pipeline_config, MiniMaxMusic3PipelineConfig):
         raise typer.BadParameter(
             "--stage-offload-components is not supported by this pipeline"
         )
     else:
         pass
 
-    unknown = components - role_to_stage.keys()
-    if unknown:
-        raise typer.BadParameter(
-            "--stage-offload-components does not support: "
-            f"{', '.join(sorted(unknown))}; supported: "
-            f"{', '.join(sorted(role_to_stage))}"
-        )
-    else:
-        pass
-    missing = role_to_stage.keys() - components
-    if missing:
-        raise typer.BadParameter(
-            "--stage-offload-components currently requires all of: "
-            f"{', '.join(sorted(role_to_stage))} (missing "
-            f"{', '.join(sorted(missing))})"
-        )
-    else:
-        pass
-
-    ar_stage = pipeline_config.stage_named(role_to_stage["ar"])
-    dit_stage = pipeline_config.stage_named(role_to_stage["dit"])
-    if ar_stage.gpu != dit_stage.gpu:
-        raise typer.BadParameter(
-            "--stage-offload-components ar,dit requires the "
-            f"{ar_stage.name!r} and {dit_stage.name!r} stages on the same GPU "
-            f"(currently {ar_stage.gpu!r} and {dit_stage.gpu!r}); use the "
-            "'single-gpu' config variant"
-        )
-    else:
-        pass
-
-    config_cls = type(pipeline_config)
-    data = pipeline_config.model_dump()
-    process = ar_stage.process or ar_stage.name
-    writes: dict[str, object] = {
-        f"stages.{ar_stage.name}.process": process,
-        f"stages.{dit_stage.name}.process": process,
-        f"stages.{ar_stage.name}.factory.enable_serial_offload": True,
-        f"stages.{dit_stage.name}.factory.enable_serial_offload": True,
-    }
-    for path_text, value in writes.items():
-        ConfigPath.parse(path_text, config_cls).write(data, value)
-    return config_cls(**data)
+    return pipeline_config.with_serial_offload(components)
 
 
 def serve(

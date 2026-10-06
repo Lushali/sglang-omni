@@ -3,12 +3,23 @@
 
 from __future__ import annotations
 
+import json
+import mmap
+import shutil
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Literal
+
 import pytest
 import torch
 from sglang.srt.managers.schedule_batch import Req, ScheduleBatch
 from sglang.srt.sampling.sampling_params import SamplingParams
+from torch_memory_saver import torch_memory_saver
 
-from sglang_omni.models.minimax_music3.acoustic import MiniMaxMusic3AcousticScheduler
+from sglang_omni.models.minimax_music3.acoustic import (
+    MiniMaxMusic3AcousticDecoder,
+    MiniMaxMusic3AcousticScheduler,
+)
 from sglang_omni.models.minimax_music3.engine_builder import MiniMaxMusic3EngineBuilder
 from sglang_omni.models.minimax_music3.scheduler import MiniMaxMusic3Scheduler
 from sglang_omni.models.minimax_music3.serial_offload import (
@@ -17,13 +28,19 @@ from sglang_omni.models.minimax_music3.serial_offload import (
     StageResidency,
     get_coordinator,
 )
+from sglang_omni.models.minimax_music3.weight_cache import (
+    CHUNK_BYTES,
+    SHARD_BYTES,
+    RuntimeWeights,
+    StagingRing,
+)
 from sglang_omni.scheduling.generation_batch_policy import (
     build_generation_batch_overrides,
 )
 
 
 @pytest.mark.parametrize("enable_serial_offload", [False, True])
-def test_offload_enforces_one_cfg_pair_and_eager_execution(
+def test_offload_enforces_one_cfg_pair_and_preserves_graph_selection(
     enable_serial_offload: bool,
 ) -> None:
     builder = MiniMaxMusic3EngineBuilder(enable_serial_offload=enable_serial_offload)
@@ -44,14 +61,17 @@ def test_offload_enforces_one_cfg_pair_and_eager_execution(
     )
 
     builder.adjust_overrides(overrides)
+    assert overrides["enable_deterministic_inference"] is True
 
     if enable_serial_offload:
         assert builder.max_running_requests == 1
         assert overrides["max_running_requests"] == 2
-        assert overrides["disable_cuda_graph"] is True
-        assert overrides["cuda_graph_backend_decode"] == "disabled"
-        assert overrides["cuda_graph_backend_prefill"] == "disabled"
-        assert "cuda_graph_config" not in overrides
+        assert overrides["disable_cuda_graph"] is False
+        assert overrides["cuda_graph_backend_decode"] == "full"
+        assert overrides["cuda_graph_backend_prefill"] == "full"
+        assert "cuda_graph_config" in overrides
+        assert overrides["enable_memory_saver"] is True
+        assert overrides["enable_weights_cpu_backup"] is False
         assert overrides["enable_torch_compile"] is False
         assert overrides["disable_overlap_schedule"] is True
     else:
@@ -194,26 +214,26 @@ def test_residency_reuses_one_host_copy_instead_of_recopying_each_sleep() -> Non
     residency = StageResidency({"module": module}, torch.device("cpu"))
 
     residency.sleep()
-    snapshot = residency.host_weights[("module", "weight")]
+    snapshot = residency.weights.chunks[0].values
     residency.wake()
     residency.sleep()
 
-    assert residency.host_weights[("module", "weight")] is snapshot
+    assert residency.weights.chunks[0].values is snapshot
 
 
-def test_a_host_built_module_is_asleep_and_never_snapshots_from_the_gpu() -> None:
+def test_restore_keeps_storage_and_tensor_identity() -> None:
     module = torch.nn.Linear(2, 2)
-    residency = StageResidency({"module": module}, torch.device("cpu"), resident=False)
-
-    assert residency.resident is False
-    assert residency.host_weights[("module", "weight")] is not module.weight
-    assert (
-        residency.host_weights[("module", "weight")].data_ptr()
-        == module.weight.data_ptr()
-    )
-
+    parameter = module.weight
+    address = parameter.data_ptr()
+    expected = parameter.detach().clone()
+    residency = StageResidency({"module": module}, torch.device("cpu"))
+    residency.sleep()
+    with torch.no_grad():
+        parameter.zero_()
     residency.wake()
-    assert residency.resident is True
+    assert module.weight is parameter
+    assert parameter.data_ptr() == address
+    assert torch.equal(parameter, expected)
 
 
 def test_residency_keeps_tied_weights_tied_across_a_round_trip() -> None:
@@ -232,81 +252,51 @@ def test_residency_keeps_tied_weights_tied_across_a_round_trip() -> None:
 
 @pytest.mark.accelerator
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
-def test_serial_offload_round_trip_moves_weights_between_devices() -> None:
-    coordinator = SerialOffloadCoordinator()
-    device = torch.device("cuda:0")
-    model = torch.nn.Linear(4, 4).to(device)
-    coordinator.register_ar(model, device)
-
-    assert coordinator.try_acquire_ar("req-1")
-    coordinator.begin_dit_handoff("req-1")
-    assert next(model.parameters()).device.type == "cpu"
-
-    coordinator.end_dit_handoff("req-1")
-    assert next(model.parameters()).device == device
-
-
-@pytest.mark.accelerator
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
-def test_host_built_residency_keeps_canonical_copy_on_cpu() -> None:
-    device = torch.device("cuda:0")
-    model = torch.nn.Linear(4, 4)
-    expected = model.weight.detach().clone()
-    residency = StageResidency({"module": model}, device, resident=False)
-    host_weight = residency.host_weights[("module", "weight")]
-
-    residency.wake()
-    assert model.weight.device == device
-    assert host_weight.device.type == "cpu"
-
-    residency.sleep()
-    assert model.weight.device.type == "cpu"
-    assert model.weight.data_ptr() == host_weight.data_ptr()
-    assert torch.equal(model.weight, expected)
-
-    residency.wake()
-    assert model.weight.device == device
-    assert host_weight.device.type == "cpu"
-    assert torch.equal(model.weight.cpu(), expected)
-
-
-@pytest.mark.accelerator
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
-def test_stage_group_wakes_once_and_keeps_allocator_blocks_cached(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("source", ["ram", "mmap"])
+def test_cuda_cycles_release_physical_memory_and_replay_graph_without_recapture(
+    tmp_path: Path, source: Literal["ram", "mmap"]
 ) -> None:
     device = torch.device("cuda:0")
-    dit = torch.nn.Linear(4, 4)
-    dav = torch.nn.Linear(4, 4)
+    tag = f"test_music3_{source}"
+    with torch_memory_saver.region(tag=tag, enable_cpu_backup=False):
+        model = torch.nn.Linear(4096, 4096, bias=False).to(device)
+    expected = model.weight.detach().clone()
+    address = model.weight.data_ptr()
+    staging_ring = StagingRing(device)
+    assert sum(buffer.numel() for buffer in staging_ring.buffers) <= 2 * SHARD_BYTES
     residency = StageResidency(
-        {"dit": dit, "dav": dav}, device, resident=False, label="dit/dav"
+        {"model": model},
+        device,
+        tags=(tag,),
+        source=source,
+        cache_dir=str(tmp_path),
+        staging_ring=staging_ring,
     )
-    synchronize_calls: list[torch.device] = []
-    empty_cache_calls = 0
-    synchronize = torch.cuda.synchronize
-    empty_cache = torch.cuda.empty_cache
-
-    def tracked_synchronize(target: torch.device) -> None:
-        synchronize_calls.append(target)
-        synchronize(target)
-
-    def tracked_empty_cache() -> None:
-        nonlocal empty_cache_calls
-        empty_cache_calls += 1
-        empty_cache()
-
-    monkeypatch.setattr(torch.cuda, "synchronize", tracked_synchronize)
-    monkeypatch.setattr(torch.cuda, "empty_cache", tracked_empty_cache)
-
-    residency.wake()
-    assert next(dit.parameters()).device == device
-    assert next(dav.parameters()).device == device
-    assert synchronize_calls == [device]
-
-    residency.sleep()
-    assert next(dit.parameters()).device.type == "cpu"
-    assert next(dav.parameters()).device.type == "cpu"
-    assert empty_cache_calls == 0
+    inputs = torch.ones((2, 4096), device=device)
+    graph = torch.cuda.CUDAGraph()
+    capture_stream = torch.cuda.Stream()
+    capture_stream.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(capture_stream), torch.no_grad():
+        model(inputs)
+    capture_stream.synchronize()
+    with torch.cuda.graph(graph), torch.no_grad():
+        output = model(inputs)
+    graph.replay()
+    torch.cuda.synchronize()
+    expected_output = output.clone()
+    for _ in range(3):
+        torch.cuda.synchronize()
+        free_before, _ = torch.cuda.mem_get_info(device)
+        residency.sleep()
+        free_after, _ = torch.cuda.mem_get_info(device)
+        assert free_after - free_before >= model.weight.nbytes
+        assert model.weight.device == device
+        assert model.weight.data_ptr() == address
+        residency.wake()
+        assert torch.equal(model.weight, expected)
+        graph.replay()
+        torch.cuda.synchronize()
+        assert torch.equal(output, expected_output)
 
 
 def test_ar_abort_releases_only_its_owner_before_handoff() -> None:
@@ -401,9 +391,15 @@ def test_acoustic_compute_requires_a_completed_handoff() -> None:
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
 def test_sleep_waits_for_compute_on_another_cuda_stream() -> None:
     device = torch.device("cuda:0")
-    model = torch.nn.Linear(256, 256, bias=False).to(device)
+    with torch_memory_saver.region(tag="test_music3_stream", enable_cpu_backup=False):
+        model = torch.nn.Linear(256, 256, bias=False).to(device)
     expected = model.weight.detach().cpu().clone()
-    residency = StageResidency({"module": model}, device)
+    residency = StageResidency(
+        {"module": model},
+        device,
+        tags=("test_music3_stream",),
+        staging_ring=StagingRing(device),
+    )
     residency.sleep()
     residency.wake()
     compute_stream = torch.cuda.Stream(device=device)
@@ -450,3 +446,260 @@ def test_scheduler_admits_only_the_owning_cfg_pair(
     assert scheduler.pair_admission_limit(queue[2:], running_batch) == 0
     coordinator.end_dit_handoff("first")
     assert scheduler.pair_admission_limit(queue[2:], running_batch) == 2
+
+
+@pytest.mark.parametrize("source", ["mmap", "ram"])
+def test_runtime_cache_restores_shared_storage_and_strided_views(
+    tmp_path: Path, source: Literal["mmap", "ram"]
+) -> None:
+    module = torch.nn.Module()
+    module.register_parameter(
+        "weight", torch.nn.Parameter(torch.arange(32.0).view(4, 8))
+    )
+    module.register_buffer("view", module.weight.detach().T[1:])
+    addresses = (module.weight.data_ptr(), module.view.data_ptr())
+    expected_view = module.view.clone()
+    weights = RuntimeWeights(
+        {"model": module},
+        source=source,
+        cache_dir=str(tmp_path),
+        checkpoint_contents={"checkpoint": "content"},
+        folding_backend="cpu",
+    )
+    assert len(weights.storages) == 1
+    with torch.no_grad():
+        module.weight.zero_()
+    weights.restore(None)
+    assert torch.equal(module.view, expected_view)
+    assert addresses == (module.weight.data_ptr(), module.view.data_ptr())
+    assert all(chunk.values.numel() <= CHUNK_BYTES for chunk in weights.chunks)
+    if source == "mmap":
+        assert all(isinstance(mapping, mmap.mmap) for mapping in weights.mappings)
+        assert all(
+            path.stat().st_size <= SHARD_BYTES
+            for path in weights.cache_path.glob("*.safetensors")
+        )
+    weights.close()
+
+
+@pytest.mark.parametrize("corruption", ["shard", "layout", "missing"])
+def test_existing_cache_corruption_fails_visibly(
+    tmp_path: Path, corruption: str
+) -> None:
+    module = torch.nn.Linear(4, 4)
+    kwargs = dict(
+        source="mmap",
+        cache_dir=str(tmp_path),
+        checkpoint_contents={"c": "1"},
+        folding_backend="cpu",
+    )
+    weights = RuntimeWeights({"model": module}, **kwargs)
+    cache_path = weights.cache_path
+    weights.close()
+    if corruption == "shard":
+        shard = next(cache_path.glob("*.safetensors"))
+        shard.write_bytes(b"broken")
+    elif corruption == "layout":
+        manifest_path = cache_path / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["layouts"][0]["offset"] = 1
+        manifest_path.write_text(json.dumps(manifest))
+    else:
+        next(cache_path.glob("*.safetensors")).unlink()
+    with pytest.raises((ValueError, FileNotFoundError)):
+        RuntimeWeights({"model": module}, **kwargs)
+
+
+def test_tmpfs_cache_is_rejected() -> None:
+    with pytest.raises(ValueError, match="non-tmpfs"):
+        RuntimeWeights(
+            {"model": torch.nn.Linear(2, 2)},
+            source="mmap",
+            cache_dir="/dev/shm/music3-test",
+            checkpoint_contents={},
+            folding_backend="cpu",
+        )
+
+
+def test_explicit_eager_selection_survives_offload_configuration() -> None:
+    builder = MiniMaxMusic3EngineBuilder(enable_serial_offload=True)
+    overrides = {"disable_cuda_graph": True}
+    builder.adjust_overrides(overrides)
+    assert overrides["disable_cuda_graph"] is True
+
+
+def test_failed_acoustic_wake_blocks_admission(monkeypatch: pytest.MonkeyPatch) -> None:
+    coordinator = registered_coordinator()
+    assert coordinator.try_acquire_ar("owner")
+    coordinator.begin_dit_handoff("owner")
+    monkeypatch.setattr(
+        "sglang_omni.models.minimax_music3.acoustic.get_coordinator",
+        lambda: coordinator,
+    )
+    decoder = MiniMaxMusic3AcousticDecoder.__new__(MiniMaxMusic3AcousticDecoder)
+    decoder.residency = coordinator.ar_residency
+
+    def fail() -> None:
+        raise RuntimeError("acoustic wake failed")
+
+    monkeypatch.setattr(decoder.residency, "wake", fail)
+    with pytest.raises(RuntimeError, match="acoustic wake failed"):
+        decoder.ensure_gpu_resident()
+    with pytest.raises(RuntimeError, match="transition failed"):
+        coordinator.try_acquire_ar("next")
+
+
+def test_cache_reuse_and_checkpoint_invalidation(tmp_path: Path) -> None:
+    module = torch.nn.Linear(2, 2)
+    first = RuntimeWeights(
+        {"model": module},
+        source="mmap",
+        cache_dir=str(tmp_path),
+        checkpoint_contents={"c": "first"},
+        folding_backend="cpu",
+    )
+    cache_path = first.cache_path
+    modified_at = (cache_path / "manifest.json").stat().st_mtime_ns
+    first.close()
+    reused = RuntimeWeights(
+        {"model": module},
+        source="mmap",
+        cache_dir=str(tmp_path),
+        checkpoint_contents={"c": "first"},
+        folding_backend="cpu",
+    )
+    assert reused.cache_path == cache_path
+    assert (cache_path / "manifest.json").stat().st_mtime_ns == modified_at
+    reused.close()
+    changed = RuntimeWeights(
+        {"model": module},
+        source="mmap",
+        cache_dir=str(tmp_path),
+        checkpoint_contents={"c": "changed"},
+        folding_backend="cpu",
+    )
+    assert changed.cache_path != cache_path
+    changed.close()
+
+
+def test_insufficient_cache_disk_space_has_no_ram_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    disk_usage = shutil.disk_usage(tmp_path)
+    monkeypatch.setattr(
+        "sglang_omni.models.minimax_music3.weight_cache.shutil.disk_usage",
+        lambda directory: type(disk_usage)(disk_usage.total, disk_usage.used, 0),
+    )
+    with pytest.raises(OSError, match="Insufficient disk space"):
+        RuntimeWeights(
+            {"model": torch.nn.Linear(2, 2)},
+            source="mmap",
+            cache_dir=str(tmp_path),
+            checkpoint_contents={},
+            folding_backend="cpu",
+        )
+    assert not list(tmp_path.glob("*/manifest.json"))
+
+
+def test_stale_cache_publication_is_cleaned_under_lock(tmp_path: Path) -> None:
+    module = torch.nn.Linear(2, 2)
+    weights = RuntimeWeights(
+        {"model": module},
+        source="mmap",
+        cache_dir=str(tmp_path),
+        checkpoint_contents={},
+        folding_backend="cpu",
+    )
+    identity = weights.cache_path.name
+    weights.close()
+    cache_path = tmp_path / identity
+    cache_path.rename(tmp_path / f".{identity}-interrupted")
+    rebuilt = RuntimeWeights(
+        {"model": module},
+        source="mmap",
+        cache_dir=str(tmp_path),
+        checkpoint_contents={},
+        folding_backend="cpu",
+    )
+    assert rebuilt.cache_path.is_dir()
+    assert not (tmp_path / f".{identity}-interrupted").exists()
+    rebuilt.close()
+
+
+@pytest.mark.accelerator
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
+def test_staging_ring_waits_before_reusing_buffers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "sglang_omni.models.minimax_music3.weight_cache.SHARD_BYTES", 1024
+    )
+    monkeypatch.setattr(
+        "sglang_omni.models.minimax_music3.weight_cache.CHUNK_BYTES", 1024
+    )
+    device = torch.device("cuda:0")
+    module = torch.nn.Linear(64, 64).to(device)
+    expected = module.weight.detach().clone()
+    weights = RuntimeWeights(
+        {"model": module},
+        source="ram",
+        cache_dir=None,
+        checkpoint_contents={},
+        folding_backend="cpu",
+    )
+    staging_ring = StagingRing(device)
+    buffer_addresses = [buffer.data_ptr() for buffer in staging_ring.buffers]
+    for _ in range(3):
+        with torch.no_grad():
+            module.weight.zero_()
+        weights.restore(staging_ring)
+        assert torch.equal(module.weight, expected)
+        assert buffer_addresses == [
+            buffer.data_ptr() for buffer in staging_ring.buffers
+        ]
+
+
+def test_cache_publication_serializes_concurrent_creators(tmp_path: Path) -> None:
+    module = torch.nn.Linear(2, 2)
+
+    def snapshot() -> RuntimeWeights:
+        return RuntimeWeights(
+            {"model": module},
+            source="mmap",
+            cache_dir=str(tmp_path),
+            checkpoint_contents={},
+            folding_backend="cpu",
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        weights = [
+            future.result() for future in [executor.submit(snapshot) for _ in range(2)]
+        ]
+    assert weights[0].cache_path == weights[1].cache_path
+    assert len(list(tmp_path.glob("*/manifest.json"))) == 1
+    for snapshot_weights in weights:
+        snapshot_weights.close()
+
+
+def test_large_storage_uses_bounded_shards_and_restores_every_byte(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "sglang_omni.models.minimax_music3.weight_cache.CHUNK_BYTES", 1024
+    )
+    module = torch.nn.Linear(64, 64)
+    expected = module.weight.detach().clone()
+    weights = RuntimeWeights(
+        {"model": module},
+        source="mmap",
+        cache_dir=str(tmp_path),
+        checkpoint_contents={},
+        folding_backend="cpu",
+    )
+    assert len(weights.chunks) > 2
+    assert all(chunk.values.numel() <= 1024 for chunk in weights.chunks)
+    with torch.no_grad():
+        module.weight.zero_()
+    weights.restore(None)
+    assert torch.equal(module.weight, expected)
+    weights.close()

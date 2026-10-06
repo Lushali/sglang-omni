@@ -3,9 +3,13 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+import os
+from importlib.util import find_spec
+from pathlib import Path
+from typing import ClassVar, Literal
 
 import torch
+import typer
 from pydantic import Field
 
 from sglang_omni.config import (
@@ -15,6 +19,7 @@ from sglang_omni.config import (
     PlacementConfig,
     StageConfig,
 )
+from sglang_omni.config.path import ConfigPath
 from sglang_omni.platforms import current_platform
 
 from .constants import DEFAULT_DIT_CFG_SCALE, DEFAULT_DIT_STEPS
@@ -40,6 +45,8 @@ class DitDavFactoryArgs(FactoryArgs):
 
 class ArFactoryArgs(FactoryArgs):
     enable_serial_offload: bool | None = None
+    serial_offload_source: Literal["mmap", "ram"] = "mmap"
+    serial_offload_cache_dir: str | None = None
 
 
 class ArStageConfig(EngineStageConfig):
@@ -125,9 +132,82 @@ class MiniMaxMusic3PipelineConfig(PipelineConfig):
     def process_local_edges(cls) -> frozenset[tuple[str, str]]:
         return frozenset({("preprocessing", "minimax_music3_ar")})
 
-    @classmethod
-    def stage_offload_role_to_stage(cls) -> dict[str, str]:
-        return {"ar": "minimax_music3_ar", "dit": "dit_dav"}
+    def resolved_env_defaults(self) -> dict[str, str]:
+        environment = super().resolved_env_defaults()
+        if self.stage_named("minimax_music3_ar").factory.enable_serial_offload:
+            package = find_spec("torch_memory_saver")
+            if package is None or package.origin is None or torch.version.cuda is None:
+                raise RuntimeError(
+                    "Music3 offload requires the CUDA torch_memory_saver==0.0.10 wheel"
+                )
+            else:
+                pass
+            package_directory = Path(package.origin).parent
+            cuda_major = torch.version.cuda.split(".")[0]
+            pattern = f"torch_memory_saver_hook_mode_preload_cu{cuda_major}.*.so"
+            libraries = [
+                library
+                for directory in (package_directory, package_directory.parent)
+                for library in directory.glob(pattern)
+            ]
+            if len(libraries) != 1:
+                raise RuntimeError(
+                    f"Music3 offload requires exactly one allocator library matching {pattern}"
+                )
+            else:
+                pass
+            library_path = str(libraries[0])
+            preload = os.environ.get("LD_PRELOAD", "")
+            if "torch_memory_saver" not in preload:
+                environment["LD_PRELOAD"] = (
+                    f"{library_path}:{preload}" if preload else library_path
+                )
+            else:
+                pass
+        else:
+            pass
+        return environment
+
+    def with_serial_offload(
+        self, components: frozenset[str]
+    ) -> MiniMaxMusic3PipelineConfig:
+        role_to_stage = {"ar": "minimax_music3_ar", "dit": "dit_dav"}
+        unknown = components - role_to_stage.keys()
+        missing = role_to_stage.keys() - components
+        if unknown:
+            raise typer.BadParameter(
+                "--stage-offload-components does not support: "
+                f"{', '.join(sorted(unknown))}; supported: ar, dit"
+            )
+        elif missing:
+            raise typer.BadParameter(
+                "--stage-offload-components currently requires all of: ar, dit "
+                f"(missing {', '.join(sorted(missing))})"
+            )
+        else:
+            pass
+        ar_stage = self.stage_named(role_to_stage["ar"])
+        dit_stage = self.stage_named(role_to_stage["dit"])
+        if ar_stage.gpu != dit_stage.gpu:
+            raise typer.BadParameter(
+                "--stage-offload-components ar,dit requires the "
+                f"{ar_stage.name!r} and {dit_stage.name!r} stages on the same GPU "
+                f"(currently {ar_stage.gpu!r} and {dit_stage.gpu!r}); use the "
+                "'single-gpu' config variant"
+            )
+        else:
+            pass
+        configuration = self.model_dump()
+        process = ar_stage.process or ar_stage.name
+        for stage in (ar_stage, dit_stage):
+            for field_name, value in (
+                ("process", process),
+                ("factory.enable_serial_offload", True),
+            ):
+                ConfigPath.parse(f"stages.{stage.name}.{field_name}", type(self)).write(
+                    configuration, value
+                )
+        return type(self)(**configuration)
 
 
 class MiniMaxMusic3SingleGPUPipelineConfig(MiniMaxMusic3PipelineConfig):

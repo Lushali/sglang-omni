@@ -58,13 +58,17 @@ CUDA_VISIBLE_DEVICES=0 sgl-omni serve --model-path MiniMaxAI/MiniMax-Music3 --po
   --stage-offload-components ar,dit
 ```
 
-This mode serves one request at a time (one CFG pair, two engine rows), even when a higher concurrency is requested. AR completes the request before handing the GPU to DIT/DAV. Both stages share one process and device. AR decode, prefill and RVQ-depth graphs, torch compilation, and acoustic compilation and graphs are disabled because each weight upload changes device addresses.
+This CUDA mode serves one request at a time (one CFG pair, two engine rows), even when a higher concurrency is requested. AR completes the request before handing the GPU to DIT/DAV. Both stages share one process and device. `torch_memory_saver==0.0.10` releases physical weight memory while retaining CUDA addresses; decode and RVQ graphs and acoustic compilation remain enabled. Acoustic breakable graphs remain opt-in. Explicit eager selections are respected.
 
-Offload reduces GPU weight residency but retains canonical pageable CPU copies for both stages. The AR copy alone is approximately 16 GiB, with additional RAM required for DIT/DAV, checkpoint loading, request buffers and other processes. A 32 GiB VM limit can still exhaust host memory; reusing the copies does not reduce their resident size. The AR KV cache also stays on the GPU.
+The default `--minimax_music3_ar.factory.serial_offload_source mmap` snapshots finalized weights to bounded safetensors shards, preserving shared storage and strided views. Two shared 256 MiB pinned buffers upload mapped shards. The AR KV cache and graph workspaces remain resident. Startup pauses AR before loading acoustic weights, folds DAV normalization on CUDA, initializes acceleration, caches and pauses acoustic weights, then restores AR.
+
+The cache directory defaults to `music3-runtime-weights` beside the Hugging Face Hub cache. Override it with `--minimax_music3_ar.factory.serial_offload_cache_dir /path/on/disk`. It must be writable, non-tmpfs storage with space for finalized AR and acoustic weights. Cache identity includes checkpoint content, runtime versions, dtype, layout and folding backend; caches publish atomically under a lock and invalid caches fail visibly. There is no automatic RAM fallback.
+
+Hosts with sufficient RAM can explicitly select `--minimax_music3_ar.factory.serial_offload_source ram`, retaining pageable runtime weights and using the same staging buffers. Give KV memory an explicit budget, for example `--minimax_music3_ar.engine.kv_cache_bytes 4294967296` for 4 GiB.
 
 Validate repeated requests, audio output, GPU residency and host RSS on the target hardware under its intended memory limit before relying on this mode.
 
-The same seed is reproducible within one execution mode. Resident and offload output can differ slightly because offload folds DAV weight normalization on CPU and disables device graphs and compilation. Compare decoded waveforms numerically when validating across modes.
+Music3 defaults to SGLang deterministic inference so attention reductions agree between eager and graph execution. The same seed is reproducible within one execution mode. Compare decoded waveforms numerically across eager, graph and compiled execution modes.
 
 Run the opt-in HTTP integration test with a local checkpoint:
 
@@ -73,9 +77,33 @@ CUDA_VISIBLE_DEVICES=0 MINIMAX_MUSIC3_TEST_CHECKPOINT=/path/to/MiniMax-Music3 \
   pytest -q tests/test_model/test_minimax_music3_serial_offload.py
 ```
 
-The test checks 100-frame and 250-frame stereo audio, resident/offload waveform parity (relative RMS difference below 0.5% and correlation above 0.9999), exact repeated offload output, two overlapping submissions, and 20 short requests with paired residency handoffs. Set `MINIMAX_MUSIC3_TEST_REPEATED_REQUESTS` to change the repetition count. It uses eager backbone and acoustic execution for both modes; resident RVQ depth graphs remain enabled.
+The test covers resident/offload execution, RAM/file sources, eager/graph/compiled execution and requested acoustic breakable graphs. It checks 100-frame and 250-frame stereo audio, waveform parity (relative RMS difference below 0.5% and correlation above 0.9999), exact repeated output, two overlapping submissions, 20 short requests and a final 100-frame request. Set `MINIMAX_MUSIC3_TEST_REPEATED_REQUESTS` to change the repetition count or `MINIMAX_MUSIC3_TEST_MODES` to select comma-separated mode names from the test. It records anonymous RSS, cgroup memory, physical GPU usage and wake latency alongside audio artifacts.
 
-Validation on an H200 with checkpoint revision `fbdf52fbaaca799592917417eb05f1899f1255ec` passed 91 focused tests and this HTTP integration test (26 offload requests and 26 completed handoffs). The container used `hongccc/sglang-omni:dev` at digest `sha256:ebe4239e29a764ee3a2806385c061c5fd438a26f01458e503d3822dcba5790df`, with its SGLang installation updated from 0.5.19 to the repository's 0.5.21 pin; PyTorch was 2.13.0+cu130 and FlashInfer 0.6.18. Set `OMP_NUM_THREADS=8` for reproduction. Relative waveform RMS differences were 0.23% (100 frames) and 0.17% (250 frames), with correlation above 0.999997. This validates the request lifecycle on a large GPU; it does not establish usability under a 24 GiB GPU or limited host RAM.
+Set `MINIMAX_MUSIC3_TEST_REQUIRE_32G_LIMIT=1` to require a cgroup memory limit of at most 32 GiB for file-backed modes. Set `MINIMAX_MUSIC3_TEST_COLD_WAKE=1` to evict runtime shard pages before the first request. The memory context artifact records the limit and OOM event counters before and after each mode.
+
+#### Validation Record
+
+Validated on one NVIDIA H200 on 2026-10-07 using the newest published `hongccc/sglang-omni:dev` image (published 2026-09-08), digest `sha256:ebe4239e29a764ee3a2806385c061c5fd438a26f01458e503d3822dcba5790df`. The container used repository pin `sglang==0.5.21`, `torch_memory_saver==0.0.10`, and PyTorch `2.13.0+cu130`. The checkpoint revision was `fbdf52fbaaca799592917417eb05f1899f1255ec`, with a 4 GiB AR KV budget.
+
+The six-mode file-backed run passed under a verified 32 GiB cgroup limit. Each offload mode completed 27 requests, including overlaps, 20 short repeats and the final reload. RAM eager and accelerated modes passed the same lifecycle under 64 GiB. Resident eager, graph-only, compilation-only, combined acceleration and requested breakable modes passed waveform validation. All modes repeated exactly within their execution mode. Graph-only and eager offload matched resident eager byte for byte. The largest cross-mode relative RMS difference was 0.3497%, with minimum correlation 0.99999399. Decode/RVQ capture and acoustic acceleration initialized once per server across repeated handoffs.
+
+| Mode | Peak Anonymous RSS (GiB) | Peak Cgroup Memory (GiB) | Peak Physical GPU (GiB) |
+| --- | ---: | ---: | ---: |
+| Resident eager | 14.63 | 29.53 | 36.04 |
+| Resident accelerated | 14.66 | 29.40 | 35.77 |
+| File-backed eager | 14.65 | 31.20 | 26.72 |
+| File-backed accelerated | 14.71 | 32.00 | 26.43 |
+| File-backed breakable | 14.74 | 31.75 | 27.21 |
+| RAM eager | 41.21 | 57.71 | 26.72 |
+| RAM accelerated | 41.28 | 57.83 | 26.43 |
+
+These sampled peaks include startup. Anonymous RSS sums server descendants; cgroup memory also includes reclaimable file cache. No OOM or OOM-kill events occurred. PyTorch allocator statistics retain virtual allocations during offload, so physical GPU usage is measured through NVML. Warm median AR/acoustic wakes were 4.83/2.66 seconds for file-backed acceleration and 3.05/1.71 seconds for RAM acceleration. The file-backed runtime cache occupied about 27 GiB on disk.
+
+A separate accelerated file-backed run evicted runtime shard pages before its first request under the 32 GiB limit. Cold AR/acoustic wakes took 6.38/4.09 seconds; subsequent warm medians were 3.93/2.42 seconds. Its parity, overlap, three short repeats and final reload checks passed without OOM events.
+
+Focused validation passed 103 tests, including physical release, unchanged addresses, exact restoration, aliases, bounded staging, cache failures/publication, cancellation and failed transitions. `pre-commit run --all-files` passed.
+
+H200 validation does not establish RTX 3090 compatibility. BF16 acoustic weights, quantization, layer streaming and request batching are outside this offload milestone.
 
 ## Generating Music
 

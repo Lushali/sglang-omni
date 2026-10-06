@@ -6,9 +6,13 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from importlib.metadata import version
 from typing import Literal, Protocol
 
 import torch
+from torch_memory_saver import torch_memory_saver
+
+from sglang_omni.models.minimax_music3.weight_cache import RuntimeWeights, StagingRing
 
 logger = logging.getLogger(__name__)
 
@@ -18,26 +22,6 @@ BYTES_PER_GIB = 1024.0**3
 
 class AcousticRelease(Protocol):
     def __call__(self) -> None: ...
-
-
-def owned_tensors(
-    modules: dict[str, torch.nn.Module],
-) -> list[tuple[tuple[str, str], torch.Tensor]]:
-    """List stage tensors once so shared weights retain one canonical host copy."""
-    owned_weights: list[tuple[tuple[str, str], torch.Tensor]] = []
-    seen_tensor_ids: set[int] = set()
-    for module_name, module in modules.items():
-        for tensor_name, tensor in (
-            *module.named_parameters(),
-            *module.named_buffers(),
-        ):
-            if id(tensor) in seen_tensor_ids:
-                continue
-            else:
-                pass
-            seen_tensor_ids.add(id(tensor))
-            owned_weights.append(((module_name, tensor_name), tensor))
-    return owned_weights
 
 
 def gpu_memory_note(device: torch.device) -> str:
@@ -55,15 +39,20 @@ def gpu_memory_note(device: torch.device) -> str:
 
 
 class StageResidency:
-    """Reuse canonical CPU weights while dropping and restoring GPU replicas."""
+    """Release physical pages and restore values into unchanged virtual storage."""
 
     def __init__(
         self,
         modules: dict[str, torch.nn.Module],
         device: torch.device,
         *,
-        resident: bool = True,
         label: str = "stage",
+        tags: tuple[str, ...] = (),
+        source: Literal["mmap", "ram"] = "ram",
+        cache_dir: str | None = None,
+        checkpoint_contents: dict[str, str] | None = None,
+        folding_backend: str = "none",
+        staging_ring: StagingRing | None = None,
     ) -> None:
         if not modules:
             raise ValueError("StageResidency requires at least one module")
@@ -71,20 +60,24 @@ class StageResidency:
             pass
         self.modules: dict[str, torch.nn.Module] = dict(modules)
         self.device: torch.device = torch.device(device)
-        self.is_resident: bool = bool(resident)
+        self.is_resident: bool = True
         self.label: str = label
-        self.host_weights: dict[tuple[str, str], torch.Tensor] = {}
-        if not self.is_resident:
-            # Note (Akazaakane): Detach the host handle so wake cannot replace its storage.
-            self.host_weights = {
-                name: tensor.detach() for name, tensor in owned_tensors(self.modules)
-            }
+        self.tags = tags
+        self.staging_ring = staging_ring
+        if self.device.type == "cuda" and (not tags or staging_ring is None):
+            raise ValueError(
+                "CUDA residency requires managed allocation tags and a staging ring"
+            )
         else:
             pass
-        weight_bytes = sum(
-            tensor.numel() * tensor.element_size()
-            for _, tensor in owned_tensors(self.modules)
+        self.weights = RuntimeWeights(
+            self.modules,
+            source=source,
+            cache_dir=cache_dir,
+            checkpoint_contents=checkpoint_contents or {},
+            folding_backend=folding_backend,
         )
+        weight_bytes = sum(storage.numel() for storage in self.weights.storages)
         logger.info(
             f"MiniMax Music 3 residency {label}: {weight_bytes / BYTES_PER_GIB:.2f}GiB of "
             f"weights, starts {'resident' if self.is_resident else 'offloaded'} "
@@ -101,23 +94,17 @@ class StageResidency:
             return
         else:
             pass
+        started_at_seconds = time.perf_counter()
         if self.device.type == "cuda":
             torch.cuda.synchronize(self.device)
         else:
             pass
-        owned_weights = owned_tensors(self.modules)
-        if not self.host_weights:
-            self.host_weights = {
-                name: tensor.detach().to("cpu", copy=True)
-                for name, tensor in owned_weights
-            }
-        else:
-            pass
-        for name, tensor in owned_weights:
-            tensor.data = self.host_weights[name]
+        for tag in self.tags:
+            torch_memory_saver.pause(tag=tag)
         self.is_resident = False
         logger.info(
             f"MiniMax Music 3 residency {self.label} -> host "
+            f"elapsed_seconds={time.perf_counter() - started_at_seconds:.4f} "
             f"({gpu_memory_note(self.device)})"
         )
 
@@ -127,10 +114,10 @@ class StageResidency:
             return
         else:
             pass
-        for name, tensor in owned_tensors(self.modules):
-            tensor.data = self.host_weights[name].to(
-                self.device, copy=True, non_blocking=True
-            )
+        started_at_seconds = time.perf_counter()
+        for tag in self.tags:
+            torch_memory_saver.resume(tag=tag)
+        self.weights.restore(self.staging_ring)
         if self.device.type == "cuda":
             torch.cuda.synchronize(self.device)
         else:
@@ -138,6 +125,7 @@ class StageResidency:
         self.is_resident = True
         logger.info(
             f"MiniMax Music 3 residency {self.label} -> gpu "
+            f"elapsed_seconds={time.perf_counter() - started_at_seconds:.4f} "
             f"({gpu_memory_note(self.device)})"
         )
 
@@ -154,23 +142,74 @@ class SerialOffloadCoordinator:
         self.failure: Exception | None = None
         self.paused_at_seconds: float | None = None
         self.has_reported_stall: bool = False
+        self.staging_ring: StagingRing | None = None
 
     @property
     def enabled(self) -> bool:
         return self.is_enabled
 
-    def register_ar(self, model: torch.nn.Module, device: torch.device) -> None:
+    def register_ar(
+        self,
+        model: torch.nn.Module,
+        device: torch.device,
+        *,
+        source: Literal["mmap", "ram"] = "ram",
+        cache_dir: str | None = None,
+        checkpoint_contents: dict[str, str] | None = None,
+    ) -> None:
         with self.lock:
             if self.is_enabled:
                 raise RuntimeError("MiniMax Music 3 serial offload is already enabled")
             else:
                 pass
-            self.ar_residency = StageResidency({"ar": model}, device, label="ar")
+            if device.type == "cuda":
+                if version("torch_memory_saver") != "0.0.10":
+                    raise RuntimeError(
+                        "Music3 CUDA offload requires torch_memory_saver==0.0.10"
+                    )
+                else:
+                    pass
+                self.staging_ring = StagingRing(device)
+                tags = ("weights", "music3_audio")
+            else:
+                tags = ()
+            self.ar_residency = StageResidency(
+                {"ar": model},
+                device,
+                label="ar",
+                tags=tags,
+                source=source,
+                cache_dir=cache_dir,
+                checkpoint_contents=checkpoint_contents,
+                staging_ring=self.staging_ring,
+            )
             self.is_enabled = True
         logger.info(
             f"MiniMax Music 3 serial offload enabled device={device}; AR "
             "starts GPU-resident, DIT/DAV starts offloaded"
         )
+
+    def pause_ar_for_startup(self) -> None:
+        with self.lock:
+            self.require_ar_locked()
+            try:
+                self.ar_residency.sleep()
+            except Exception as failure:
+                self.failure = failure
+                self.phase = "failed"
+                raise
+            self.phase = "acoustic"
+
+    def restore_ar_after_startup(self) -> None:
+        with self.lock:
+            self.require_ar_locked()
+            try:
+                self.ar_residency.wake()
+            except Exception as failure:
+                self.failure = failure
+                self.phase = "failed"
+                raise
+            self.phase = "idle"
 
     def ar_can_admit(self) -> bool:
         """Whether AR may admit a new request onto the GPU right now."""
@@ -251,6 +290,11 @@ class SerialOffloadCoordinator:
                 )
             else:
                 pass
+
+    def fail_transition(self, failure: Exception) -> None:
+        with self.lock:
+            self.failure = failure
+            self.phase = "failed"
 
     def end_dit_handoff(
         self,

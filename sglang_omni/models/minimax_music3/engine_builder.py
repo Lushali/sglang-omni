@@ -7,15 +7,16 @@ import json
 import logging
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Literal, TypedDict
 
-from sglang.srt.model_executor.cuda_graph_config import Backend as CudaGraphBackend
 from torch import Tensor
+from torch_memory_saver import torch_memory_saver
 from typing_extensions import Unpack
 
 from sglang_omni.model_runner.base import ModelRunner
 from sglang_omni.model_runner.model_worker import ModelWorker
 from sglang_omni.models.minimax_music3.serial_offload import get_coordinator
+from sglang_omni.models.minimax_music3.weight_cache import checkpoint_identity
 from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.engine_factory import (
     GenerationDefaults,
@@ -83,7 +84,12 @@ class MiniMaxMusic3EngineBuilder(TtsEngineBuilder["MiniMaxMusic3SGLangRequestDat
     model_arch_override = "Qwen3ForCausalLM"
 
     def __init__(
-        self, *, max_running_requests: int = 16, enable_serial_offload: bool = False
+        self,
+        *,
+        max_running_requests: int = 16,
+        enable_serial_offload: bool = False,
+        serial_offload_source: Literal["mmap", "ram"] = "mmap",
+        serial_offload_cache_dir: str | None = None,
     ) -> None:
         self.max_running_requests = int(max_running_requests)
         if self.max_running_requests <= 0:
@@ -91,6 +97,8 @@ class MiniMaxMusic3EngineBuilder(TtsEngineBuilder["MiniMaxMusic3SGLangRequestDat
         else:
             pass
         self.enable_serial_offload = bool(enable_serial_offload)
+        self.serial_offload_source = serial_offload_source
+        self.serial_offload_cache_dir = serial_offload_cache_dir
         self.model_runner: MiniMaxMusic3ModelRunner | None = None
         self.checkpoint_root: str | None = None
 
@@ -107,10 +115,11 @@ class MiniMaxMusic3EngineBuilder(TtsEngineBuilder["MiniMaxMusic3SGLangRequestDat
 
     def generation_defaults(self, *, dtype: str) -> GenerationDefaults:
         return {
-            "disable_cuda_graph": self.enable_serial_offload,
+            "disable_cuda_graph": False,
             "disable_overlap_schedule": True,
             "disable_radix_cache": True,
             "enable_torch_compile": False,
+            "enable_deterministic_inference": True,
             "max_running_requests": (
                 1 if self.enable_serial_offload else self.max_running_requests
             ),
@@ -135,11 +144,8 @@ class MiniMaxMusic3EngineBuilder(TtsEngineBuilder["MiniMaxMusic3SGLangRequestDat
         if self.enable_serial_offload:
             # Note (Akazaakane): One CFG pair must finish before AR weights leave the GPU.
             requested = 1
-            # Note (Akazaakane): Re-uploaded weights invalidate captured graph addresses.
-            overrides["disable_cuda_graph"] = True
-            overrides["cuda_graph_backend_decode"] = CudaGraphBackend.DISABLED
-            overrides["cuda_graph_backend_prefill"] = CudaGraphBackend.DISABLED
-            overrides.pop("cuda_graph_config", None)
+            overrides["enable_memory_saver"] = True
+            overrides["enable_weights_cpu_backup"] = False
             overrides["enable_torch_compile"] = False
             overrides["disable_overlap_schedule"] = True
         else:
@@ -176,7 +182,11 @@ class MiniMaxMusic3EngineBuilder(TtsEngineBuilder["MiniMaxMusic3SGLangRequestDat
 
         assert self.checkpoint_root is not None
         model = model_worker.model_runner.model
-        attach_minimax_modules(model, self.checkpoint_root)
+        if self.enable_serial_offload:
+            with torch_memory_saver.region(tag="music3_audio", enable_cpu_backup=False):
+                attach_minimax_modules(model, self.checkpoint_root)
+        else:
+            attach_minimax_modules(model, self.checkpoint_root)
         if not bool(get_exec().graph.disable_cuda_graph):
             enable_graph_feedback(
                 model,
@@ -198,18 +208,28 @@ class MiniMaxMusic3EngineBuilder(TtsEngineBuilder["MiniMaxMusic3SGLangRequestDat
     ) -> None:
         del server_args
         if self.enable_serial_offload:
-            assert not generation_cuda_graph_enabled
-            get_coordinator().register_ar(model, next(model.parameters()).device)
-            logger.info(
-                "MiniMax Music 3 serial offload: skipping RVQ depth CUDA "
-                "graph capture"
+            assert self.checkpoint_root is not None
+            paths = list(Path(self.checkpoint_root).rglob("*.safetensors"))
+            paths.append(
+                Path(self.checkpoint_root) / "qwen_7B" / "qwen_7B" / "config.json"
             )
-            return
+            get_coordinator().register_ar(
+                model,
+                next(model.parameters()).device,
+                source=self.serial_offload_source,
+                cache_dir=self.serial_offload_cache_dir,
+                checkpoint_contents=checkpoint_identity(paths),
+            )
         else:
             pass
         from .sglang_model import enable_rvq_depth_cuda_graph
 
-        enable_rvq_depth_cuda_graph(model, rvq_graph_buckets(self.max_running_requests))
+        if generation_cuda_graph_enabled:
+            enable_rvq_depth_cuda_graph(
+                model, rvq_graph_buckets(self.max_running_requests)
+            )
+        else:
+            model.rvq_depth_graph = None
 
     def make_scheduler(
         self, **kwargs: Unpack[MiniMaxMusic3SchedulerArguments]

@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Mapping
+from typing import Literal
 
 import torch
 
@@ -46,6 +47,8 @@ def create_ar_executor(
     max_concurrency: int = _DEFAULT_AR_CONCURRENCY,
     server_args_overrides: Mapping[str, object] | None = None,
     enable_serial_offload: bool = False,
+    serial_offload_source: Literal["mmap", "ram"] = "mmap",
+    serial_offload_cache_dir: str | None = None,
 ):
     if not (
         current_platform.is_cuda()
@@ -69,6 +72,8 @@ def create_ar_executor(
     builder = MiniMaxMusic3EngineBuilder(
         max_running_requests=max(int(max_concurrency), 1),
         enable_serial_offload=enable_serial_offload,
+        serial_offload_source=serial_offload_source,
+        serial_offload_cache_dir=serial_offload_cache_dir,
     )
     scheduler = builder.build(
         model_path,

@@ -9,15 +9,18 @@ import math
 import threading
 import time
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 
 import torch
 from torch import Tensor
+from torch_memory_saver import torch_memory_saver
 
 from sglang_omni.models.minimax_music3.serial_offload import (
     StageResidency,
     get_coordinator,
 )
+from sglang_omni.models.minimax_music3.weight_cache import checkpoint_identity
 from sglang_omni.pipeline.stage.stream_queue import StreamItem
 from sglang_omni.platforms import current_platform
 from sglang_omni.proto import StagePayload
@@ -185,32 +188,7 @@ class MiniMaxMusic3AcousticDecoder:
         )
         self.breakable_cuda_graph = False
         self.serial_offload_enabled = boolean("serial_offload", serial_offload)
-        if self.serial_offload_enabled:
-            # Note (Akazaakane): Residency changes invalidate compile guards and graph addresses.
-            if self.compile_acoustic:
-                logger.warning(
-                    "MiniMax Music 3 serial offload disables compile_acoustic "
-                    "(torch.compile does not tolerate the repeated CPU/GPU "
-                    "moves that --stage-offload-components ar,dit performs)"
-                )
-                self.compile_acoustic = False
-            else:
-                pass
-            if self.breakable_cuda_graph_requested:
-                logger.warning(
-                    "MiniMax Music 3 serial offload disables breakable_cuda_graph "
-                    "(a captured CUDA graph would reference memory freed or "
-                    "relocated once the module moves off the GPU)"
-                )
-                self.breakable_cuda_graph_requested = False
-            else:
-                pass
-        else:
-            pass
-        # Note (Akazaakane): Loading on CPU avoids a startup peak with both stages resident.
-        self.load_device = (
-            torch.device("cpu") if self.serial_offload_enabled else self.device
-        )
+        self.load_device = torch.device("cpu")
         if self.cache_dit and self.breakable_cuda_graph_requested:
             raise ValueError(
                 "MiniMax Music 3 cache_dit and breakable_cuda_graph cannot be enabled together"
@@ -238,15 +216,30 @@ class MiniMaxMusic3AcousticDecoder:
 
         paths = resolve_checkpoint(model_path)
         load_started = time.perf_counter()
-        self.build_dit(
-            paths.dit_path,
-            cache_dit_fn_compute_blocks=cache_dit_fn_compute_blocks,
-            cache_dit_bn_compute_blocks=cache_dit_bn_compute_blocks,
-            cache_dit_max_warmup_steps=cache_dit_max_warmup_steps,
-            cache_dit_residual_diff_threshold=cache_dit_residual_diff_threshold,
-            cache_dit_max_continuous_cached_steps=cache_dit_max_continuous_cached_steps,
-        )
-        removed_weight_norms = self.build_dav(paths.dav_path)
+        coordinator = get_coordinator()
+        if self.serial_offload_enabled:
+            if self.device.type != "cuda":
+                raise ValueError("Music3 serial offload requires CUDA")
+            else:
+                pass
+            coordinator.pause_ar_for_startup()
+        else:
+            pass
+        with (
+            torch_memory_saver.region(tag="music3_acoustic", enable_cpu_backup=False)
+            if self.serial_offload_enabled
+            else nullcontext()
+        ):
+            self.build_dit(
+                paths.dit_path,
+                cache_dit_fn_compute_blocks=cache_dit_fn_compute_blocks,
+                cache_dit_bn_compute_blocks=cache_dit_bn_compute_blocks,
+                cache_dit_max_warmup_steps=cache_dit_max_warmup_steps,
+                cache_dit_residual_diff_threshold=cache_dit_residual_diff_threshold,
+                cache_dit_max_continuous_cached_steps=cache_dit_max_continuous_cached_steps,
+            )
+            removed_weight_norms = self.build_dav(paths.dav_path)
+        self.initialize_acceleration()
         logger.info(
             f"MiniMax Music 3 PyTorch DIT/DAV loaded device={self.device} dtype={self.dtype} dit_parameters={sum((parameter.numel() for parameter in self.dit.parameters()))} dav_parameters={sum((parameter.numel() for parameter in self.dav.parameters()))} folded_weight_norms={removed_weight_norms} elapsed={time.perf_counter() - load_started:.1f}s"
         )
@@ -255,12 +248,25 @@ class MiniMaxMusic3AcousticDecoder:
         )
         self.residency: StageResidency | None = None
         if self.serial_offload_enabled:
+            assert coordinator.ar_residency is not None
+            ar_weights = coordinator.ar_residency.weights
             self.residency = StageResidency(
                 {"dit": self.dit, "dav": self.dav},
                 self.device,
-                resident=False,
                 label="dit/dav",
+                tags=("music3_acoustic",),
+                source=ar_weights.source,
+                cache_dir=(
+                    str(ar_weights.cache_path.parent) if ar_weights.cache_path else None
+                ),
+                checkpoint_contents=checkpoint_identity(
+                    [paths.dit_path, paths.dav_path]
+                ),
+                folding_backend=f"{self.device.type}-{torch.cuda.get_device_capability(self.device)}-weight-norm",
+                staging_ring=coordinator.staging_ring,
             )
+            self.residency.sleep()
+            coordinator.restore_ar_after_startup()
         else:
             pass
 
@@ -271,7 +277,11 @@ class MiniMaxMusic3AcousticDecoder:
     def ensure_gpu_resident(self) -> None:
         """Restore DIT/DAV to the GPU; a cheap no-op once already resident."""
         if self.residency is not None:
-            self.residency.wake()
+            try:
+                self.residency.wake()
+            except Exception as failure:
+                get_coordinator().fail_transition(failure)
+                raise
         else:
             pass
 
@@ -306,24 +316,7 @@ class MiniMaxMusic3AcousticDecoder:
             )
         self.dit.load_state_dict(state, strict=True, assign=True)
         del state
-        self.dit = self.dit.to(dtype=self.dtype).eval()
-        window = self.dit.aligned_mel_length(AR_CHUNK_FRAMES)
-        if self.compile_acoustic and not (
-            self.cache_dit or self.breakable_cuda_graph_requested
-        ):
-            compile_timed(
-                "DIT blocks",
-                lambda: self.dit.enable_compiled_blocks(warmup_mel_length=window),
-            )
-        else:
-            pass
-        if self.breakable_cuda_graph_requested:
-            self.breakable_cuda_graph = self.dit.enable_breakable_cuda_graph(
-                mel_len=window,
-                min_free_gb=self.breakable_cuda_graph_min_free_gb,
-            )
-        else:
-            pass
+        self.dit = self.dit.to(device=self.device, dtype=self.dtype).eval()
         if self.cache_dit:
             self.dit.enable_cache_dit(
                 num_steps=self.dit_steps,
@@ -344,17 +337,41 @@ class MiniMaxMusic3AcousticDecoder:
             self.dav = MiniMaxMusic3DAV()
         self.dav.load_state_dict(select_decoder_state(state), strict=True, assign=True)
         del state
-        self.dav = self.dav.to(dtype=self.dtype).eval()
+        self.dav = self.dav.to(device=self.device, dtype=self.dtype).eval()
         removed_weight_norms = remove_weight_norm(self.dav)
+        return removed_weight_norms
+
+    def initialize_acceleration(self) -> None:
+        window = self.dit.aligned_mel_length(AR_CHUNK_FRAMES)
+        if self.compile_acoustic and not (
+            self.cache_dit or self.breakable_cuda_graph_requested
+        ):
+            compile_timed(
+                "DIT blocks",
+                lambda: self.dit.enable_compiled_blocks(warmup_mel_length=window),
+            )
+        else:
+            pass
+        if self.breakable_cuda_graph_requested:
+            self.breakable_cuda_graph = self.dit.enable_breakable_cuda_graph(
+                mel_len=window,
+                min_free_gb=self.breakable_cuda_graph_min_free_gb,
+            )
+            if not self.breakable_cuda_graph:
+                raise RuntimeError(
+                    "Requested Music3 breakable CUDA graph could not initialize"
+                )
+            else:
+                pass
+        else:
+            pass
         if self.compile_acoustic:
-            window = self.dit.aligned_mel_length(AR_CHUNK_FRAMES)
             compile_timed(
                 "DAV decoder",
                 lambda: self.dav.enable_compiled_decoder(warmup_mel_length=window),
             )
         else:
             pass
-        return removed_weight_norms
 
     @torch.inference_mode()
     def decode_with_state(
