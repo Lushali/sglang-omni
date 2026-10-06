@@ -443,6 +443,7 @@ class DotsTTSStreamingVocoder(
             pool.graph_runner = (
                 self.capture_step_graphs(pool)
                 if self.enable_streaming_audio_vae_cuda_graph
+                and pool.device.type == "cuda"
                 else None
             )
             self.slot_pool = pool

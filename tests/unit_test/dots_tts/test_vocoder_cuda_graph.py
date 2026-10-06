@@ -214,10 +214,15 @@ def test_step_graphs_can_be_disabled() -> None:
     assert vocoder.ensure_slot_pool().graph_runner is None
 
 
-def test_default_step_graphs_reject_a_non_cuda_codec() -> None:
+@pytest.mark.parametrize("device_type", ["cpu", "xpu"])
+def test_default_step_graphs_preserve_non_cuda_eager_path(
+    device_type: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     vocoder = make_streaming_vocoder(torch.device("cpu"))
-    with pytest.raises(RuntimeError, match="require a CUDA device"):
-        vocoder.ensure_slot_pool()
+    monkeypatch.setattr(
+        DotsVocoderSlotPool, "device", property(lambda self: torch.device(device_type))
+    )
+    assert vocoder.ensure_slot_pool().graph_runner is None
 
 
 @pytest.mark.parametrize(
