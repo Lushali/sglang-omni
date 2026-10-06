@@ -9,11 +9,13 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
+from sglang.srt.model_executor.cuda_graph_config import Backend as CudaGraphBackend
 from torch import Tensor
 from typing_extensions import Unpack
 
 from sglang_omni.model_runner.base import ModelRunner
 from sglang_omni.model_runner.model_worker import ModelWorker
+from sglang_omni.models.minimax_music3.serial_offload import get_coordinator
 from sglang_omni.proto.request import StagePayload
 from sglang_omni.scheduling.engine_factory import (
     GenerationDefaults,
@@ -105,11 +107,13 @@ class MiniMaxMusic3EngineBuilder(TtsEngineBuilder["MiniMaxMusic3SGLangRequestDat
 
     def generation_defaults(self, *, dtype: str) -> GenerationDefaults:
         return {
-            "disable_cuda_graph": False,
+            "disable_cuda_graph": self.enable_serial_offload,
             "disable_overlap_schedule": True,
             "disable_radix_cache": True,
             "enable_torch_compile": False,
-            "max_running_requests": self.max_running_requests,
+            "max_running_requests": (
+                1 if self.enable_serial_offload else self.max_running_requests
+            ),
             "chunked_prefill_size": 0,
             "mem_fraction_static": 0.50,
             "dtype": dtype,
@@ -126,6 +130,18 @@ class MiniMaxMusic3EngineBuilder(TtsEngineBuilder["MiniMaxMusic3SGLangRequestDat
         )
         if requested <= 0:
             raise ValueError("MiniMax Music 3 max_running_requests must be positive")
+        else:
+            pass
+        if self.enable_serial_offload:
+            # Note (Akazaakane): One CFG pair must finish before AR weights leave the GPU.
+            requested = 1
+            # Note (Akazaakane): Re-uploaded weights invalidate captured graph addresses.
+            overrides["disable_cuda_graph"] = True
+            overrides["cuda_graph_backend_decode"] = CudaGraphBackend.DISABLED
+            overrides["cuda_graph_backend_prefill"] = CudaGraphBackend.DISABLED
+            overrides.pop("cuda_graph_config", None)
+            overrides["enable_torch_compile"] = False
+            overrides["disable_overlap_schedule"] = True
         else:
             pass
         self.max_running_requests = requested
@@ -180,8 +196,10 @@ class MiniMaxMusic3EngineBuilder(TtsEngineBuilder["MiniMaxMusic3SGLangRequestDat
         *,
         generation_cuda_graph_enabled: bool,
     ) -> None:
-        del generation_cuda_graph_enabled, server_args
+        del server_args
         if self.enable_serial_offload:
+            assert not generation_cuda_graph_enabled
+            get_coordinator().register_ar(model, next(model.parameters()).device)
             logger.info(
                 "MiniMax Music 3 serial offload: skipping RVQ depth CUDA "
                 "graph capture"

@@ -6,12 +6,59 @@ from __future__ import annotations
 import pytest
 import torch
 
+from sglang_omni.models.minimax_music3.engine_builder import MiniMaxMusic3EngineBuilder
 from sglang_omni.models.minimax_music3.serial_offload import (
     STALL_REPORT_SECONDS,
     SerialOffloadCoordinator,
     StageResidency,
     get_coordinator,
 )
+from sglang_omni.scheduling.generation_batch_policy import (
+    build_generation_batch_overrides,
+)
+
+
+@pytest.mark.parametrize("enable_serial_offload", [False, True])
+def test_offload_enforces_one_cfg_pair_and_eager_execution(
+    enable_serial_offload: bool,
+) -> None:
+    builder = MiniMaxMusic3EngineBuilder(enable_serial_offload=enable_serial_offload)
+    overrides = build_generation_batch_overrides(
+        server_args_overrides={
+            "max_running_requests": 16,
+            "disable_cuda_graph": False,
+            "cuda_graph_backend_decode": "full",
+            "cuda_graph_backend_prefill": "full",
+            "cuda_graph_config": {
+                "decode": {"backend": "full"},
+                "prefill": {"backend": "full"},
+            },
+            "enable_torch_compile": True,
+            "disable_overlap_schedule": False,
+        },
+        **builder.generation_defaults(dtype="bfloat16"),
+    )
+
+    builder.adjust_overrides(overrides)
+
+    if enable_serial_offload:
+        assert builder.max_running_requests == 1
+        assert overrides["max_running_requests"] == 2
+        assert overrides["disable_cuda_graph"] is True
+        assert overrides["cuda_graph_backend_decode"] == "disabled"
+        assert overrides["cuda_graph_backend_prefill"] == "disabled"
+        assert "cuda_graph_config" not in overrides
+        assert overrides["enable_torch_compile"] is False
+        assert overrides["disable_overlap_schedule"] is True
+    else:
+        assert builder.max_running_requests == 16
+        assert overrides["max_running_requests"] == 32
+        assert overrides["disable_cuda_graph"] is False
+        assert overrides["cuda_graph_backend_decode"] == "full"
+        assert overrides["cuda_graph_backend_prefill"] == "full"
+        assert "cuda_graph_config" in overrides
+        assert overrides["enable_torch_compile"] is True
+        assert overrides["disable_overlap_schedule"] is False
 
 
 def registered_coordinator() -> SerialOffloadCoordinator:

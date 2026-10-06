@@ -67,7 +67,8 @@ def create_ar_executor(
     else:
         pass
     builder = MiniMaxMusic3EngineBuilder(
-        max_running_requests=max(int(max_concurrency), 1)
+        max_running_requests=max(int(max_concurrency), 1),
+        enable_serial_offload=enable_serial_offload,
     )
     scheduler = builder.build(
         model_path,
@@ -121,6 +122,7 @@ def create_dit_dav_executor(
         cache_dit_max_warmup_steps=cache_dit_max_warmup_steps,
         cache_dit_residual_diff_threshold=cache_dit_residual_diff_threshold,
         cache_dit_max_continuous_cached_steps=cache_dit_max_continuous_cached_steps,
+        serial_offload=enable_serial_offload,
     )
     logger.info(
         f"MiniMax Music 3 acoustic executor ready device={decoder.device} dtype={decoder.dtype} dit_steps={decoder.dit_steps} dit_cfg_scale={decoder.dit_cfg_scale:.3f} attention_backend={decoder.attention_backend} compile_acoustic={decoder.compile_acoustic} sample_rate={OUTPUT_SAMPLE_RATE}"

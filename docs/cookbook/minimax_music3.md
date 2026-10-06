@@ -49,6 +49,21 @@ Default optimizations that are on without further flags: backbone decode device 
 
 Classifier-free guidance is on in both stages and has no flag. See [Guidance](#guidance) for what it costs you, because the AR half changes how much a request occupies.
 
+### Serial weight offload
+
+To alternate AR and DIT/DAV weights on one GPU, enable both offload components:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 sgl-omni serve --model-path MiniMaxAI/MiniMax-Music3 --port 8000 \
+  --stage-offload-components ar,dit
+```
+
+This mode serves one request at a time (one CFG pair, two engine rows), even when a higher concurrency is requested. AR completes the request before handing the GPU to DIT/DAV. Both stages share one process and device. AR decode, prefill and RVQ-depth graphs, torch compilation, and acoustic compilation and graphs are disabled because each weight upload changes device addresses.
+
+Offload reduces GPU weight residency but retains canonical pageable CPU copies for both stages. The AR copy alone is approximately 16 GiB, with additional RAM required for DIT/DAV, checkpoint loading, request buffers and other processes. A 32 GiB VM limit can still exhaust host memory; reusing the copies does not reduce their resident size. The AR KV cache also stays on the GPU.
+
+Validate repeated requests, audio output, GPU residency and host RSS on the target hardware under its intended memory limit before relying on this mode.
+
 ## Generating Music
 
 Two fields carry the request. `input` is the lyrics; `instructions` is the caption that describes style, instrumentation, tempo and mood. Both are required, and both matter: the caption is what decides genre and arrangement, and the lyrics are what gets sung.
