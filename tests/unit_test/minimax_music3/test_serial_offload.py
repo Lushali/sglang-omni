@@ -5,8 +5,12 @@ from __future__ import annotations
 
 import pytest
 import torch
+from sglang.srt.managers.schedule_batch import Req, ScheduleBatch
+from sglang.srt.sampling.sampling_params import SamplingParams
 
+from sglang_omni.models.minimax_music3.acoustic import MiniMaxMusic3AcousticScheduler
 from sglang_omni.models.minimax_music3.engine_builder import MiniMaxMusic3EngineBuilder
+from sglang_omni.models.minimax_music3.scheduler import MiniMaxMusic3Scheduler
 from sglang_omni.models.minimax_music3.serial_offload import (
     STALL_REPORT_SECONDS,
     SerialOffloadCoordinator,
@@ -90,6 +94,7 @@ def test_register_ar_enables_the_coordinator_and_starts_ar_active() -> None:
 
 def test_begin_dit_handoff_moves_ar_off_the_gpu_and_blocks_admission() -> None:
     coordinator = registered_coordinator()
+    assert coordinator.try_acquire_ar("req-1")
 
     coordinator.begin_dit_handoff("req-1")
 
@@ -98,6 +103,7 @@ def test_begin_dit_handoff_moves_ar_off_the_gpu_and_blocks_admission() -> None:
 
 def test_end_dit_handoff_restores_ar_and_reopens_admission() -> None:
     coordinator = registered_coordinator()
+    assert coordinator.try_acquire_ar("req-1")
     coordinator.begin_dit_handoff("req-1")
 
     coordinator.end_dit_handoff("req-1")
@@ -107,6 +113,7 @@ def test_end_dit_handoff_restores_ar_and_reopens_admission() -> None:
 
 def test_handoff_calls_are_idempotent() -> None:
     coordinator = registered_coordinator()
+    assert coordinator.try_acquire_ar("req-1")
 
     coordinator.begin_dit_handoff("req-1")
     coordinator.begin_dit_handoff("req-1")
@@ -117,21 +124,22 @@ def test_handoff_calls_are_idempotent() -> None:
     assert coordinator.ar_can_admit() is True
 
 
-def test_ar_stays_parked_until_every_outstanding_request_retires() -> None:
-    """The wake is driven by the outstanding set, not by the last event."""
+def test_one_owner_excludes_other_requests_until_acoustic_retires() -> None:
     coordinator = registered_coordinator()
+    assert coordinator.try_acquire_ar("req-1")
+    assert not coordinator.try_acquire_ar("req-2")
     coordinator.begin_dit_handoff("req-1")
-    coordinator.begin_dit_handoff("req-2")
+    assert not coordinator.try_acquire_ar("req-2")
+    with pytest.raises(RuntimeError, match="does not own"):
+        coordinator.begin_dit_handoff("req-2")
 
     coordinator.end_dit_handoff("req-1")
-    assert coordinator.ar_can_admit() is False
-
-    coordinator.end_dit_handoff("req-2")
-    assert coordinator.ar_can_admit() is True
+    assert coordinator.try_acquire_ar("req-2")
 
 
 def test_end_for_a_request_that_never_handed_off_does_not_wake_ar() -> None:
     coordinator = registered_coordinator()
+    assert coordinator.try_acquire_ar("req-1")
     coordinator.begin_dit_handoff("req-1")
 
     coordinator.end_dit_handoff("req-unknown")
@@ -143,6 +151,7 @@ def test_a_stalled_handoff_is_reported_once_and_never_force_woken(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     coordinator = registered_coordinator()
+    assert coordinator.try_acquire_ar("req-1")
     coordinator.begin_dit_handoff("req-1")
     coordinator.paused_at_seconds -= STALL_REPORT_SECONDS + 1.0
 
@@ -221,7 +230,7 @@ def test_residency_keeps_tied_weights_tied_across_a_round_trip() -> None:
     assert module.weight.data_ptr() == tied.weight.data_ptr()
 
 
-@pytest.mark.gpu
+@pytest.mark.accelerator
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
 def test_serial_offload_round_trip_moves_weights_between_devices() -> None:
     coordinator = SerialOffloadCoordinator()
@@ -229,6 +238,7 @@ def test_serial_offload_round_trip_moves_weights_between_devices() -> None:
     model = torch.nn.Linear(4, 4).to(device)
     coordinator.register_ar(model, device)
 
+    assert coordinator.try_acquire_ar("req-1")
     coordinator.begin_dit_handoff("req-1")
     assert next(model.parameters()).device.type == "cpu"
 
@@ -236,7 +246,7 @@ def test_serial_offload_round_trip_moves_weights_between_devices() -> None:
     assert next(model.parameters()).device == device
 
 
-@pytest.mark.gpu
+@pytest.mark.accelerator
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
 def test_host_built_residency_keeps_canonical_copy_on_cpu() -> None:
     device = torch.device("cuda:0")
@@ -260,7 +270,7 @@ def test_host_built_residency_keeps_canonical_copy_on_cpu() -> None:
     assert torch.equal(model.weight.cpu(), expected)
 
 
-@pytest.mark.gpu
+@pytest.mark.accelerator
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
 def test_stage_group_wakes_once_and_keeps_allocator_blocks_cached(
     monkeypatch: pytest.MonkeyPatch,
@@ -297,3 +307,146 @@ def test_stage_group_wakes_once_and_keeps_allocator_blocks_cached(
     assert next(dit.parameters()).device.type == "cpu"
     assert next(dav.parameters()).device.type == "cpu"
     assert empty_cache_calls == 0
+
+
+def test_ar_abort_releases_only_its_owner_before_handoff() -> None:
+    coordinator = registered_coordinator()
+    assert coordinator.try_acquire_ar("req-1")
+    coordinator.cancel_ar("unknown")
+    assert not coordinator.try_acquire_ar("req-2")
+    coordinator.cancel_ar("req-1")
+    assert coordinator.try_acquire_ar("req-2")
+    coordinator.begin_dit_handoff("req-2")
+    coordinator.cancel_ar("req-2")
+    assert not coordinator.try_acquire_ar("req-3")
+
+
+class RecordingAcousticDecoder:
+    serial_offload = True
+
+    def __init__(self) -> None:
+        self.release_count = 0
+
+    def offload_to_cpu(self) -> None:
+        self.release_count += 1
+
+
+def test_late_acoustic_cleanup_cannot_release_a_new_owner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    coordinator = registered_coordinator()
+    monkeypatch.setattr(
+        "sglang_omni.models.minimax_music3.acoustic.get_coordinator",
+        lambda: coordinator,
+    )
+    decoder = RecordingAcousticDecoder()
+    scheduler = MiniMaxMusic3AcousticScheduler(decoder)
+    assert coordinator.try_acquire_ar("old")
+    coordinator.begin_dit_handoff("old")
+    scheduler.clear_stream_state("old")
+    assert decoder.release_count == 1
+
+    assert coordinator.try_acquire_ar("new")
+    coordinator.begin_dit_handoff("new")
+    scheduler.clear_stream_state("old")
+    scheduler.clear_stream_state("unknown")
+    assert decoder.release_count == 1
+    coordinator.require_acoustic("new")
+    assert not coordinator.try_acquire_ar("next")
+    scheduler.clear_stream_state("new")
+    assert decoder.release_count == 2
+    assert coordinator.try_acquire_ar("next")
+
+
+@pytest.mark.parametrize("operation", ["sleep", "wake", "release"])
+def test_failed_transition_prevents_further_admission(
+    monkeypatch: pytest.MonkeyPatch, operation: str
+) -> None:
+    coordinator = registered_coordinator()
+    assert coordinator.try_acquire_ar("req-1")
+
+    def fail() -> None:
+        raise RuntimeError("transfer failed")
+
+    if operation == "sleep":
+        monkeypatch.setattr(coordinator.ar_residency, "sleep", fail)
+        with pytest.raises(RuntimeError, match="transfer failed"):
+            coordinator.begin_dit_handoff("req-1")
+    else:
+        coordinator.begin_dit_handoff("req-1")
+        if operation == "wake":
+            monkeypatch.setattr(coordinator.ar_residency, "wake", fail)
+            release_acoustic = None
+        else:
+            release_acoustic = fail
+        with pytest.raises(RuntimeError, match="transfer failed"):
+            coordinator.end_dit_handoff("req-1", release_acoustic=release_acoustic)
+
+    with pytest.raises(RuntimeError, match="transition failed"):
+        coordinator.try_acquire_ar("req-2")
+
+
+def test_acoustic_compute_requires_a_completed_handoff() -> None:
+    coordinator = registered_coordinator()
+    assert coordinator.try_acquire_ar("req-1")
+    with pytest.raises(RuntimeError, match="does not own"):
+        coordinator.require_acoustic("req-1")
+    coordinator.begin_dit_handoff("req-1")
+    coordinator.require_acoustic("req-1")
+    with pytest.raises(RuntimeError, match="does not own"):
+        coordinator.require_acoustic("req-2")
+
+
+@pytest.mark.accelerator
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
+def test_sleep_waits_for_compute_on_another_cuda_stream() -> None:
+    device = torch.device("cuda:0")
+    model = torch.nn.Linear(256, 256, bias=False).to(device)
+    expected = model.weight.detach().cpu().clone()
+    residency = StageResidency({"module": model}, device)
+    residency.sleep()
+    residency.wake()
+    compute_stream = torch.cuda.Stream(device=device)
+    completed = torch.cuda.Event()
+    with torch.cuda.stream(compute_stream):
+        torch.cuda._sleep(
+            10_000_000
+        )  # noqa: leading-underscore  # upstream CUDA test API
+        output = model(torch.eye(256, device=device))
+        completed.record()
+
+    residency.sleep()
+
+    assert completed.query()
+    torch.testing.assert_close(output.cpu(), expected.T)
+
+
+def test_scheduler_admits_only_the_owning_cfg_pair(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    coordinator = registered_coordinator()
+    monkeypatch.setattr(
+        "sglang_omni.models.minimax_music3.scheduler.get_coordinator",
+        lambda: coordinator,
+    )
+    scheduler = MiniMaxMusic3Scheduler.__new__(MiniMaxMusic3Scheduler)
+    scheduler.max_prefill_tokens = 100
+    monkeypatch.setattr(scheduler, "get_num_allocatable_reqs", lambda count: 4)
+    queue = [
+        Req(
+            rid=request_id,
+            origin_input_text="",
+            origin_input_ids=[1, 2],
+            sampling_params=SamplingParams(max_new_tokens=1),
+        )
+        for request_id in ("first", "first-uncond", "second", "second-uncond")
+    ]
+    running_batch = ScheduleBatch.__new__(ScheduleBatch)
+    running_batch.reqs = []
+
+    assert scheduler.pair_admission_limit(queue, running_batch) == 2
+    assert scheduler.pair_admission_limit(queue[2:], running_batch) == 0
+    coordinator.begin_dit_handoff("first")
+    assert scheduler.pair_admission_limit(queue[2:], running_batch) == 0
+    coordinator.end_dit_handoff("first")
+    assert scheduler.pair_admission_limit(queue[2:], running_batch) == 2

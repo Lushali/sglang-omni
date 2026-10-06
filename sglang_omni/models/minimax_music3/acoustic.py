@@ -469,6 +469,10 @@ class MiniMaxMusic3AcousticScheduler(StreamingSimpleScheduler):
         else:
             pass
         hidden = item.data[0]
+        if self.decoder.serial_offload:
+            get_coordinator().require_acoustic(request_id)
+        else:
+            pass
         state = self.stream_states.setdefault(request_id, AcousticStreamState())
         metadata = item.metadata
         if not isinstance(metadata, dict):
@@ -592,8 +596,9 @@ class MiniMaxMusic3AcousticScheduler(StreamingSimpleScheduler):
         else:
             pass
         if self.decoder.serial_offload:
-            self.decoder.offload_to_cpu()
-            get_coordinator().end_dit_handoff(request_id)
+            get_coordinator().end_dit_handoff(
+                request_id, release_acoustic=self.decoder.offload_to_cpu
+            )
         else:
             pass
 

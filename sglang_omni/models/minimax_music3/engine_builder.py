@@ -264,6 +264,9 @@ class MiniMaxMusic3EngineBuilder(TtsEngineBuilder["MiniMaxMusic3SGLangRequestDat
         assert self.model_runner is not None
         return self.model_runner.reset_request
 
+    def make_request_finished_callback(self) -> Callable[[str], None]:
+        return get_coordinator().cancel_ar
+
     def extra_scheduler_kwargs(self) -> SchedulerExtras[MiniMaxMusic3SGLangRequestData]:
         from .sglang_request_builder import build_stream_output
 

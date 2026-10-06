@@ -64,6 +64,19 @@ Offload reduces GPU weight residency but retains canonical pageable CPU copies f
 
 Validate repeated requests, audio output, GPU residency and host RSS on the target hardware under its intended memory limit before relying on this mode.
 
+The same seed is reproducible within one execution mode. Resident and offload output can differ slightly because offload folds DAV weight normalization on CPU and disables device graphs and compilation. Compare decoded waveforms numerically when validating across modes.
+
+Run the opt-in HTTP integration test with a local checkpoint:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 MINIMAX_MUSIC3_TEST_CHECKPOINT=/path/to/MiniMax-Music3 \
+  pytest -q tests/test_model/test_minimax_music3_serial_offload.py
+```
+
+The test checks 100-frame and 250-frame stereo audio, resident/offload waveform parity (relative RMS difference below 0.5% and correlation above 0.9999), exact repeated offload output, two overlapping submissions, and 20 short requests with paired residency handoffs. Set `MINIMAX_MUSIC3_TEST_REPEATED_REQUESTS` to change the repetition count. It uses eager backbone and acoustic execution for both modes; resident RVQ depth graphs remain enabled.
+
+Validation on an H200 with checkpoint revision `fbdf52fbaaca799592917417eb05f1899f1255ec` passed 91 focused tests and this HTTP integration test (26 offload requests and 26 completed handoffs). The container used `hongccc/sglang-omni:dev` at digest `sha256:ebe4239e29a764ee3a2806385c061c5fd438a26f01458e503d3822dcba5790df`, with its SGLang installation updated from 0.5.19 to the repository's 0.5.21 pin; PyTorch was 2.13.0+cu130 and FlashInfer 0.6.18. Set `OMP_NUM_THREADS=8` for reproduction. Relative waveform RMS differences were 0.23% (100 frames) and 0.17% (250 frames), with correlation above 0.999997. This validates the request lifecycle on a large GPU; it does not establish usability under a 24 GiB GPU or limited host RAM.
+
 ## Generating Music
 
 Two fields carry the request. `input` is the lyrics; `instructions` is the caption that describes style, instrumentation, tempo and mood. Both are required, and both matter: the caption is what decides genre and arrangement, and the lyrics are what gets sung.

@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from typing import Literal, Protocol
 
 import torch
 
@@ -13,6 +14,10 @@ logger = logging.getLogger(__name__)
 
 STALL_REPORT_SECONDS = 900.0
 BYTES_PER_GIB = 1024.0**3
+
+
+class AcousticRelease(Protocol):
+    def __call__(self) -> None: ...
 
 
 def owned_tensors(
@@ -96,6 +101,10 @@ class StageResidency:
             return
         else:
             pass
+        if self.device.type == "cuda":
+            torch.cuda.synchronize(self.device)
+        else:
+            pass
         owned_weights = owned_tensors(self.modules)
         if not self.host_weights:
             self.host_weights = {
@@ -139,9 +148,10 @@ class SerialOffloadCoordinator:
     def __init__(self) -> None:
         self.lock: threading.Lock = threading.Lock()
         self.is_enabled: bool = False
-        self.is_ar_active: bool = True
         self.ar_residency: StageResidency | None = None
-        self.outstanding_request_ids: set[str] = set()
+        self.owner_request_id: str | None = None
+        self.phase: Literal["idle", "ar", "acoustic", "failed"] = "idle"
+        self.failure: Exception | None = None
         self.paused_at_seconds: float | None = None
         self.has_reported_stall: bool = False
 
@@ -151,9 +161,12 @@ class SerialOffloadCoordinator:
 
     def register_ar(self, model: torch.nn.Module, device: torch.device) -> None:
         with self.lock:
+            if self.is_enabled:
+                raise RuntimeError("MiniMax Music 3 serial offload is already enabled")
+            else:
+                pass
             self.ar_residency = StageResidency({"ar": model}, device, label="ar")
             self.is_enabled = True
-            self.is_ar_active = True
         logger.info(
             f"MiniMax Music 3 serial offload enabled device={device}; AR "
             "starts GPU-resident, DIT/DAV starts offloaded"
@@ -166,12 +179,31 @@ class SerialOffloadCoordinator:
         else:
             pass
         with self.lock:
-            if self.is_ar_active:
+            self.require_ar_locked()
+            if self.phase == "idle":
                 return True
             else:
                 pass
             self.report_stall_locked()
             return False
+
+    def try_acquire_ar(self, request_id: str) -> bool:
+        """Claim one request until its AR and acoustic work have retired."""
+        if not self.is_enabled:
+            return True
+        else:
+            pass
+        with self.lock:
+            self.require_ar_locked()
+            if self.owner_request_id == request_id and self.phase == "ar":
+                return True
+            elif self.phase == "idle":
+                self.owner_request_id = request_id
+                self.phase = "ar"
+                return True
+            else:
+                self.report_stall_locked()
+                return False
 
     def begin_dit_handoff(self, request_id: str) -> None:
         """Hand the GPU to DIT/DAV for *request_id* and take AR off it."""
@@ -181,13 +213,22 @@ class SerialOffloadCoordinator:
             pass
         with self.lock:
             self.require_ar_locked()
-            self.outstanding_request_ids.add(request_id)
-            if not self.is_ar_active:
+            if self.owner_request_id != request_id:
+                raise RuntimeError(
+                    f"MiniMax Music 3 handoff request={request_id!r} does not own "
+                    f"residency (owner={self.owner_request_id!r})"
+                )
+            elif self.phase == "acoustic":
                 return
             else:
                 pass
-            self.ar_residency.sleep()
-            self.is_ar_active = False
+            try:
+                self.ar_residency.sleep()
+            except Exception as failure:
+                self.failure = failure
+                self.phase = "failed"
+                raise
+            self.phase = "acoustic"
             self.paused_at_seconds = time.monotonic()
             self.has_reported_stall = False
         logger.info(
@@ -195,21 +236,51 @@ class SerialOffloadCoordinator:
             f"request={request_id})"
         )
 
-    def end_dit_handoff(self, request_id: str) -> None:
-        """Retire a handoff and restore AR once no requests remain outstanding."""
+    def require_acoustic(self, request_id: str) -> None:
+        """Reject acoustic compute outside the owning request's handoff."""
         if not self.is_enabled:
             return
         else:
             pass
         with self.lock:
             self.require_ar_locked()
-            self.outstanding_request_ids.discard(request_id)
-            if self.is_ar_active or self.outstanding_request_ids:
+            if self.owner_request_id != request_id or self.phase != "acoustic":
+                raise RuntimeError(
+                    f"MiniMax Music 3 acoustic request={request_id!r} does not own "
+                    f"residency (owner={self.owner_request_id!r}, phase={self.phase})"
+                )
+            else:
+                pass
+
+    def end_dit_handoff(
+        self,
+        request_id: str,
+        *,
+        release_acoustic: AcousticRelease | None = None,
+    ) -> None:
+        """Release acoustic weights and restore AR only for the current owner."""
+        if not self.is_enabled:
+            return
+        else:
+            pass
+        with self.lock:
+            self.require_ar_locked()
+            if self.owner_request_id != request_id or self.phase != "acoustic":
                 return
             else:
                 pass
-            self.ar_residency.wake()
-            self.is_ar_active = True
+            try:
+                if release_acoustic is not None:
+                    release_acoustic()
+                else:
+                    pass
+                self.ar_residency.wake()
+            except Exception as failure:
+                self.failure = failure
+                self.phase = "failed"
+                raise
+            self.owner_request_id = None
+            self.phase = "idle"
             self.paused_at_seconds = None
             self.has_reported_stall = False
         logger.info(
@@ -217,8 +288,26 @@ class SerialOffloadCoordinator:
             f"request={request_id})"
         )
 
+    def cancel_ar(self, request_id: str) -> None:
+        """Release an AR owner after scheduler compute stops, before handoff."""
+        if not self.is_enabled:
+            return
+        else:
+            pass
+        with self.lock:
+            if self.owner_request_id == request_id and self.phase == "ar":
+                self.owner_request_id = None
+                self.phase = "idle"
+            else:
+                pass
+
     def require_ar_locked(self) -> None:
-        if self.ar_residency is None:
+        if self.failure is not None:
+            raise RuntimeError(
+                "MiniMax Music 3 serial offload is unavailable after a residency "
+                "transition failed"
+            ) from self.failure
+        elif self.ar_residency is None:
             raise RuntimeError(
                 "MiniMax Music 3 serial offload is enabled but the AR "
                 "backbone was never registered"
@@ -241,7 +330,7 @@ class SerialOffloadCoordinator:
         logger.error(
             f"MiniMax Music 3 serial offload: AR has been off the GPU for "
             f"{elapsed_seconds:.0f}s and is still waiting on "
-            f"{sorted(self.outstanding_request_ids)}; AR admits nothing until DIT/DAV "
+            f"{self.owner_request_id!r}; AR admits nothing until DIT/DAV "
             "retires them, so this server needs a restart if the requests "
             "are gone"
         )
