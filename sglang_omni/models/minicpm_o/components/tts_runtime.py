@@ -46,7 +46,6 @@ class SharedSpeaker:
 
 @dataclass(kw_only=True)
 class MiniCPMOVocoderSessionState:
-    session_id: str
     speaker: SharedSpeaker
     caches: StreamCaches
     pre_lookahead_tokens: int
@@ -95,7 +94,6 @@ class MiniCPMOVocoderRuntime:
             pass
         speaker.session_ids.append(session_id)
         state = MiniCPMOVocoderSessionState(
-            session_id=session_id,
             speaker=speaker,
             caches=clone_caches(speaker.base_caches),
             pre_lookahead_tokens=self.token2wav.flow.pre_lookahead_len,
