@@ -14,6 +14,10 @@ from dataclasses import dataclass, field
 import torch
 from torch import Tensor
 
+from sglang_omni.models.minimax_music3.serial_offload import (
+    StageResidency,
+    get_coordinator,
+)
 from sglang_omni.pipeline.stage.stream_queue import StreamItem
 from sglang_omni.platforms import current_platform
 from sglang_omni.proto import StagePayload
@@ -37,7 +41,6 @@ from .constants import (
 from .dav import MiniMaxMusic3DAV, remove_weight_norm, select_decoder_state
 from .dit import MiniMaxMusic3DIT
 from .payload_types import MiniMaxMusic3State
-from .serial_offload import StageResidency, get_coordinator
 
 logger = logging.getLogger(__name__)
 
@@ -183,9 +186,7 @@ class MiniMaxMusic3AcousticDecoder:
         self.breakable_cuda_graph = False
         self.serial_offload_enabled = boolean("serial_offload", serial_offload)
         if self.serial_offload_enabled:
-            # Moving the module between CPU and GPU each request invalidates
-            # both torch.compile's device-bound guards and any CUDA graph's
-            # captured (now stale) memory addresses, so neither is safe here.
+            # Note (Akazaakane): Residency changes invalidate compile guards and graph addresses.
             if self.compile_acoustic:
                 logger.warning(
                     "MiniMax Music 3 serial offload disables compile_acoustic "
@@ -193,6 +194,8 @@ class MiniMaxMusic3AcousticDecoder:
                     "moves that --stage-offload-components ar,dit performs)"
                 )
                 self.compile_acoustic = False
+            else:
+                pass
             if self.breakable_cuda_graph_requested:
                 logger.warning(
                     "MiniMax Music 3 serial offload disables breakable_cuda_graph "
@@ -200,10 +203,11 @@ class MiniMaxMusic3AcousticDecoder:
                     "relocated once the module moves off the GPU)"
                 )
                 self.breakable_cuda_graph_requested = False
-        # Serial offload parks DIT/DAV on the host between requests, so load
-        # them straight there. Staging the checkpoint through the GPU would
-        # peak with AR and DIT/DAV both fully resident, which is precisely the
-        # peak this mode exists to avoid.
+            else:
+                pass
+        else:
+            pass
+        # Note (Akazaakane): Loading on CPU avoids a startup peak with both stages resident.
         self.load_device = (
             torch.device("cpu") if self.serial_offload_enabled else self.device
         )
@@ -257,6 +261,8 @@ class MiniMaxMusic3AcousticDecoder:
                 resident=False,
                 label="dit/dav",
             )
+        else:
+            pass
 
     @property
     def serial_offload(self) -> bool:
@@ -266,11 +272,15 @@ class MiniMaxMusic3AcousticDecoder:
         """Restore DIT/DAV to the GPU; a cheap no-op once already resident."""
         if self.residency is not None:
             self.residency.wake()
+        else:
+            pass
 
     def offload_to_cpu(self) -> None:
         """Drop the DIT/DAV GPU replica; a no-op once already offloaded."""
         if self.residency is not None:
             self.residency.sleep()
+        else:
+            pass
 
     def build_dit(
         self,

@@ -187,6 +187,8 @@ class MiniMaxMusic3EngineBuilder(TtsEngineBuilder["MiniMaxMusic3SGLangRequestDat
                 "graph capture"
             )
             return
+        else:
+            pass
         from .sglang_model import enable_rvq_depth_cuda_graph
 
         enable_rvq_depth_cuda_graph(model, rvq_graph_buckets(self.max_running_requests))

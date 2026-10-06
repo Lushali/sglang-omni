@@ -7,6 +7,7 @@ from collections.abc import Iterable
 
 from sglang.srt.managers.schedule_batch import NextBatchPlan, Req, ScheduleBatch
 
+from sglang_omni.models.minimax_music3.serial_offload import get_coordinator
 from sglang_omni.models.minimax_music3.sglang_request_builder import (
     MiniMaxMusic3SGLangRequestData,
     cfg_uncond_rid,
@@ -14,8 +15,6 @@ from sglang_omni.models.minimax_music3.sglang_request_builder import (
 )
 from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.omni_scheduler import OmniScheduler
-
-from .serial_offload import get_coordinator
 
 
 class MiniMaxMusic3Scheduler(OmniScheduler["MiniMaxMusic3SGLangRequestData"]):
@@ -87,6 +86,8 @@ class MiniMaxMusic3Scheduler(OmniScheduler["MiniMaxMusic3SGLangRequestData"]):
         """How many leading queue entries the adder may see, always whole pairs."""
         if not get_coordinator().ar_can_admit():
             return 0
+        else:
+            pass
         allocatable = int(self.get_num_allocatable_reqs(len(running_batch.reqs)))
         limit = min(len(queue), max(0, allocatable))
         limit -= limit % 2

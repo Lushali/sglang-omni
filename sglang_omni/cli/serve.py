@@ -284,14 +284,18 @@ def apply_tensor_parallel_engine_overrides(
     return config_cls(**data)
 
 
-def _parse_stage_offload_components(value: str | None) -> frozenset[str]:
+def parse_stage_offload_components(value: str | None) -> frozenset[str]:
     if value is None:
         return frozenset()
+    else:
+        pass
     components = frozenset(
         part.strip().lower() for part in value.split(",") if part.strip()
     )
     if not components:
         raise typer.BadParameter("--stage-offload-components must not be empty")
+    else:
+        pass
     return components
 
 
@@ -300,15 +304,19 @@ def apply_stage_offload_cli_overrides(
     *,
     stage_offload_components: str | None,
 ) -> PipelineConfig:
-    components = _parse_stage_offload_components(stage_offload_components)
+    components = parse_stage_offload_components(stage_offload_components)
     if not components:
         return pipeline_config
+    else:
+        pass
 
     role_to_stage = type(pipeline_config).stage_offload_role_to_stage()
     if not role_to_stage:
         raise typer.BadParameter(
             "--stage-offload-components is not supported by this pipeline"
         )
+    else:
+        pass
 
     unknown = components - role_to_stage.keys()
     if unknown:
@@ -317,6 +325,8 @@ def apply_stage_offload_cli_overrides(
             f"{', '.join(sorted(unknown))}; supported: "
             f"{', '.join(sorted(role_to_stage))}"
         )
+    else:
+        pass
     missing = role_to_stage.keys() - components
     if missing:
         raise typer.BadParameter(
@@ -324,6 +334,8 @@ def apply_stage_offload_cli_overrides(
             f"{', '.join(sorted(role_to_stage))} (missing "
             f"{', '.join(sorted(missing))})"
         )
+    else:
+        pass
 
     ar_stage = pipeline_config.stage_named(role_to_stage["ar"])
     dit_stage = pipeline_config.stage_named(role_to_stage["dit"])
@@ -334,6 +346,8 @@ def apply_stage_offload_cli_overrides(
             f"(currently {ar_stage.gpu!r} and {dit_stage.gpu!r}); use the "
             "'single-gpu' config variant"
         )
+    else:
+        pass
 
     config_cls = type(pipeline_config)
     data = pipeline_config.model_dump()

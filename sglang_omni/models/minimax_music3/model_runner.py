@@ -14,13 +14,13 @@ import torch
 
 from sglang_omni.model_runner.base import ModelRunner
 from sglang_omni.model_runner.model_worker import ModelWorker
+from sglang_omni.models.minimax_music3.serial_offload import get_coordinator
 from sglang_omni.sampling.seed import derive_sampling_seed
 from sglang_omni.scheduling.types import SchedulerRequest
 
 from .chunking import ChunkWindow, chunk_windows
 from .constants import AR_CHUNK_FRAMES, AR_CHUNK_HOP_FRAMES
 from .rvq_decoder import sample_topk_seeded
-from .serial_offload import get_coordinator
 from .sglang_model import apply_cfg, depth_decode, embed_audio_frames, select_c0_logits
 
 if TYPE_CHECKING:

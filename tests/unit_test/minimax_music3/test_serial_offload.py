@@ -14,7 +14,7 @@ from sglang_omni.models.minimax_music3.serial_offload import (
 )
 
 
-def _registered() -> SerialOffloadCoordinator:
+def registered_coordinator() -> SerialOffloadCoordinator:
     coordinator = SerialOffloadCoordinator()
     coordinator.register_ar(torch.nn.Linear(2, 2), torch.device("cpu"))
     return coordinator
@@ -35,14 +35,14 @@ def test_disabled_coordinator_never_blocks_admission_and_handoffs_are_noops() ->
 
 
 def test_register_ar_enables_the_coordinator_and_starts_ar_active() -> None:
-    coordinator = _registered()
+    coordinator = registered_coordinator()
 
     assert coordinator.enabled is True
     assert coordinator.ar_can_admit() is True
 
 
 def test_begin_dit_handoff_moves_ar_off_the_gpu_and_blocks_admission() -> None:
-    coordinator = _registered()
+    coordinator = registered_coordinator()
 
     coordinator.begin_dit_handoff("req-1")
 
@@ -50,7 +50,7 @@ def test_begin_dit_handoff_moves_ar_off_the_gpu_and_blocks_admission() -> None:
 
 
 def test_end_dit_handoff_restores_ar_and_reopens_admission() -> None:
-    coordinator = _registered()
+    coordinator = registered_coordinator()
     coordinator.begin_dit_handoff("req-1")
 
     coordinator.end_dit_handoff("req-1")
@@ -59,7 +59,7 @@ def test_end_dit_handoff_restores_ar_and_reopens_admission() -> None:
 
 
 def test_handoff_calls_are_idempotent() -> None:
-    coordinator = _registered()
+    coordinator = registered_coordinator()
 
     coordinator.begin_dit_handoff("req-1")
     coordinator.begin_dit_handoff("req-1")
@@ -72,7 +72,7 @@ def test_handoff_calls_are_idempotent() -> None:
 
 def test_ar_stays_parked_until_every_outstanding_request_retires() -> None:
     """The wake is driven by the outstanding set, not by the last event."""
-    coordinator = _registered()
+    coordinator = registered_coordinator()
     coordinator.begin_dit_handoff("req-1")
     coordinator.begin_dit_handoff("req-2")
 
@@ -84,7 +84,7 @@ def test_ar_stays_parked_until_every_outstanding_request_retires() -> None:
 
 
 def test_end_for_a_request_that_never_handed_off_does_not_wake_ar() -> None:
-    coordinator = _registered()
+    coordinator = registered_coordinator()
     coordinator.begin_dit_handoff("req-1")
 
     coordinator.end_dit_handoff("req-unknown")
@@ -95,10 +95,9 @@ def test_end_for_a_request_that_never_handed_off_does_not_wake_ar() -> None:
 def test_a_stalled_handoff_is_reported_once_and_never_force_woken(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    coordinator = _registered()
+    coordinator = registered_coordinator()
     coordinator.begin_dit_handoff("req-1")
-    # Backdate the pause past the reporting threshold.
-    coordinator._paused_at -= STALL_REPORT_SECONDS + 1.0
+    coordinator.paused_at_seconds -= STALL_REPORT_SECONDS + 1.0
 
     with caplog.at_level("ERROR"):
         assert coordinator.ar_can_admit() is False
@@ -112,7 +111,7 @@ def test_a_stalled_handoff_is_reported_once_and_never_force_woken(
 def test_handoff_without_registration_raises_if_force_enabled() -> None:
     """Defensive guard for a caller that enables without registering."""
     coordinator = SerialOffloadCoordinator()
-    coordinator._enabled = True
+    coordinator.is_enabled = True
 
     with pytest.raises(RuntimeError, match="never registered"):
         coordinator.begin_dit_handoff("req-1")
@@ -139,11 +138,11 @@ def test_residency_reuses_one_host_copy_instead_of_recopying_each_sleep() -> Non
     residency = StageResidency({"module": module}, torch.device("cpu"))
 
     residency.sleep()
-    snapshot = residency._host[("module", "weight")]
+    snapshot = residency.host_weights[("module", "weight")]
     residency.wake()
     residency.sleep()
 
-    assert residency._host[("module", "weight")] is snapshot
+    assert residency.host_weights[("module", "weight")] is snapshot
 
 
 def test_a_host_built_module_is_asleep_and_never_snapshots_from_the_gpu() -> None:
@@ -151,8 +150,11 @@ def test_a_host_built_module_is_asleep_and_never_snapshots_from_the_gpu() -> Non
     residency = StageResidency({"module": module}, torch.device("cpu"), resident=False)
 
     assert residency.resident is False
-    assert residency._host[("module", "weight")] is not module.weight
-    assert residency._host[("module", "weight")].data_ptr() == module.weight.data_ptr()
+    assert residency.host_weights[("module", "weight")] is not module.weight
+    assert (
+        residency.host_weights[("module", "weight")].data_ptr()
+        == module.weight.data_ptr()
+    )
 
     residency.wake()
     assert residency.resident is True
@@ -194,7 +196,7 @@ def test_host_built_residency_keeps_canonical_copy_on_cpu() -> None:
     model = torch.nn.Linear(4, 4)
     expected = model.weight.detach().clone()
     residency = StageResidency({"module": model}, device, resident=False)
-    host_weight = residency._host[("module", "weight")]
+    host_weight = residency.host_weights[("module", "weight")]
 
     residency.wake()
     assert model.weight.device == device
