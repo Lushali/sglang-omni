@@ -1,13 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
 """Gather window of batched session hooks: an idle stage waits briefly for more appends."""
 
+import asyncio
 import queue
 import time
 
 import pytest
 
+from sglang_omni.proto import StagePayload
 from sglang_omni.scheduling.message import IncomingMessage
-from sglang_omni.scheduling.session import SessionScheduler
+from sglang_omni.scheduling.session import SessionAppend, SessionScheduler
 from tests.unit_test.scheduling.test_session_batch import (
     RecordingHooks,
     SequentialHooks,
@@ -16,6 +18,7 @@ from tests.unit_test.scheduling.test_session_batch import (
 )
 
 WINDOW_SECONDS = 0.03
+HOOK_SECONDS = 0.01
 
 
 class WindowHooks(RecordingHooks):
@@ -25,9 +28,9 @@ class WindowHooks(RecordingHooks):
 class ScriptedInbox:
     """Inbox whose messages arrive at scripted times on a clock the test advances."""
 
-    def __init__(self, arrivals: list[tuple[float, IncomingMessage]]) -> None:
+    def __init__(self) -> None:
         self.now_seconds = 0.0
-        self.arrivals = arrivals
+        self.arrivals: list[tuple[float, IncomingMessage]] = []
         self.timeouts: list[float] = []
 
     def get(self, timeout: float) -> IncomingMessage:
@@ -40,23 +43,35 @@ class ScriptedInbox:
             raise queue.Empty
 
     def get_nowait(self) -> IncomingMessage:
-        if self.arrivals and self.arrivals[0][0] <= self.now_seconds:
-            return self.arrivals.pop(0)[1]
-        else:
+        if self.empty():
             raise queue.Empty
+        else:
+            return self.arrivals.pop(0)[1]
 
     def empty(self) -> bool:
-        return not self.arrivals
+        return not self.arrivals or self.arrivals[0][0] > self.now_seconds
 
 
-def run_batches(
+class TimedWindowHooks(WindowHooks):
+    """Each batched call takes HOOK_SECONDS on the scripted clock."""
+
+    def __init__(self, inbox: ScriptedInbox) -> None:
+        super().__init__()
+        self.inbox = inbox
+
+    def append_batch(self, appends: list[SessionAppend]) -> list[StagePayload]:
+        self.inbox.now_seconds += HOOK_SECONDS
+        return super().append_batch(appends)
+
+
+def script_arrivals(
     monkeypatch: pytest.MonkeyPatch,
     scheduler: SessionScheduler,
+    inbox: ScriptedInbox,
     session_ids: str,
     arrivals: list[tuple[str, float]],
-) -> list[list[str]]:
-    """Open the sessions, then collect and run batches until every scripted arrival ran."""
-    scripted: list[tuple[float, IncomingMessage]] = []
+) -> None:
+    """Open the sessions, then make the scripted arrivals the scheduler's inbox and clock."""
     for queued in opens(*session_ids):
         scheduler.register_operation(queued)
         scheduler.compute(queued.data)
@@ -67,15 +82,34 @@ def run_batches(
         else:
             queued = message(request_id, "append", request_id[0])
         scheduler.register_operation(queued)
-        scripted.append((seconds, queued))
-    scheduler.inbox = inbox = ScriptedInbox(scripted)
+        inbox.arrivals.append((seconds, queued))
+    scheduler.inbox = inbox
     monkeypatch.setattr(time, "monotonic", lambda: inbox.now_seconds)
+
+
+def run_next_batch(scheduler: SessionScheduler, inbox: ScriptedInbox) -> list[str]:
+    """Move the clock to the next arrival, then collect a batch and run it through run_batch."""
+    inbox.now_seconds = max(inbox.now_seconds, inbox.arrivals[0][0])
+    batch = scheduler.collect_batch(inbox.get_nowait())
+    loop = asyncio.new_event_loop()
+    try:
+        scheduler.run_batch(batch, loop)
+    finally:
+        loop.close()
+    return [queued.request_id for queued in batch]
+
+
+def run_batches(
+    monkeypatch: pytest.MonkeyPatch,
+    scheduler: SessionScheduler,
+    session_ids: str,
+    arrivals: list[tuple[str, float]],
+) -> list[list[str]]:
+    inbox = ScriptedInbox()
+    script_arrivals(monkeypatch, scheduler, inbox, session_ids, arrivals)
     batches: list[list[str]] = []
-    while not inbox.empty():
-        inbox.now_seconds = max(inbox.now_seconds, inbox.arrivals[0][0])
-        batch = scheduler.collect_batch(inbox.get_nowait())
-        scheduler.compute_batch([queued.data for queued in batch])
-        batches.append([queued.request_id for queued in batch])
+    while inbox.arrivals:
+        batches.append(run_next_batch(scheduler, inbox))
     return batches
 
 
@@ -108,10 +142,21 @@ def test_idle_stage_gathers_appends_within_the_window(
     assert len(scheduler.inbox.timeouts) == waits
 
 
-def test_backlogged_stage_never_waits(monkeypatch):
-    scheduler = SessionScheduler(WindowHooks())
-    scheduler.is_backlogged = True
-    arrivals = [("a0", 0), ("b0", 0), ("c0", 0.005)]
-    batches = run_batches(monkeypatch, scheduler, "abc", arrivals)
-    assert batches == [["a0", "b0"], ["c0"]]
-    assert scheduler.inbox.timeouts == []
+def test_work_arriving_during_a_hook_skips_the_next_wait_until_the_queue_drains(
+    monkeypatch,
+):
+    inbox = ScriptedInbox()
+    scheduler = SessionScheduler(TimedWindowHooks(inbox))
+    arrivals = [("a0", 0), ("b0", WINDOW_SECONDS + HOOK_SECONDS / 2), ("c0", 0.1)]
+    script_arrivals(monkeypatch, scheduler, inbox, "abc", arrivals)
+
+    assert run_next_batch(scheduler, inbox) == ["a0"]
+    assert scheduler.is_backlogged
+    assert len(inbox.timeouts) == 1
+
+    assert run_next_batch(scheduler, inbox) == ["b0"]
+    assert not scheduler.is_backlogged
+    assert len(inbox.timeouts) == 1
+
+    assert run_next_batch(scheduler, inbox) == ["c0"]
+    assert len(inbox.timeouts) == 2

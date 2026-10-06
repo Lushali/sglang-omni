@@ -122,10 +122,9 @@ replaces the concurrent workers. When fewer sessions are ready than open, an
 idle stage waits up to `gather_window_ms` for more appends; each stage derives
 that window from its own per-call floor, and 0 runs with what is ready.
 
-If a session's append fails, the stage ends that session and the other
-sessions continue. Each session has a state budget,
-`max_state_bytes_per_session`, checked after every append; a session over it
-is ended the same way.
+A session whose state exceeds `max_state_bytes_per_session` after an append
+is ended alone. An exception raised by `append_batch` ends every session in
+that call. Sessions outside the failed call continue.
 
 #### Code2WavScheduler
 
