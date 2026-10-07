@@ -4,9 +4,11 @@
     python check_model_golden.py --runtime-bin DIR --data-root DIR --golden FILE [--write]
 
 The golden file names the parity tool (whisper_transcribe, ...), its request
-flags, and the language each clip language is sent with (a user with that main
-language). Every corpus clip is transcribed, one tool run per language sent,
-and each clip's text, language, token count and finish reason must equal the
+flags, the language each clip language is sent with (a user with that main
+language), and optionally the flags Voxt adds for clips past some duration.
+A flag given as {"model": repo} is that provisioned model's directory. Every
+corpus clip is transcribed, one tool run per language sent and length, and
+each clip's text, language, token count and finish reason must equal the
 golden file. Word, character and mixed error rates are reported next to the
 original Voxt backend's (Swift on MLX Audio) as a summary; they do not gate.
 --write regenerates the golden clips and metrics from the current runtime.
@@ -30,6 +32,29 @@ class ClipResult(TypedDict):
     language: str | None
     generated_token_count: int
     finish_reason: str
+
+
+class ModelReference(TypedDict):
+    model: str
+
+
+RequestValue = str | int | float | ModelReference
+
+
+def model_directory(data_root: Path, repo: str) -> Path:
+    return data_root / "models" / repo.replace("/", "_")
+
+
+def request_flags(data_root: Path, request: dict[str, RequestValue]) -> list[str]:
+    flags = []
+    for field, value in request.items():
+        argument = (
+            model_directory(data_root, value["model"])
+            if isinstance(value, dict)
+            else value
+        )
+        flags += [f"--{field.replace('_', '-')}", str(argument)]
+    return flags
 
 
 def transcribe(
@@ -67,22 +92,26 @@ def main() -> None:
             (CI_DIRECTORY / "corpus" / "manifest.jsonl").read_text().splitlines(),
         )
     }
-    model_directory = arguments.data_root / "models" / golden["model"].replace("/", "_")
     command = [
         str(arguments.runtime_bin / golden["tool"]),
         "--model-path",
-        str(model_directory),
-    ]
-    for flag, value in golden["request"].items():
-        command += [f"--{flag.replace('_', '-')}", str(value)]
-    clips_by_request_language: dict[str | None, list[Path]] = {}
+        str(model_directory(arguments.data_root, golden["model"])),
+    ] + request_flags(arguments.data_root, golden["request"])
+    long_audio = golden.get("long_audio")
+    clip_groups: dict[tuple[str | None, bool], list[Path]] = {}
     for clip_id, clip in manifest.items():
-        clips_by_request_language.setdefault(
-            golden["language_by_clip_language"][clip["lang"]], []
+        is_long = (
+            long_audio is not None and clip["duration"] > long_audio["over_seconds"]
+        )
+        clip_groups.setdefault(
+            (golden["language_by_clip_language"][clip["lang"]], is_long), []
         ).append(arguments.data_root / "corpus" / "v1" / "clips" / f"{clip_id}.wav")
     results: dict[str, ClipResult] = {}
-    for language, clips in clips_by_request_language.items():
-        results.update(transcribe(command, clips, language))
+    for (language, is_long), clips in clip_groups.items():
+        long_flags = (
+            request_flags(arguments.data_root, long_audio["request"]) if is_long else []
+        )
+        results.update(transcribe(command + long_flags, clips, language))
     results = {clip_id: results[clip_id] for clip_id in manifest}
     metrics = quality(
         manifest, {clip_id: row["text"] for clip_id, row in results.items()}
