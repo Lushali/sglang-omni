@@ -54,6 +54,9 @@ SileroVad::SileroVad(const std::filesystem::path &model_directory) {
       }
     }
   }
+  if (weights_.empty()) {
+    throw std::runtime_error("Silero VAD checkpoint has no weights");
+  }
   std::vector<mx::array> parameters;
   for (const auto &[name, array] : weights_)
     parameters.push_back(array);
