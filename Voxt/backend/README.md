@@ -8,6 +8,7 @@ starts and owns the selected server. Other models keep their Swift backend.
 | --- | --- | --- |
 | `mlx-community/Qwen3-ASR-0.6B-4bit` | `qwen3_asr_server` | Final with context bias and language hint, Swift's audio layout and stop rules, 1200 s energy-cut chunks sharing one token budget, first detected language carried forward; live preview over the realtime socket, first decode after 100 ms of audio, then once a second |
 | `mlx-community/whisper-large-v3-turbo` | `whisper_server` | Final and batch preview with Voxt's language, token budget, temperature, and 30 s audio windows |
+| `beshkenadze/cohere-transcribe-03-2026-mlx-fp16` | `cohere_transcribe_server` | Final with Voxt's language, punctuation, and token budget; long recordings use Silero VAD when voice-activity segmentation is selected; live text uses batch preview |
 
 ## Build and run
 
@@ -21,7 +22,8 @@ Voxt/backend/run_omni_dev.sh run
 `build` builds the runtime into `Voxt/build/omni-runtime` with
 `sglang_omni_mlx/native/scripts/build_runtime.sh`, then builds "Voxt Omni Dev".
 `bin/` holds `qwen3_asr_server`, `qwen3_asr_transcribe`, `whisper_server`,
-`whisper_transcribe`, and the pinned MLX library and Metal kernels next to them.
+`whisper_transcribe`, `cohere_transcribe_server`, `cohere_transcribe`, and the
+pinned MLX library and Metal kernels next to them.
 
 "Voxt Omni Dev" has its own bundle identifier. It runs without the sandbox so it
 can start the runtime, and it sees `~/.voxt-omni-dev` as its home, so its
@@ -59,6 +61,7 @@ that dies is replaced on the next use.
   - `check_golden.py` runs the runtime over the 392-clip corpus with Voxt's Final request and requires every clip to match the golden output. It reports error rates next to the original Swift backend's.
 - The `Voxt Mac CI` workflow runs these on the repository's Apple Silicon runner, together with the server API tests and Voxt's Omni unit tests.
 - The Whisper check pins its checkpoint and tokenizer, compares all 392 frozen clips with its native golden, and tests the transcription server. Its Swift baseline and performance comparison must be recorded separately before release.
+- The Cohere check pins its checkpoint and Silero VAD v6, compares the same frozen corpus with its native golden, and tests the server. Its Swift baseline and performance comparison must be recorded separately before release.
 - Voxt's opt-in suites need the installed model and `VOXT_RUN_MODEL_TESTS=1`:
   - `OmniPhase1LifecycleTests`:
     - load/Final/unload rounds that must leave no process behind;
@@ -77,6 +80,7 @@ the `.xctestrun` file.
 
 - Greedy decoding only.
 - Whisper uses batch preview; its server has no realtime socket.
+- Cohere uses batch preview until a native streaming session is implemented.
 - The dev build is ad hoc signed without keychain access groups, so remote
   provider API keys may not persist in it.
 - The server accepts requests from any local client on its loopback port; it
