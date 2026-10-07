@@ -97,7 +97,8 @@ target_link_libraries(asr_service PUBLIC qwen3_asr civetweb-c-library)
 target_compile_options(asr_service PRIVATE -Wall -Wextra)
 add_library(swift_port STATIC src/swift_port.cpp)
 target_link_libraries(swift_port PUBLIC mlx)
-add_library(whisper_asr STATIC src/whisper_model.cpp src/whisper_transcriber.cpp)
+add_library(whisper_asr STATIC src/whisper_model.cpp src/whisper_transcriber.cpp
+  src/npz.cpp)
 target_link_libraries(whisper_asr PUBLIC qwen3_asr swift_port)
 # CPU float math rounds each operation, as Swift does: no fused multiply-add.
 target_compile_options(swift_port PRIVATE -Wall -Wextra -ffp-contract=off)
