@@ -189,7 +189,8 @@ extension MLXTranscriber {
         runtime: OmniASRRuntime,
         audioSamples: [Float],
         inferenceConfiguration: ResolvedInferenceConfiguration,
-        targetSampleRate: Int
+        targetSampleRate: Int,
+        speechSegments: OmniSpeechSegments?
     ) async throws -> MLXDetachedInferenceResult {
         try Task.checkCancellation()
         let parameters = inferenceConfiguration.generationParameters
@@ -213,12 +214,24 @@ extension MLXTranscriber {
                 maxNewTokens: parameters.maxTokens,
                 temperature: parameters.temperature
             )).text
+        case .cohereTranscribe:
+            text = try await runtime.transcribe(OmniASRRuntime.cohereFinalRequest(
+                samples: audioSamples,
+                sampleRate: targetSampleRate,
+                language: inferenceConfiguration.languageHint,
+                usePunctuation: parameters.usePunctuation,
+                maxNewTokens: parameters.maxTokens,
+                temperature: parameters.temperature,
+                chunkDuration: parameters.chunkDuration,
+                minChunkDuration: parameters.minChunkDuration,
+                speechSegments: speechSegments
+            )).text
         }
         // Chunk and window segments have chunk timing, which Voxt discards.
         return MLXDetachedInferenceResult(rawText: text, senseVoiceMetadata: nil, structuredSegments: [])
     }
 
-    private nonisolated static func longFormSpeechSegmentConfig(
+    nonisolated static func longFormSpeechSegmentConfig(
         chunkMaximumDurationSeconds: Double,
         vadThreshold: Float,
         vadMinSpeechDurationMs: Int,

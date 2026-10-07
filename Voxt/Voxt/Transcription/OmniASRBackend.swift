@@ -26,6 +26,7 @@ nonisolated enum OmniASRBackend {
     static let modelKindsByRepo: [String: OmniASRModelKind] = [
         "mlx-community/Qwen3-ASR-0.6B-4bit": .qwen3ASR,
         "mlx-community/whisper-large-v3-turbo": .whisper,
+        "beshkenadze/cohere-transcribe-03-2026-mlx-fp16": .cohereTranscribe,
     ]
 
     static let launchSettings: LaunchSettings? = LaunchSettings(environment: ProcessInfo.processInfo.environment)
@@ -54,7 +55,7 @@ nonisolated enum OmniASRBackend {
         switch kind {
         case .qwen3ASR:
             return qwenRuntime
-        case .whisper:
+        case .whisper, .cohereTranscribe:
             return qwenRuntime.deletingLastPathComponent().appendingPathComponent("\(kind.rawValue)_server")
         }
     }
