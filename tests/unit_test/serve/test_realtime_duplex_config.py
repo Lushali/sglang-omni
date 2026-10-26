@@ -310,21 +310,23 @@ def test_direct_deployment_exposes_pipeline_timeouts(
     ) == expected_timeouts
 
 
-@pytest.mark.parametrize("has_pipeline_config", [False, True])
+@pytest.mark.parametrize(
+    ("pipeline_timeouts", "expected_timeouts"),
+    [
+        ({}, (60, 300)),
+        (
+            {"realtime_session_update_timeout_s": 11, "realtime_idle_timeout_s": 47},
+            (11, 47),
+        ),
+    ],
+)
 def test_direct_voicechat_keeps_session_cleanup_limit(
-    has_pipeline_config: bool,
+    pipeline_timeouts: dict[str, float], expected_timeouts: tuple[float, float]
 ) -> None:
     """Applying pipeline timeouts must preserve VoiceChat's session cleanup policy."""
-    if has_pipeline_config:
-        pipeline_config = NemotronVoiceChatDuplexPipelineConfig(
-            model_path="unused",
-            realtime_session_update_timeout_s=11,
-            realtime_idle_timeout_s=47,
-        )
-        expected_timeouts = (11, 47)
-    else:
-        pipeline_config = None
-        expected_timeouts = (60, 300)
+    pipeline_config = NemotronVoiceChatDuplexPipelineConfig(
+        model_path="unused", **pipeline_timeouts
+    )
     client = MagicMock(spec=Client)
     client.health.return_value = {"running": True}
     deployment = voicechat_deployment(
