@@ -106,8 +106,8 @@ def talker_config(source: Path) -> dict:
 
 class VoiceChatEngineBuilder(TtsEngineBuilder[SGLangARRequestData]):
     scheduler_class: type
-    # note: thinker decode graphs flip greedy text where bf16 logits tie, so
-    # only the talker captures by default, and only on CUDA where it was
+    # note (Lushali): thinker decode graphs flip greedy text where bf16 logits
+    # tie, so only the talker captures by default, and only on CUDA where it was
     # validated; engine.disable_cuda_graph overrides either way.
     disable_cuda_graph = True
 

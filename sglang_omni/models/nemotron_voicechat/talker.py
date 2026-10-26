@@ -271,8 +271,8 @@ class NemotronVoiceChatTalker(nn.Module):
     def forward(self, input_ids, positions, forward_batch, input_embeds=None, **_):
         if input_embeds is None:
             batch = input_ids.shape[0]
-            # note: with decode graphs this body runs only for capture and its
-            # warm-up, before before_decode fills the mask; replay skips it.
+            # note (Lushali): the check syncs with the host, which graph capture
+            # forbids, so it runs only when the talker decodes without graphs.
             if get_exec().graph.disable_cuda_graph:
                 assert bool(
                     self.fusion_mask[:batch].all()
