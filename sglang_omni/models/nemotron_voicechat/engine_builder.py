@@ -11,6 +11,7 @@ from sglang.kernels.ops.mamba.triton_ops import (
 )
 from transformers import AutoTokenizer
 
+from sglang_omni.models.nemotron_voicechat.duplex_config import CONTEXT_LENGTH
 from sglang_omni.models.nemotron_voicechat.hf_config import (
     VOICECHAT_MODEL_ARCH_OVERRIDE,
     NemotronVoiceChatConfig,
@@ -44,6 +45,7 @@ from sglang_omni.scheduling.engine_factory import (
 )
 from sglang_omni.scheduling.omni_scheduler import OmniScheduler
 from sglang_omni.scheduling.sglang_backend.request_data import SGLangARRequestData
+from sglang_omni.utils.gpu_compat import get_visible_gpu_sm_version
 
 TALKER_SPEAKER = "Aria"
 TALKER_PROMPT_FRAMES = 37
@@ -144,13 +146,16 @@ class VoiceChatEngineBuilder(TtsEngineBuilder[SGLangARRequestData]):
 
 class NemotronVoiceChatEngineBuilder(VoiceChatEngineBuilder):
     model_name = "nemotron-voicechat"
-    context_length = 8192
+    context_length = CONTEXT_LENGTH
     scheduler_class = OmniScheduler
 
-    def __init__(self, *, max_running_requests: int = 1) -> None:
+    def __init__(
+        self, *, max_running_requests: int = 1, system_prompt: str = SYSTEM_PROMPT
+    ) -> None:
         super().__init__(max_running_requests=max_running_requests)
         self.model_arch_override = VOICECHAT_MODEL_ARCH_OVERRIDE
         self.source: Path | None = None
+        self.system_prompt = system_prompt
 
     def resolve_checkpoint(self, model_path):
         source = Path(resolve_model_path(model_path))
@@ -184,7 +189,7 @@ class NemotronVoiceChatEngineBuilder(VoiceChatEngineBuilder):
         ident = tokenizer.convert_tokens_to_ids
         prompt = [
             ident(stt.get("bos_token", "<s>")),
-            *tokenizer.encode(SYSTEM_PROMPT, add_special_tokens=False),
+            *tokenizer.encode(self.system_prompt, add_special_tokens=False),
             ident(stt.get("eos_token", "</s>")),
         ]
         return prompt, ident(stt.get("pad_token", "<SPECIAL_12>"))
@@ -221,7 +226,7 @@ class NemotronVoiceChatEngineBuilder(VoiceChatEngineBuilder):
 
 class NemotronVoiceChatTalkerEngineBuilder(VoiceChatEngineBuilder):
     model_name = "nemotron-voicechat-talker"
-    context_length = 4096
+    context_length = CONTEXT_LENGTH
     scheduler_class = NemotronTalkerScheduler
     disable_cuda_graph = False
 
@@ -234,6 +239,14 @@ class NemotronVoiceChatTalkerEngineBuilder(VoiceChatEngineBuilder):
             self.context_length = int(context_length)
         else:
             pass
+
+    def generation_defaults(self, *, dtype: str) -> GenerationDefaults:
+        defaults = super().generation_defaults(dtype=dtype)
+        if current_platform.is_cuda() and get_visible_gpu_sm_version(self.gpu_id) != 90:
+            defaults["attention_backend"] = "triton"
+        else:
+            pass
+        return defaults
 
     def resolve_checkpoint(self, model_path):
         source = Path(resolve_model_path(model_path))
